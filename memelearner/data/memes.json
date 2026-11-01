@@ -1,0 +1,6 @@
+{
+ "_comment": "Memes learned by MemeLearnerBot (https://github.com/HHCreator/MemeLearnerBot). Change them with py -m memelearner accept, reject or forget; the format is in memelearner/store.py and the README.",
+ "version": 1,
+ "memes": {},
+ "rejected": {}
+}

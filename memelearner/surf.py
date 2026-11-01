@@ -5,6 +5,9 @@
     py surf.py --videos 3             # fewer videos per game: a quick test
     py surf.py --days 3               # "new" means the last 3 days instead of 7
     py surf.py --no-fetch             # don't visit Bilibili; list again from what was read
+    py surf.py --known G:\\SBtranslator\\sbtranslator\\data   # skip what another app knows
+
+(py surf.py is short for py -m memelearner learn; cli.py has the other commands.)
 
 It only reads, like a visitor who isn't logged in: it never posts, likes or replies, and it
 waits 5 to 7 seconds between requests (bilibili.py), since Bilibili stops answering a visitor
@@ -32,11 +35,12 @@ How it works:
                        English word (yyds).
     4. New or rising   Each phrase's share of the people writing in the last DAYS days is
                        compared with its share before that: nobody used it before = new, at
-                       least RISE times as common = rising. Phrases the translator already
-                       knows, and everyday ones in data/surf_common.txt, are left out.
+                       least RISE times as common = rising. Known phrases are left out
+                       (known_phrases()): the memes already learned or turned down, everyday
+                       ones in data/surf_common.txt, and another app's words if you say where.
     5. Save            The phrases, with example lines and the videos they came from, go to
-                       surf/candidates.json in the cache folder. Nothing is added to the
-                       translator's data files.
+                       surf/candidates.json in the cache folder. Nothing is learned until you
+                       accept a phrase (store.py), which adds it to data/memes.json.
 """
 
 import collections
@@ -49,19 +53,32 @@ import time
 import unicodedata
 import urllib.error
 
-from . import bilibili
-from .phrases import PARTICLES
-from .translator import CACHE_FILE, WORDS_FILE
+from . import bilibili, store
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCES_FILE = os.path.join(HERE, "data", "surf_sources.json")
 COMMON_FILE = os.path.join(HERE, "data", "surf_common.txt")
-SURF_DIR = os.path.join(os.path.dirname(CACHE_FILE), "surf")  # what was read; never committed
+WORDS_FILE = os.path.join(HERE, "data", "words", "common_english.txt")
+
+
+def _cache_dir():
+    """Where the bot keeps what it read (never committed): MEMELEARNER_HOME if it is set,
+    else .cache/ beside the code, or %LOCALAPPDATA%\\MemeLearnerBot when run as an exe."""
+    if os.environ.get("MEMELEARNER_HOME"):
+        return os.environ["MEMELEARNER_HOME"]
+    if getattr(sys, "frozen", False):
+        return os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"),
+                            "MemeLearnerBot")
+    return os.path.join(HERE, ".cache")
+
+
+SURF_DIR = os.path.join(_cache_dir(), "surf")
 VIDEOS_FILE = os.path.join(SURF_DIR, "videos.json")
 CANDIDATES_FILE = os.path.join(SURF_DIR, "candidates.json")
-# The translator's own tables: a phrase in any of them is already known, so it isn't news
-KNOWN_FILES = ["memes.json", "memes_learned.json", "memes_chat.json", "phrases.json",
-               "nicknames.json", "chat_meanings.json", "stupid_words.json", "players.txt"]
+# Other files whose phrases count as known, like another app's word tables: paths separated
+# by ; on Windows (: elsewhere), the same as --known
+KNOWN_ENV = "MEMELEARNER_KNOWN"
+PARTICLES = set("了呢吧啊吗的哦呀嘛")  # mood words that carry no meaning in a phrase
 
 DAYS = 7  # "new" means used in the last DAYS days; videos posted in that time are read
 VIDEOS_PER_GAME = 10  # the videos with the most danmu are read for each game
@@ -417,15 +434,16 @@ def freedom(neighbours):
     return bits
 
 
-def known_phrases():
-    """Everything in the translator's tables (the files in data/ and your own entries from
-    the overlay's ⚙ window) and in data/surf_common.txt, lowercase."""
-    from . import settings
+def read_phrases(paths):
+    """The phrases in some files, lowercase: a .json file's keys and values at any depth
+    (another app's word tables, like the translator's data/*.json and its settings.json), a
+    .txt file's lines (lines starting with # are notes). A folder means the .json and .txt
+    files right in it, not in its subfolders."""
     known = set()
 
     def add(value):
         if isinstance(value, str):
-            known.add(NOT_TEXT.sub("", unicodedata.normalize("NFKC", value).lower()))
+            known.add(store.normal(value))
         elif isinstance(value, dict):
             for key, item in value.items():
                 if not str(key).startswith("_"):
@@ -435,9 +453,15 @@ def known_phrases():
             for item in value:
                 add(item)
 
-    for name in KNOWN_FILES + [os.path.basename(COMMON_FILE)]:
-        path = os.path.join(HERE, "data", name)
-        if name.endswith(".json"):
+    files = []
+    for path in paths:
+        if os.path.isdir(path):
+            files += sorted(os.path.join(path, name) for name in os.listdir(path)
+                            if name.endswith((".json", ".txt")))
+        else:
+            files.append(path)
+    for path in files:
+        if path.endswith(".json"):
             add(_load_json(path, {}))
         else:
             try:
@@ -445,8 +469,18 @@ def known_phrases():
                     add([line.strip() for line in f if line.strip() and not line.startswith("#")])
             except OSError:
                 pass
-    for table in settings.TABLES:
-        add(settings.words(table))
+    known.discard("")
+    return known
+
+
+def known_phrases(extra=(), files=()):
+    """The phrases that aren't news, lowercase: everyday ones in data/surf_common.txt, the
+    memes already learned or turned down (data/memes.json), the phrases in the files listed
+    in MEMELEARNER_KNOWN and in files (as for read_phrases()), and extra, phrases another
+    app already knows."""
+    paths = [COMMON_FILE] + [p for p in os.environ.get(KNOWN_ENV, "").split(os.pathsep) if p]
+    known = read_phrases(paths + list(files)) | store.phrases()
+    known |= {store.normal(phrase) for phrase in extra}
     known.discard("")
     return known
 
@@ -590,7 +624,7 @@ def _pick_examples(by_video):
     return picked
 
 
-# -- command line -------------------------------------------------------------------------
+# -- a whole run --------------------------------------------------------------------------
 
 def save(candidates, summary, days):
     """Write surf/candidates.json: the phrases, their examples and the videos they're from."""
@@ -606,44 +640,24 @@ def save(candidates, summary, days):
     })
 
 
-def main():
-    """py surf.py [--games cs2 lol ...] [--videos N] [--days N] [--people N] [--no-fetch]"""
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")  # print Chinese in the Windows console
-    args = sys.argv[1:]
+def learn(games=None, days=DAYS, videos=VIDEOS_PER_GAME, people=MIN_PEOPLE, fetching=True,
+          known=(), known_files=()):
+    """Steps 1 to 5 for some games (all of surf_sources.json by default): read Bilibili
+    (unless fetching is False), find the new and rising phrases and save them. known and
+    known_files are more phrases to leave out (known_phrases()). Returns (candidates,
+    summary), like find_candidates(); raises ValueError for a game it doesn't know."""
     where = sources()
-    games, days, count, people, fetching = list(where), DAYS, VIDEOS_PER_GAME, MIN_PEOPLE, True
-    try:
-        while args:
-            option = args.pop(0)
-            if option == "--games":
-                games = []
-                while args and not args[0].startswith("--"):
-                    games.append(args.pop(0).lower())
-            elif option in ("--days", "--videos", "--people"):
-                value = int(args.pop(0))
-                if option == "--days":
-                    days = value
-                elif option == "--videos":
-                    count = value
-                else:
-                    people = value
-            elif option == "--no-fetch":
-                fetching = False
-            else:
-                raise ValueError(option)
-    except (ValueError, IndexError):
-        sys.exit(__doc__.split("It only reads")[0].strip())
+    games = list(where) if games is None else [game.lower() for game in games]
     unknown = [game for game in games if game not in where]
     if unknown or not games:
-        sys.exit(f"Unknown game {', '.join(unknown) or '(none given)'}; "
-                 f"data/surf_sources.json has: {', '.join(where)}")
+        raise ValueError(f"Unknown game {', '.join(unknown) or '(none given)'}; "
+                         f"data/surf_sources.json has: {', '.join(where)}")
 
     now = time.time()
     if fetching:
         print("Reading Bilibili (read only, a request every 5 to 7 seconds) ...")
         try:
-            fetch(games, where, days, count, now)
+            fetch(games, where, days, videos, now)
         except bilibili.Blocked as error:
             print(error)
             print("Listing phrases from what was read so far.")
@@ -655,25 +669,15 @@ def main():
 
     candidates, summary = find_candidates(
         ((game, bvid, message) for game, bvid, message in load_messages() if game in games),
-        days=days, now=now, min_people=people)
+        days=days, now=now, min_people=people, known=known_phrases(known, known_files))
     save(candidates, summary, days)
+    return candidates, summary
 
-    for game in games:
-        s = summary.get(game)
-        if not s:
-            print(f"{game}: nothing read yet")
-            continue
-        print(f"{game}: {s['videos']} videos, {s['recent']} lines from the last {days} days, "
-              f"{s['before']} from before" + ("" if s["baseline"] else
-                                              " (too few to compare with: all are a first look)"))
-    print(f"\n{len(candidates)} phrases are new or rising (used by at least {people} people "
-          f"in at least {MIN_VIDEOS} videos):")
-    for c in candidates:
-        how = c["status"] if c["status"] != "rising" else f"rising x{c['rise']}"
-        example = c["examples"][0]["text"] if c["examples"] else ""
-        print(f"  {c['game']:<9} {how:<12} {c['phrase']}  ({c['people']} people, "
-              f"{c['videos']} videos)  e.g. {example[:40]}")
-    print(f"\nSaved them with example lines to {CANDIDATES_FILE}")
+
+def main(argv=None):
+    """py surf.py [options]: short for py -m memelearner learn [options] (see cli.py)."""
+    from . import cli
+    cli.main(["learn"] + list(sys.argv[1:] if argv is None else argv))
 
 
 if __name__ == "__main__":

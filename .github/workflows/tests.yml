@@ -1,0 +1,31 @@
+# Runs the offline tests (they never visit Bilibili) on each push to main and each pull
+# request, on Windows like Hao's PC and on Linux. Then it installs the package the way
+# another app would and asks it for the learned memes from outside the source folder, so a
+# change that breaks the entry point shows up before it is merged.
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m unittest -v
+      - run: python -m pip install .
+      - run: python -m memelearner memes --json
+        working-directory: ${{ runner.temp }}

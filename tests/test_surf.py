@@ -13,7 +13,7 @@ import urllib.parse
 import zlib
 from unittest import mock
 
-from sbtranslator import bilibili, settings, surf
+from memelearner import bilibili, store, surf
 
 NOW = 1_800_000_000
 DAY = 86400
@@ -172,21 +172,40 @@ def message(who, text, sent, n=[0]):
     return {"id": f"d{n[0]}", "kind": "danmu", "who": who, "text": text, "sent": sent}
 
 
+def use_folder(test):
+    """A new empty folder for one test: no learned memes and no MEMELEARNER_KNOWN files
+    count as known, so the real ones don't change the results."""
+    folder = tempfile.TemporaryDirectory()
+    test.addCleanup(folder.cleanup)
+    for patcher in (mock.patch.object(store, "MEMES_FILE", os.path.join(folder.name, "memes.json")),
+                    mock.patch.dict(os.environ, {surf.KNOWN_ENV: ""})):
+        patcher.start()
+        test.addCleanup(patcher.stop)
+    return folder.name
+
+
 class PhraseTest(unittest.TestCase):
     def setUp(self):
-        # Entries from your own ⚙ window count as known phrases: test with none
-        folder = tempfile.TemporaryDirectory()
-        self.addCleanup(folder.cleanup)
-        self.addCleanup(settings.reload)  # runs last, after the real settings file is back
-        patcher = mock.patch.dict(os.environ, {
-            "SBTRANSLATOR_SETTINGS": os.path.join(folder.name, "settings.json")})
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        settings.reload()
+        self.folder = use_folder(self)
 
-    def test_your_own_entries_count_as_known(self):
-        settings.set_entry("memes", "g2", "鸡兔")
-        self.assertIn("鸡兔", surf.known_phrases())
+    def test_learned_turned_down_and_another_apps_phrases_count_as_known(self):
+        store.accept("绷不住了")
+        store.reject("下路")
+        tables = os.path.join(self.folder, "tables")
+        os.makedirs(os.path.join(tables, "opencc"))
+        with open(os.path.join(tables, "settings.json"), "w", encoding="utf-8") as f:
+            json.dump({"rarity": 1.2, "words": {"memes": {"g2": "鸡兔"}}}, f)  # the translator's
+        with open(os.path.join(tables, "players.txt"), "w", encoding="utf-8") as f:
+            f.write("# notes don't count\nZywoo\n")
+        with open(os.path.join(tables, "opencc", "phrases.txt"), "w", encoding="utf-8") as f:
+            f.write("繁體字\n")  # a subfolder isn't read
+        known = surf.known_phrases(["Ｇ２ 战队"], files=[tables])
+        for phrase in ["绷不住了", "下路", "鸡兔", "g2", "zywoo", "g2战队", "哈哈哈"]:
+            self.assertIn(phrase, known)
+        for phrase in ["繁體字", "notesdontcount", "12"]:  # 12: the rarity 1.2 is a number
+            self.assertNotIn(phrase, known)
+        with mock.patch.dict(os.environ, {surf.KNOWN_ENV: os.path.join(tables, "players.txt")}):
+            self.assertIn("zywoo", surf.known_phrases())
 
     def test_clean(self):
         self.assertEqual(surf.clean("回复 @某人 :绷不住了[doge]"), "绷不住了")
@@ -224,7 +243,8 @@ class PhraseTest(unittest.TestCase):
                 text = "nice 哈哈哈"  # an English word and an everyday danmu
             lines.append(("cs2", video, message(f"r{i}", text, recent)))
 
-        found, summary = surf.find_candidates(lines, days=7, now=NOW, min_before=50)
+        found, summary = surf.find_candidates(lines, days=7, now=NOW, min_before=50,
+                                              known=surf.known_phrases(["zywoo"]))
         by_phrase = {c["phrase"]: c for c in found}
         self.assertEqual(by_phrase["绷不住了"]["status"], "new")
         self.assertEqual(by_phrase["绷不住了"]["people"], 45)

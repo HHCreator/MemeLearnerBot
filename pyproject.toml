@@ -1,0 +1,24 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "memelearner"
+version = "0.1.0"
+description = "A bot that reads Bilibili for the newest gaming memes, and gives other apps the memes it learned"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.8"
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/HHCreator/MemeLearnerBot"
+
+[project.scripts]
+memelearner = "memelearner.cli:main"
+
+[tool.setuptools]
+packages = ["memelearner"]
+
+[tool.setuptools.package-data]
+memelearner = ["data/*.json", "data/*.txt", "data/*/*.txt", "data/*/*.md"]

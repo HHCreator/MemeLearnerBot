@@ -1,9 +1,10 @@
 """Command line entry point: py surf.py (the meme bot reads Bilibili for new memes).
 
-The code lives in the sbtranslator package; see sbtranslator/surf.py.
+The code lives in the memelearner package: py surf.py is short for py -m memelearner learn,
+and memelearner/cli.py has the other commands.
 """
 
-from sbtranslator.surf import main
+from memelearner.surf import main
 
 if __name__ == "__main__":
     main()
