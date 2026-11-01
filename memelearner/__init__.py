@@ -24,12 +24,12 @@ A meme is a dict:
      "examples": ["这下真的绷不住了"],    a few lines that used it
      "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"]}   videos those came from
 
-A candidate is a phrase the bot found new or rising, with its numbers and example lines
-(see surf.find_candidates()), and once judged, the local model's verdict and meaning
-("judge", see judging.judge()). Apps that aren't written in Python get the same through the
-command line with --json (cli.py), or read data/memes.json, which holds the learned memes
-(its format is in store.py). API_VERSION changes when a field changes meaning or goes away;
-a new field doesn't change it.
+A candidate is a short danmu that many people send on their own, with how new it is, its
+numbers, its variants and example lines (see surf.find_candidates()), and once judged, the
+local model's verdict and meaning ("judge", see judging.judge()). Apps that aren't written
+in Python get the same through the command line with --json (cli.py), or read
+data/memes.json, which holds the learned memes (its format is in store.py). API_VERSION
+changes when a field changes meaning or goes away; a new field doesn't change it.
 """
 
 import contextlib
@@ -39,8 +39,8 @@ from . import judging, store, surf
 from .judging import ModelUnavailable, watching
 from .store import find, forget, lookup, memes, reject
 
-__version__ = "0.1.0"
-API_VERSION = 1
+__version__ = "0.2.0"
+API_VERSION = 2  # 2: a candidate is a phrase people send on their own, new or not
 
 __all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "watching", "accept",
            "reject", "forget", "ModelUnavailable", "API_VERSION"]
@@ -62,7 +62,8 @@ def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.M
     stops the reading, not the call.
 
     games: some of cs2, lol, valorant, dota2 (all by default); videos: videos read per game;
-    days: how recent "new" is; people: different people who must use a phrase; fetch=False
+    days: how recent "new" is; people: different people who must send a phrase on its own
+    (in at least two videos); fetch=False
     finds phrases again in what was read before, without visiting Bilibili; known: phrases
     your app knows already, left out like the learned ones; judge: then have the local
     model judge them, as judge() does (raises ModelUnavailable when it can't be asked; the
@@ -75,28 +76,29 @@ def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.M
     return found
 
 
-def judge(games=None, model=None, look_up=True, again=False, quiet=False):
+def judge(games=None, model=None, again=False, quiet=False):
     """Have a local model (through Ollama) judge the last run's candidates: is each a meme,
-    a name or an everyday word, and what does a meme mean? Returns the candidates, each
-    with its verdict as "judge" (also saved for candidates()); see judging.py for how it
-    works and what a verdict holds. It takes a few seconds per candidate.
+    a name, a game word or an everyday word, and what does a meme mean? Returns the
+    candidates, each with its verdict as "judge" (also saved for candidates()); see
+    judging.py for how it works and what a verdict holds. It takes a few seconds per
+    candidate.
 
     games: only these games' candidates; model: an Ollama model (MEMELEARNER_MODEL, or
-    deepseek-r1:14b); look_up=False doesn't look the phrases up on the wikis; again=True
-    judges again what was judged before. Raises ModelUnavailable when Ollama isn't running
-    or doesn't have the model; the verdicts given until then are kept. quiet: print nothing.
+    deepseek-r1:14b); again=True judges again what was judged before. Raises
+    ModelUnavailable when Ollama isn't running or doesn't have the model; the verdicts given
+    until then are kept. quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
-        return judging.judge(games, model or judging.MODEL, look_up, again)
+        return judging.judge(games, model or judging.MODEL, again)
 
 
 def accept(phrase, meaning="", english="", game=None):
     """Learn a phrase as a meme, usually one of candidates(), and return the meme.
 
     When the phrase was a candidate in the last run, its games, example lines and videos
-    come from there, and when the judge found it a meme, so do its meaning and English
-    gloss, unless you give them. Accepting it again updates it: a meaning or English gloss
-    given replaces the old one.
+    come from there, and when the judge found it a meme (tested or not), so do its meaning
+    and English gloss, unless you give them. Accepting it again updates it: a meaning or
+    English gloss given replaces the old one.
     """
     key = store.normal(phrase)
     last = surf._load_json(surf.CANDIDATES_FILE, {})

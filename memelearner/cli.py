@@ -1,6 +1,6 @@
 """The command line: py -m memelearner COMMAND, or memelearner COMMAND once pip-installed.
 
-    py -m memelearner learn                    read Bilibili, then list new and rising phrases
+    py -m memelearner learn                    read Bilibili, then list the phrases people send
     py -m memelearner judge                    a local model tells memes from names
     py -m memelearner candidates               what the last run found, to look through
     py -m memelearner watching                 what the model wasn't sure of yet
@@ -38,21 +38,23 @@ def _show_meme(meme):
 
 def _show_candidate(c):
     how = c["status"] if c["status"] != "rising" else f"rising x{c['rise']}"
+    alone = f", {round(c['alone'] * 100)}% on its own" if c.get("alone") is not None else ""
+    also = "".join(f", also {v['phrase']}" for v in (c.get("variants") or [])[:2])
     example = c["examples"][0]["text"] if c["examples"] else ""
     verdict = c.get("judge") or {}
     said = {"meme": f"  -> a meme: {verdict.get('meaning', '')}",
-            "not a meme": "  -> not a meme: " + (
-                "a name" if verdict.get("kind") == "name" else "an everyday word"),
+            "untested": f"  -> a meme, meaning not tested: {verdict.get('meaning', '')}",
+            "not a meme": "  -> not a meme: " + judging.NOT_MEMES.get(verdict.get("kind"), "?"),
             "watching": "  -> watching"}.get(verdict.get("verdict"), "")
-    print(f"  {c['game']:<9} {how:<12} {c['phrase']}  ({c['people']} people, "
-          f"{c['videos']} videos)  e.g. {example[:40]}{said}")
+    print(f"  {c['game']:<9} {how:<12} {c['phrase']}  ({c['people']} people{alone}, "
+          f"{c['videos']} videos{also})  e.g. {example[:40]}{said}")
 
 
-def _judge(games, model=judging.MODEL, look_up=True, again=False):
+def _judge(games, model=judging.MODEL, again=False):
     """Judge the last run's candidates and say what to do next; False when the model
     couldn't be asked."""
     try:
-        judging.judge(games, model, look_up, again)
+        judging.judge(games, model, again)
     except ModelUnavailable as error:
         print(f"Couldn't ask the local model: {error}.")
         return False
@@ -78,7 +80,7 @@ def _learn(args):
         print(f"{game}: {s['videos']} videos, {s['recent']} lines from the last {args.days} "
               f"days, {s['before']} from before" + (
                   "" if s["baseline"] else " (too few to compare with: all are a first look)"))
-    print(f"\n{len(found)} phrases are new or rising (used by at least {args.people} people "
+    print(f"\n{len(found)} phrases people send on their own (at least {args.people} people, "
           f"in at least {surf.MIN_VIDEOS} videos):")
     for c in found:
         _show_candidate(c)
@@ -93,7 +95,7 @@ def _learn(args):
 
 
 def _judge_command(args):
-    if not _judge(args.games, args.model, not args.no_lookup, args.again):
+    if not _judge(args.games, args.model, args.again):
         sys.exit(1)
 
 
@@ -175,7 +177,8 @@ def parser():
         "Bilibili, and gives other programs the memes it learned.")
     sub = commands.add_subparsers(dest="command", required=True, metavar="COMMAND")
 
-    learn = sub.add_parser("learn", help="read Bilibili, then list the new and rising phrases")
+    learn = sub.add_parser("learn", help="read Bilibili, then list the phrases people send on "
+                           "their own")
     learn.add_argument("--games", nargs="+", metavar="GAME",
                        help="only these games (cs2, lol, valorant, dota2); all by default")
     learn.add_argument("--videos", type=int, default=surf.VIDEOS_PER_GAME, metavar="N",
@@ -183,7 +186,8 @@ def parser():
     learn.add_argument("--days", type=int, default=surf.DAYS, metavar="N",
                        help='"new" means the last N days (default %(default)s)')
     learn.add_argument("--people", type=int, default=surf.MIN_PEOPLE, metavar="N",
-                       help="different people who must use a phrase (default %(default)s)")
+                       help="different people who must send a phrase on its own (default "
+                       "%(default)s)")
     learn.add_argument("--no-fetch", action="store_true",
                        help="don't visit Bilibili; find phrases again in what was read")
     learn.add_argument("--known", nargs="+", action="extend", default=[], metavar="PATH",
@@ -193,13 +197,11 @@ def parser():
                        help="then have the local model judge what was found (see judge)")
     learn.set_defaults(run=_learn)
 
-    judge = sub.add_parser("judge", help="have a local model tell memes from names and "
-                           "everyday words, and explain them")
+    judge = sub.add_parser("judge", help="have a local model tell memes from names, game "
+                           "words and everyday words, and explain them")
     judge.add_argument("--games", nargs="+", metavar="GAME", help="only these games' phrases")
     judge.add_argument("--model", default=judging.MODEL,
                        help="the Ollama model (default %(default)s; also MEMELEARNER_MODEL)")
-    judge.add_argument("--no-lookup", action="store_true",
-                       help="don't look the phrases up on 萌娘百科 and 维基百科")
     judge.add_argument("--again", action="store_true", help="judge again what was judged before")
     judge.set_defaults(run=_judge_command)
 

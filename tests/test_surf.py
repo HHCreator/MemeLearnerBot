@@ -213,58 +213,117 @@ class PhraseTest(unittest.TestCase):
         self.assertEqual(surf.clean("哈哈哈哈哈哈哈"), "哈哈哈")
         self.assertEqual(surf.clean("看 https://b23.tv/abc @小明 好"), "看 好")
 
-    def test_freedom(self):
-        self.assertGreater(surf.freedom({None: 5}), 2)  # always written on its own
-        self.assertEqual(surf.freedom({"绷": 5}), 0)  # always attached to the same character
+    def test_a_danmu_counts_the_way_people_mean_it(self):
+        key = surf.key_of
+        self.assertEqual(key("阿一古！！！"), "阿一古")
+        self.assertEqual(key("阿一古 阿一古 阿一古"), "阿一古")  # a repeat is said once
+        self.assertEqual(key("正义必胜正义必胜正义"), "正义必胜")
+        self.assertEqual(key("IG牛逼！！！"), "ig牛逼")
+        self.assertEqual(key("怎么翻的"), key("怎么翻"))  # a mood word at the end doesn't count
+        self.assertEqual(key("哈哈哈哈哈"), "哈哈哈")  # one character repeated stays
+        for nothing in ["666666", "6", "了", "?？", "这一句话太长了不是一个说法吧兄弟们"]:
+            self.assertIsNone(key(nothing), nothing)
+        self.assertEqual(surf.phrase_of(["nice"], {"nice"}), ("nice", None))  # just English
+        self.assertEqual(surf.phrase_of(["yyds"], {"nice"}), ("yyds", ["yyds"]))
+        self.assertTrue(surf.contains(surf.units("ig 赢了"), ["ig"]))
+        self.assertFalse(surf.contains(surf.units("big win"), ["ig"]))  # whole words only
 
-    def test_new_and_rising_phrases_are_found_and_the_rest_left_out(self):
+    def test_variants_share_most_of_their_start_and_end(self):
+        units = lambda text: surf.units(surf.clean(text))
+        for a, b in [("千言万语感谢现役", "千言万语赶紧退役"), ("我们是冠军", "我们是路边"),
+                     ("怎么翻", "怎么输"), ("IG牛逼", "BLG牛逼"), ("我们是区", "我们是冠军")]:
+            self.assertTrue(surf.variant(units(a), units(b)), (a, b))
+        for a, b in [("怎么翻", "怎么回事"), ("退役", "赶紧退役"), ("吓哭了", "发狂了"),
+                     ("中国牛逼", "ig牛逼")]:
+            self.assertFalse(surf.variant(units(a), units(b)), (a, b))
+
+    def test_phrases_people_send_on_their_own_are_found_and_discussion_is_not(self):
         recent, before = NOW - DAY, NOW - 20 * DAY
         lines = []
-        # Before: 300 people; 4 of them already say 下饭, and 老马又来了 is old news
+        # Before: 300 people. 老马又来了 was as common then; 千言万语感谢现役 was a thing then
         for i in range(300):
-            text = "这把真下饭" if i < 4 else ["这波操作太秀了", "老马又来了", "哈哈哈", "好家伙"][i % 4]
+            text = ("老马又来了" if i < 40 else "千言万语感谢现役" if i < 80
+                    else f"这一把第{i}回合打得真不错")
             lines.append(("cs2", f"BV1old{i % 3}", message(f"b{i}", text, before)))
         # Recent: 300 people in 4 videos
+        context = ["主播又在阿一古了", "又是阿一古哈哈哈", "阿一古是什么意思啊", "听到阿一古就想笑",
+                   "这波阿一古了兄弟们", "阿一古永远的神"]
         for i in range(300):
             video = f"BV1new{i % 4}"
             if i < 30:
-                text = "绷不住了"  # new, written on its own
-            elif i < 45:
-                text = "这下真的绷不住了"  # and inside longer lines
-            elif i < 65:
-                text = "zywoo yyds"  # yyds: a new Latin-letter word (zywoo is known)
+                text = ["阿一古", "阿一古！！！", "阿一古阿一古"][i % 3]  # new, sent on its own
+            elif i < 36:
+                text = context[i - 30]  # ... and inside a few longer lines
+            elif i < 96:
+                text = f"donk第{i}枪也太准了吧"  # a player, written inside longer lines
+            elif i < 100:
+                text = "donk"  # ... and by a few on its own
             elif i < 125:
-                text = ["这把下饭了", "太下饭了吧", "下饭操作", "真下饭"][i % 4]  # rising
+                text = "正义必胜正义必胜"  # a chant
+            elif i < 145:
+                text = "怎么翻的"
             elif i < 150:
+                text = "怎么翻"  # the same as 怎么翻的
+            elif i < 160:
+                text = "怎么输的"  # a variant of it
+            elif i < 185:
                 text, video = "这个视频第一", "BV1new0"  # one video's own thing
             elif i < 225:
-                text = "老马又来了"  # as common as before: not news
+                text = "老马又来了"  # as common as before
+            elif i < 245:
+                text = "nice"  # an English word
+            elif i < 265:
+                text = "哈哈哈哈"  # everyday (data/surf_common.txt)
+            elif i < 275:
+                text = "千言万语赶紧退役"  # a variant of 千言万语感谢现役, which faded
             else:
-                text = "nice 哈哈哈"  # an English word and an everyday danmu
+                text = f"第{i}个回合这个闪光弹给得好"
             lines.append(("cs2", video, message(f"r{i}", text, recent)))
 
         found, summary = surf.find_candidates(lines, days=7, now=NOW, min_before=50,
-                                              known=surf.known_phrases(["zywoo"]))
+                                              known=surf.known_phrases(), english_words={"nice"})
         by_phrase = {c["phrase"]: c for c in found}
-        self.assertEqual(by_phrase["绷不住了"]["status"], "new")
-        self.assertEqual(by_phrase["绷不住了"]["people"], 45)
-        self.assertEqual(by_phrase["yyds"]["status"], "new")
-        self.assertEqual(by_phrase["下饭"]["status"], "rising")
-        self.assertGreaterEqual(by_phrase["下饭"]["rise"], surf.RISE)
-        for left_out in ["不住了", "绷不住", "老马又来了", "这个视频第一", "zywoo", "nice",
-                         "哈哈哈", "这把", "下饭了", "真的", "下饭操作"]:
-            self.assertNotIn(left_out, by_phrase)
-        examples = by_phrase["绷不住了"]["examples"]
-        self.assertGreater(len({e["video"] for e in examples}), 1)  # from several videos
-        self.assertEqual(examples[0]["text"], "这下真的绷不住了")  # context first
+        self.assertEqual(set(by_phrase), {"阿一古", "正义必胜", "怎么翻的", "老马又来了",
+                                          "千言万语感谢现役"})
+        ayigu = by_phrase["阿一古"]
+        self.assertEqual((ayigu["status"], ayigu["people"], ayigu["people_before"]),
+                         ("new", 30, 0))
+        self.assertEqual((ayigu["alone"], ayigu["videos"]), (round(30 / 36, 2), 4))
+        self.assertIn(ayigu["examples"][0]["text"], context)  # lines with context first
+        self.assertGreater(len({e["video"] for e in ayigu["examples"]}), 1)  # several videos
+        bare = [e["text"] for e in ayigu["examples"] if e["text"] not in context]
+        self.assertEqual(len(bare), surf.ALONE_EXAMPLES)  # then the phrase on its own
+        self.assertEqual(by_phrase["正义必胜"]["status"], "new")
+        fan = by_phrase["怎么翻的"]  # the way most write it
+        self.assertEqual((fan["people"], fan["variants"]),
+                         (25, [{"phrase": "怎么输的", "people": 10}]))
+        self.assertEqual(by_phrase["老马又来了"]["status"], "steady")
+        faded = by_phrase["千言万语感谢现役"]
+        self.assertEqual((faded["status"], faded["people_recent"], faded["people_before"]),
+                         ("fading", 0, 40))
+        self.assertEqual(faded["variants"], [{"phrase": "千言万语赶紧退役", "people": 10}])
+        self.assertEqual(found[0]["phrase"], "老马又来了")  # the most people, in most videos
         self.assertTrue(summary["cs2"]["baseline"])
+        self.assertEqual((summary["cs2"]["recent"], summary["cs2"]["before"]), (300, 300))
+
+    def test_a_phrase_sent_in_one_video_only_counts_as_a_variant(self):
+        lines = []
+        for i in range(30):
+            text = "我们是冠军" if i < 15 else "我们是路边" if i < 24 else "我们是区"
+            video = "BV1three" if text == "我们是区" else f"BV1v{i % 3}"
+            lines.append(("valorant", video, message(f"p{i}", text, NOW - DAY)))
+        found, _ = surf.find_candidates(lines, days=7, now=NOW, known=set(), english_words=set())
+        self.assertEqual([(c["phrase"], c["variants"]) for c in found], [
+            ("我们是冠军", [{"phrase": "我们是路边", "people": 9},
+                       {"phrase": "我们是区", "people": 6}])])
 
     def test_a_handful_of_new_users_is_not_enough_to_call_it_new(self):
         lines = [("cs2", "BV1old", message(f"b{i}", "好家伙", NOW - 20 * DAY)) for i in range(300)]
         lines += [("cs2", f"BV1new{i % 2}", message(f"r{i}", "好家伙" if i > 3 else "神中神",
                                                     NOW - DAY)) for i in range(300)]
         found, _ = surf.find_candidates(lines, days=7, now=NOW, min_before=50)
-        self.assertEqual(found, [])  # 4 people: could be chance, so it waits for more
+        # 4 people: listed, but it could be chance that nobody sent it before
+        self.assertEqual([(c["phrase"], c["status"]) for c in found], [("神中神", "steady")])
 
     def test_surprise(self):
         self.assertAlmostEqual(surf.surprise(10, 0, 100, 100), 10 * 0.30103, places=3)

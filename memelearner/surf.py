@@ -1,6 +1,6 @@
 """The meme bot: read Bilibili for the newest memes of each game, for you to look through.
 
-    py surf.py                        # read Bilibili for every game, then list new phrases
+    py surf.py                        # read Bilibili for every game, then list the phrases
     py surf.py --games cs2 dota2      # only some games (cs2, lol, valorant, dota2)
     py surf.py --videos 3             # fewer videos per game: a quick test
     py surf.py --days 3               # "new" means the last 3 days instead of 7
@@ -28,16 +28,23 @@ How it works:
                        with every sender replaced by a short hash. The first time, it also
                        reads some older videos (posted 30 to 90 days ago), so it knows what
                        people were saying before and can tell what's new.
-    3. Find phrases    A phrase counts when at least MIN_PEOPLE different people use it, in at
-                       least MIN_VIDEOS videos. Three kinds: a whole short danmu (绷不住了), a
-                       piece of longer lines that people write on its own and not only as part
-                       of a longer phrase (freedom()), and a Latin-letter word that isn't an
-                       English word (yyds).
-    4. New or rising   Each phrase's share of the people writing in the last DAYS days is
-                       compared with its share before that: nobody used it before = new, at
-                       least RISE times as common = rising. Known phrases are left out
-                       (known_phrases()): the memes already learned or turned down, everyday
-                       ones in data/surf_common.txt, and another app's words if you say where.
+    3. Find phrases    Memes are sent on their own: people send 阿一古 or 正义必胜 as the
+                       whole danmu, while names and game words (奥拉夫, 号种子) sit inside
+                       longer lines. So a phrase is a whole short danmu that at least
+                       MIN_PEOPLE different people send, in at least MIN_VIDEOS videos, and
+                       that at least MIN_ALONE of the people who use it send on its own. A
+                       danmu that repeats itself counts once (正义必胜正义必胜 is 正义必胜), and
+                       mood words at its end don't count (怎么翻的 is 怎么翻): phrase_of().
+                       Variants of one pattern (千言万语感谢现役, 千言万语赶紧退役) are listed
+                       together, under the one most people send (_group()). Known phrases
+                       are left out (known_phrases()): the memes already learned or turned
+                       down, everyday ones in data/surf_common.txt, and another app's words
+                       if you say where.
+    4. How new         Each phrase's share of the people writing in the last DAYS days is
+                       compared with its share before that: nobody sent it before = new, at
+                       least RISE times as common = rising, RISE times rarer = fading, else
+                       steady (and a first look when there is too little from before). Only
+                       a change that luck would explain less than once in 10^SURE counts.
     5. Save            The phrases, with example lines and the videos they came from, go to
                        surf/candidates.json in the cache folder. Nothing is learned until you
                        accept a phrase (store.py), which adds it to data/memes.json.
@@ -78,7 +85,7 @@ CANDIDATES_FILE = os.path.join(SURF_DIR, "candidates.json")
 # Other files whose phrases count as known, like another app's word tables: paths separated
 # by ; on Windows (: elsewhere), the same as --known
 KNOWN_ENV = "MEMELEARNER_KNOWN"
-PARTICLES = set("了呢吧啊吗的哦呀嘛")  # mood words that carry no meaning in a phrase
+PARTICLES = set("了呢吧啊吗的哦呀嘛啦")  # mood words at the end of a phrase that don't change it
 
 DAYS = 7  # "new" means used in the last DAYS days; videos posted in that time are read
 VIDEOS_PER_GAME = 10  # the videos with the most danmu are read for each game
@@ -89,24 +96,23 @@ BASELINE_SHARE = 1  # ... as many of them as recent ones (only the first time)
 MIN_BEFORE_MESSAGES = 2000  # fewer earlier messages than this and older videos are read
 MAX_PARTS = 3  # parts (分P) of a video whose danmu are read; match videos have one per game
 COMMENT_PAGES = 3  # pages of hot comments read under each video (20 per page)
-MIN_PEOPLE = 3  # different people who must use a phrase before it counts
-MIN_VIDEOS = 2  # videos it must show up in, so one video's own catchphrase doesn't count
-RISE = 3.0  # how many times more common than before a phrase must be to count as rising
-SURE = 2  # how sure (in powers of ten, on top of the number of phrases checked) a rise must be
-MAX_SHORT = 8  # a whole danmu up to this long is one phrase (like learn_chat.py)
-PIECE_LENGTHS = range(2, 7)  # lengths of the phrases looked for inside longer lines
-MIN_FREEDOM = 1.0  # how varied the characters on each side of a phrase must be (freedom())
-CONTAINED = 0.9  # a phrase mostly used inside a longer one (this share of its people) is dropped
-TOP = 25  # phrases kept for each game
+MIN_PEOPLE = 3  # different people who must send a phrase on its own before it counts
+MIN_VIDEOS = 2  # videos it must be sent in, so one video's own catchphrase doesn't count
+MIN_ALONE = 0.5  # the share of the people using a phrase who must send it on its own
+MAX_SHORT = 12  # characters a whole danmu (said once) can have and still be a phrase
+RISE = 3.0  # how many times as common as before a phrase must be to count as rising (or as
+            # rare, to count as fading)
+SURE = 2  # how sure a change must be, in powers of ten: 2 is a 1 in 100 chance of luck
+TOP = 30  # phrases kept for each game
 EXAMPLES = 8  # example lines kept for each phrase
+ALONE_EXAMPLES = 2  # ... of them the phrase on its own, after the longer lines that use it
+VARIANTS = 6  # variants kept with a phrase (千言万语赶紧退役 with 千言万语感谢现役)
 DAY = 86400
 
 EMOTE = re.compile(r"\[[^\[\]\s]{1,12}\]")  # [doge] [笑哭]: emotes in comments
 REPLY = re.compile(r"^回复\s*@[^:：\s]+\s*[:：]")  # "回复 @someone :" at the start of a reply
 MENTION = re.compile(r"@[^\s@:：,，。!！?？]+")  # @someone: a user name, not a meme
 LINK = re.compile(r"https?://\S+|www\.\S+|bv[0-9a-z]{10}|av\d+")
-CJK_RUN = re.compile(r"[一-鿿]+")
-LATIN_WORD = re.compile(r"[a-z][a-z0-9]*")
 NOT_TEXT = re.compile(r"[^0-9a-z一-鿿]+")
 
 
@@ -335,67 +341,81 @@ def clean(text):
     return " ".join(text.split())
 
 
-Line = collections.namedtuple("Line", "game bvid who recent whole runs latin message")
+UNIT = re.compile(r"[0-9a-z]+|[一-鿿]")
 
 
-def _prepare(text, english_words):
-    """(whole, runs, latin) for a cleaned line: the line itself when it is short enough to be
-    one phrase, its runs of Chinese characters, and its Latin-letter words that aren't
-    English words (yyds)."""
-    compact = NOT_TEXT.sub("", text)
-    short = 0 < len(compact) <= MAX_SHORT and (CJK_RUN.search(compact) or compact.isdigit())
-    latin = {w for w in LATIN_WORD.findall(text) if 2 <= len(w) <= 15 and w not in english_words}
-    return (compact if short else None), CJK_RUN.findall(text), latin
+def units(text):
+    """A cleaned text as units: each Chinese character, and each word of Latin letters and
+    digits (ig, yyds, 666). Spaces, punctuation and emoji are left out."""
+    return UNIT.findall(text)
 
 
-def pieces(line, wanted):
-    """Yield (phrase, left neighbour, right neighbour) for the phrases of a line in wanted.
+def said_once(parts):
+    """The units of a line that repeats itself (正义必胜正义必胜, 阿一古 阿一古 阿一古), said once.
+    Only repeats of two units or more: 哈哈哈 and 好好好 stay as they are."""
+    for period in range(2, len(parts) // 2 + 1):
+        if all(parts[i] == parts[i - period] for i in range(period, len(parts))):
+            return parts[:period]
+    return parts
 
-    The neighbours are the characters next to the phrase; None is the edge of the line or of
-    a run of Chinese characters, and "" marks a Latin-letter word, whose neighbours don't
-    matter. A short line counts as a whole, with edges on both sides.
+
+def phrase_of(parts, english_words=()):
+    """(form, key) for a whole line, given as units: (None, None) when it is too long to be
+    a phrase people send on its own.
+
+    form is the line said once, as text (阿一古！！！ and 阿一古阿一古 are 阿一古). key is the
+    form's units without the mood words at its end, so 怎么翻的 and 怎么翻 count as one; it is
+    None when nothing is left that could be a meme: one character, digits only (666), or
+    English words only (nice).
     """
-    if line.whole in wanted:
-        yield line.whole, None, None
-    for run in line.runs:
-        for length in PIECE_LENGTHS:
-            for start in range(len(run) - length + 1):
-                piece = run[start:start + length]
-                if piece in wanted and piece != line.whole:
-                    yield (piece, run[start - 1] if start else None,
-                           run[start + length] if start + length < len(run) else None)
-    for word in line.latin:
-        if word in wanted:
-            yield word, "", ""
+    form = said_once(parts)
+    text = "".join(form)
+    if not form or len(text) > MAX_SHORT:
+        return None, None
+    key = list(form)
+    while key and key[-1] in PARTICLES:
+        key.pop()
+    joined = "".join(key)
+    if len(joined) < 2 or joined.isdigit() or all(part in english_words for part in key):
+        return text, None
+    return text, key
 
 
-def common_phrases(lines, min_people):
-    """The phrases that at least min_people of the lines use: a first cut, before people
-    are counted.
+def key_of(text):
+    """The key a line or a phrase counts under when it is sent on its own (phrase_of()), as
+    text, or None."""
+    key = phrase_of(units(clean(text)))[1]
+    return "".join(key) if key else None
 
-    Pieces are counted one length at a time, and a piece is only counted when both of its
-    shorter pieces (without its last or without its first character) were common, since a
-    phrase can't be in more lines than its parts. That keeps the counting small.
-    """
-    keep = lambda counts: {phrase for phrase, n in counts.items() if n >= min_people}
-    common = keep(collections.Counter(line.whole for line in lines if line.whole))
-    common |= keep(collections.Counter(word for line in lines for word in line.latin))
-    shorter = None
-    for length in PIECE_LENGTHS:
-        counts = collections.Counter()
-        for line in lines:
-            found = set()
-            for run in line.runs:
-                for start in range(len(run) - length + 1):
-                    piece = run[start:start + length]
-                    if shorter is None or (piece[:-1] in shorter and piece[1:] in shorter):
-                        found.add(piece)
-            counts.update(found)
-        shorter = keep(counts)
-        common |= shorter
-        if not shorter:
-            break
-    return common
+
+def contains(parts, wanted):
+    """Whether the units wanted come one after another in parts: ig is in ig牛逼 and in
+    "ig 赢了", not in big."""
+    n = len(wanted)
+    return any(parts[i:i + n] == wanted for i in range(len(parts) - n + 1))
+
+
+def shared(a, b):
+    """How many units two phrases share at their start and their end together
+    (千言万语感谢现役 and 千言万语赶紧退役: 千言万语 and 役, 5)."""
+    start = 0
+    while start < min(len(a), len(b)) and a[start] == b[start]:
+        start += 1
+    end = 0
+    while end < min(len(a), len(b)) - start and a[-1 - end] == b[-1 - end]:
+        end += 1
+    return start + end
+
+
+def variant(a, b):
+    """Whether two phrases are variants of one pattern: they share at least two units at
+    their start and end, and more than half of the longer one (我们是冠军 and 我们是路边; not
+    怎么翻 and 怎么回事)."""
+    both = shared(a, b)
+    return both >= 2 and 2 * both > max(len(a), len(b))
+
+
+Line = collections.namedtuple("Line", "game bvid who recent parts form key message")
 
 
 def surprise(recent, before, people_recent, people_before):
@@ -413,25 +433,6 @@ def surprise(recent, before, people_recent, people_before):
     top = max(terms)
     chance = top + math.log(sum(math.exp(t - top) for t in terms))  # log of the sum
     return max(0.0, -chance / math.log(10))
-
-
-def freedom(neighbours):
-    """How varied the characters next to a phrase are: their entropy in bits.
-
-    Every time a phrase stands at the edge of a line counts as a different neighbour, so a
-    phrase people write on its own scores high (绷不住了), and a piece of a longer phrase
-    scores low on the side where it is always attached (不住了, always after 绷).
-    """
-    total = sum(neighbours.values())
-    if not total:
-        return 0.0
-    bits = 0.0
-    for neighbour, count in neighbours.items():
-        if neighbour is None:
-            bits += count * (1 / total) * math.log2(total)  # each edge: its own neighbour
-        else:
-            bits -= count / total * math.log2(count / total)
-    return bits
 
 
 def read_phrases(paths):
@@ -493,11 +494,23 @@ def _english_words():
 def find_candidates(messages, days=DAYS, now=None, min_people=MIN_PEOPLE,
                     min_videos=MIN_VIDEOS, min_before=MIN_BEFORE_MESSAGES, known=None,
                     english_words=None):
-    """Steps 3 and 4: the phrases that are new or rising, for each game.
+    """Steps 3 and 4: the phrases people send on their own, for each game, and how new they
+    are.
 
     messages is an iterable of (game, bvid, message). Returns (candidates, summary): the
     candidates sorted best first, and per game {"videos", "recent", "before", "baseline"}
-    (line counts, and whether there were enough earlier lines to compare with).
+    (line counts, and whether there were enough earlier lines to compare with). A candidate:
+
+        {"phrase": "阿一古", "game": "lol",
+         "status": "new", "rising", "steady", "fading" or "first look",
+         "people": 52,            different people who sent it on its own (at any time)
+         "people_recent": 50, "people_before": 2,    ... in the last days days, and before
+         "alone": 0.98,           the share of the people using it who sent it on its own
+         "videos": 5,             videos it was sent in on its own
+         "rise": 9.1,             how many times as common as before (None for a first look)
+         "score": 172.7,          what they are sorted by: people * (1 + log2(videos))
+         "variants": [{"phrase": "阿古", "people": 4}],   other phrases of the same pattern
+         "examples": [{"text", "video", "kind", "sent"}]}  lines that use it
     """
     now = time.time() if now is None else now
     cut = now - days * DAY
@@ -506,9 +519,11 @@ def find_candidates(messages, days=DAYS, now=None, min_people=MIN_PEOPLE,
     by_game = collections.defaultdict(list)
     for game, bvid, message in messages:
         text = clean(message.get("text", ""))
-        if text and message.get("sent"):  # a line with no time can't be placed: skip it
+        parts = units(text)
+        if parts and message.get("sent"):  # a line with no time can't be placed: skip it
+            form, key = phrase_of(parts, english_words)
             by_game[game].append(Line(game, bvid, message["who"], message["sent"] >= cut,
-                                      *_prepare(text, english_words), message))
+                                      parts, form, key, message))
     candidates, summary = [], {}
     for game, lines in by_game.items():
         found, summary[game] = _game_candidates(game, lines, min_people, min_videos,
@@ -518,109 +533,191 @@ def find_candidates(messages, days=DAYS, now=None, min_people=MIN_PEOPLE,
     return candidates, summary
 
 
+def _keep(pool, line):
+    """Keep a line as a possible example in {bvid: {text: message}}: up to EXAMPLES different
+    ones from each video."""
+    texts = pool[line.bvid]
+    if len(texts) < EXAMPLES and line.message["text"] not in texts:
+        texts[line.message["text"]] = line.message
+
+
 def _game_candidates(game, lines, min_people, min_videos, min_before, known):
     """find_candidates() for the lines of one game."""
-    recent_lines = [line for line in lines if line.recent]
-    wanted = common_phrases(recent_lines, min_people) - known
+    recent_people = {line.who for line in lines if line.recent}
+    before_people = {line.who for line in lines if not line.recent}
+    recent_lines = sum(1 for line in lines if line.recent)
+    summary = {"videos": len({line.bvid for line in lines}), "recent": recent_lines,
+               "before": len(lines) - recent_lines,
+               "baseline": len(lines) - recent_lines >= min_before}
 
-    # People, videos, neighbours and example lines of each common phrase
-    info = collections.defaultdict(lambda: {
-        "recent": set(), "before": set(), "videos": set(), "left": collections.Counter(),
-        "right": collections.Counter(), "examples": collections.defaultdict(dict)})
-    people_recent, people_before = set(), set()
+    # Who sends each phrase on its own, and how they write it
+    alone = {}
     for line in lines:
-        (people_recent if line.recent else people_before).add(line.who)
-        used = set()
-        for phrase, left, right in pieces(line, wanted):
-            entry = info[phrase]
-            if line.recent:  # how it is used now decides whether it stands on its own
-                entry["left"][left] += 1
-                entry["right"][right] += 1
-            if phrase in used:
-                continue
-            used.add(phrase)
-            if not line.recent:
-                entry["before"].add(line.who)
-                continue
-            entry["recent"].add(line.who)
-            entry["videos"].add(line.bvid)
-            pool = entry["examples"][line.bvid]  # different lines only, so spam fills one place
-            if len(pool) < EXAMPLES and line.message["text"] not in pool:
-                pool[line.message["text"]] = line.message
-
-    before_lines = len(lines) - len(recent_lines)
-    baseline = before_lines >= min_before
-    checked = []
-    for phrase, entry in info.items():
-        people, videos = len(entry["recent"]), len(entry["videos"])
-        if people < min_people or videos < min_videos:
+        if line.key is None:
             continue
-        if phrase.isdigit() and len(phrase) < 3:
-            continue  # scores and counts, not memes
-        latin = "" in entry["left"]
-        if not latin and min(freedom(entry["left"]), freedom(entry["right"])) < MIN_FREEDOM:
-            continue  # a piece of a longer phrase, not a phrase of its own
-        checked.append((phrase, entry))
-    # Thousands of phrases are checked, so some look like they rose by pure chance. A rise
-    # only counts when chance would explain it less than once in 10^SURE such runs
-    enough = math.log10(max(1, len(checked))) + SURE
+        key = "".join(line.key)
+        entry = alone.get(key)
+        if entry is None:
+            entry = alone[key] = {"parts": line.key, "recent": set(), "before": set(),
+                                  "videos": set(), "forms": collections.defaultdict(set),
+                                  "examples": collections.defaultdict(dict)}
+        entry["recent" if line.recent else "before"].add(line.who)
+        entry["videos"].add(line.bvid)
+        entry["forms"][line.form].add(line.who)
+        _keep(entry["examples"], line)
+    wanted = {}
+    for key, entry in alone.items():
+        senders = entry["recent"] | entry["before"]
+        if len(senders) >= min_people and key not in known and \
+                not any(form in known for form in entry["forms"]):
+            wanted[key] = (entry, senders)
+
+    # ... and who writes them inside a longer line, which is how names and game words are used
+    sizes = sorted({len(entry["parts"]) for entry, _ in wanted.values()})
+    inside = collections.defaultdict(set)
+    inside_examples = collections.defaultdict(lambda: collections.defaultdict(dict))
+    for line in lines:
+        text = "".join(line.parts)
+        ends = [0]
+        for part in line.parts:
+            ends.append(ends[-1] + len(part))
+        own = "".join(line.key) if line.key else None  # the line is this phrase on its own
+        used = set()
+        for n in sizes:
+            for start in range(len(line.parts) - n + 1):
+                piece = text[ends[start]:ends[start + n]]
+                if piece in wanted and piece != own:
+                    used.add(piece)
+        for piece in used:
+            inside[piece].add(line.who)
+            _keep(inside_examples[piece], line)
+
+    # The phrases mostly sent on their own
+    found = {}
+    for key, (entry, senders) in wanted.items():
+        share = len(senders) / len(senders | inside[key])
+        if share >= MIN_ALONE:
+            found[key] = (entry, senders, share)
+    score = {key: len(senders) * (1 + math.log2(len(entry["videos"])))
+             for key, (entry, senders, _) in found.items()}
+    heads, variants = _group(found, score, min_videos)
+
+    # How new each one is: a change only counts when luck would explain it less than once
+    # in 10^SURE times
+    now_people, then_people = len(recent_people), len(before_people)
+
+    def freshness(entry):
+        now, then = len(entry["recent"]), len(entry["before"])
+        if not summary["baseline"]:
+            return "first look", None
+        if not now_people:
+            return "fading", 0.0
+        # How many times as many of the people send it now as before. One person is added
+        # to each side, so a phrase is only new when the earlier lines were enough to show
+        # it, had it been as common then
+        rise = (now / now_people) / ((then + 1) / then_people)
+        if rise >= RISE and surprise(now, then, now_people, then_people) >= SURE:
+            return ("new" if then == 0 else "rising"), rise
+        fall = (then / then_people) / ((now + 1) / now_people)
+        if fall >= RISE and surprise(then, now, then_people, now_people) >= SURE:
+            return "fading", rise
+        return "steady", rise
+
     candidates = []
-    for phrase, entry in checked:
-        people, videos, before = len(entry["recent"]), len(entry["videos"]), len(entry["before"])
-        rise = None
-        if baseline:
-            # How many times more of the people use it now than before. One person is
-            # added to "before", so a phrase is only new when the earlier lines were enough
-            # to show it, had it been as common then
-            rise = (people / len(people_recent)) / ((before + 1) / max(1, len(people_before)))
-            if rise < RISE or surprise(people, before, len(people_recent),
-                                       len(people_before)) < enough:
-                continue  # about as common before, or too few people to tell
-            status = "new" if before == 0 else "rising"
-        else:
-            status = "first look"  # nothing to compare with yet
+    for key in heads:
+        entry, senders, share = found[key]
+        status, rise = freshness(entry)
         candidates.append({
-            "phrase": phrase, "game": game, "status": status, "people": people,
-            "videos": videos, "people_before": before,
-            "rise": round(rise, 1) if rise else None,
-            "score": round(people * (1 + math.log2(videos)), 1),
-            "examples": _pick_examples(entry["examples"]),
+            "phrase": _written(entry), "game": game, "status": status,
+            "people": len(senders), "people_recent": len(entry["recent"]),
+            "people_before": len(entry["before"]), "alone": round(share, 2),
+            "videos": len(entry["videos"]),
+            "rise": None if rise is None else round(rise, 2 if rise < 1 else 1),
+            "score": round(score[key], 1),
+            "variants": [{"phrase": _written(found[other][0]), "people": len(found[other][1])}
+                         for other in sorted(variants[key], key=lambda k: -len(found[k][1]))
+                         ][:VARIANTS],
+            "examples": _pick_examples(entry["examples"], inside_examples[key]),
         })
-
-    # A candidate plus mood words (下饭了, 下饭吧) is the same phrase as the candidate
-    mood = "".join(PARTICLES)
-    phrases = {c["phrase"] for c in candidates}
-    candidates = [c for c in candidates if c["phrase"].rstrip(mood) == c["phrase"]
-                  or c["phrase"].rstrip(mood) not in phrases]
-    # A phrase mostly used inside a longer candidate is that one's piece: drop it
-    kept = []
-    for candidate in sorted(candidates, key=lambda c: -len(c["phrase"])):
-        if not any(candidate["phrase"] in other["phrase"]
-                   and other["people"] >= CONTAINED * candidate["people"] for other in kept):
-            kept.append(candidate)
-    kept = sorted(kept, key=lambda c: -c["score"])[:TOP]
-    return kept, {"videos": len({line.bvid for line in lines}), "recent": len(recent_lines),
-                  "before": before_lines, "baseline": baseline}
+    candidates.sort(key=lambda c: -c["score"])
+    return candidates[:TOP], summary
 
 
-def _pick_examples(by_video):
-    """Up to EXAMPLES different lines using a phrase, from {bvid: {text: message}}: one from
-    each video first, and lines with some context (up to 60 characters) before bare ones."""
-    order = lambda m: (len(m["text"]) > 120, -min(len(m["text"]), 60), -m["sent"])
-    queues = [[(bvid, m) for m in sorted(messages.values(), key=order)]
-              for bvid, messages in sorted(by_video.items())]
-    picked, texts = [], set()
-    while len(picked) < EXAMPLES and any(queues):
-        for queue in queues:  # take turns, so the examples span the videos
-            while queue and len(picked) < EXAMPLES:
-                bvid, message = queue.pop(0)
-                if message["text"] not in texts:
-                    texts.add(message["text"])
-                    picked.append({"text": message["text"], "video": bvid,
-                                   "kind": message["kind"],
-                                   "sent": time.strftime("%Y-%m-%d",
-                                                         time.localtime(message["sent"]))})
-                    break
+def _written(entry):
+    """How most of the people sending a phrase write it (怎么翻的, rather than 怎么翻)."""
+    forms = entry["forms"]
+    return min(forms, key=lambda form: (-len(forms[form]), len(form), form))
+
+
+def _group(found, score, min_videos):
+    """Put the variants of a pattern together: (heads, {head: [variant, ...]}). Best first,
+    each phrase joins the best one before it that it is a variant of (variant()), the one it
+    shares the most with; the others lead a group of their own. A phrase sent in fewer than
+    min_videos videos (one video's catchphrase) can only be another one's variant."""
+    heads, variants = [], {}
+    by_end = collections.defaultdict(list)  # the heads, by their first and by their last unit
+
+    def best_head(parts):
+        best, most = None, 0
+        for head in dict.fromkeys(by_end["<", parts[0]] + by_end[">", parts[-1]]):
+            other = found[head][0]["parts"]
+            if variant(parts, other) and shared(parts, other) > most:
+                best, most = head, shared(parts, other)
+        return best
+
+    later = []
+    for key in sorted(found, key=lambda key: (-score[key], key)):
+        parts = found[key][0]["parts"]
+        if len(found[key][0]["videos"]) < min_videos:
+            later.append(key)
+            continue
+        head = best_head(parts)
+        if head is None:
+            heads.append(key)
+            variants[key] = []
+            by_end["<", parts[0]].append(key)
+            by_end[">", parts[-1]].append(key)
+        else:
+            variants[head].append(key)
+    for key in later:
+        head = best_head(found[key][0]["parts"])
+        if head is not None:
+            variants[head].append(key)
+    return heads, variants
+
+
+def _pick_examples(alone, inside):
+    """Up to EXAMPLES different lines with a phrase, from {bvid: {text: message}} of lines
+    that are the phrase on its own (alone) and of longer lines that use it (inside): the
+    longer lines first, with some context (up to 60 characters) before short ones, then
+    ALONE_EXAMPLES of the others, newest first; each kind taking turns between the videos."""
+    def queues(pools, order):
+        return [[(bvid, m) for m in sorted(messages.values(), key=order)]
+                for bvid, messages in sorted(pools.items())]
+
+    picked, seen = [], set()
+
+    def take(queues, limit):
+        while len(picked) < limit and any(queues):
+            for queue in queues:  # take turns, so the examples span the videos
+                while queue and len(picked) < limit:
+                    bvid, message = queue.pop(0)
+                    same = NOT_TEXT.sub("", clean(message["text"]))
+                    if same not in seen:  # 阿一古！！！ is the same line as 阿一古
+                        seen.add(same)
+                        picked.append({"text": message["text"], "video": bvid,
+                                       "kind": message["kind"],
+                                       "sent": time.strftime("%Y-%m-%d",
+                                                             time.localtime(message["sent"]))})
+                        break
+
+    longer = queues(inside, lambda m: (len(m["text"]) > 120, -min(len(m["text"]), 60),
+                                       -m["sent"]))
+    short = queues(alone, lambda m: -m["sent"])
+    take(longer, EXAMPLES - ALONE_EXAMPLES)
+    take(short, len(picked) + ALONE_EXAMPLES)
+    take(longer, EXAMPLES)
+    take(short, EXAMPLES)
     return picked
 
 
