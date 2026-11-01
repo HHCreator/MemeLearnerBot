@@ -42,9 +42,11 @@ How it works:
                        if you say where.
     4. How new         Each phrase's share of the people writing in the last DAYS days is
                        compared with its share before that: nobody sent it before = new, at
-                       least RISE times as common = rising, RISE times rarer = fading, else
-                       steady (and a first look when there is too little from before). Only
-                       a change that luck would explain less than once in 10^SURE counts.
+                       least RISE times as common = rising, RISE times rarer = older, else
+                       steady. Only a change that luck would explain less than once in
+                       10^SURE counts, and steady needs enough lines on both sides to show a
+                       change (MIN_EXPECTED): with too few, a phrase is a first look, or
+                       older when it was more common before.
     5. Save            The phrases, with example lines and the videos they came from, go to
                        surf/candidates.json in the cache folder. Nothing is learned until you
                        accept a phrase (store.py), which adds it to data/memes.json.
@@ -101,8 +103,10 @@ MIN_VIDEOS = 2  # videos it must be sent in, so one video's own catchphrase does
 MIN_ALONE = 0.5  # the share of the people using a phrase who must send it on its own
 MAX_SHORT = 12  # characters a whole danmu (said once) can have and still be a phrase
 RISE = 3.0  # how many times as common as before a phrase must be to count as rising (or as
-            # rare, to count as fading)
+            # rare, to count as older)
 SURE = 2  # how sure a change must be, in powers of ten: 2 is a 1 in 100 chance of luck
+MIN_EXPECTED = 5  # a phrase is only steady when, had it been as common all along, at least
+                  # this many of its senders would be from before and from the last DAYS days
 TOP = 30  # phrases kept for each game
 EXAMPLES = 8  # example lines kept for each phrase
 ALONE_EXAMPLES = 2  # ... of them the phrase on its own, after the longer lines that use it
@@ -502,7 +506,7 @@ def find_candidates(messages, days=DAYS, now=None, min_people=MIN_PEOPLE,
     (line counts, and whether there were enough earlier lines to compare with). A candidate:
 
         {"phrase": "阿一古", "game": "lol",
-         "status": "new", "rising", "steady", "fading" or "first look",
+         "status": "new", "rising", "steady", "older" or "first look",
          "people": 52,            different people who sent it on its own (at any time)
          "people_recent": 50, "people_before": 2,    ... in the last days days, and before
          "alone": 0.98,           the share of the people using it who sent it on its own
@@ -565,28 +569,33 @@ def _game_candidates(game, lines, min_people, min_videos, min_before, known):
         entry["videos"].add(line.bvid)
         entry["forms"][line.form].add(line.who)
         _keep(entry["examples"], line)
-    wanted = {}
+    wanted, popular = {}, set()
     for key, entry in alone.items():
         senders = entry["recent"] | entry["before"]
-        if len(senders) >= min_people and key not in known and \
-                not any(form in known for form in entry["forms"]):
+        if len(senders) < min_people:
+            continue
+        popular.add(key)
+        if key not in known and not any(form in known for form in entry["forms"]):
             wanted[key] = (entry, senders)
 
-    # ... and who writes them inside a longer line, which is how names and game words are used
+    # ... and who writes them inside a longer line, which is how names and game words are
+    # used. A line that many send on its own is no discussion, so it doesn't count against
+    # a phrase in it: 这怎么翻的 is a variant of 怎么翻的
     sizes = sorted({len(entry["parts"]) for entry, _ in wanted.values()})
     inside = collections.defaultdict(set)
     inside_examples = collections.defaultdict(lambda: collections.defaultdict(dict))
     for line in lines:
+        if line.key and "".join(line.key) in popular:
+            continue
         text = "".join(line.parts)
         ends = [0]
         for part in line.parts:
             ends.append(ends[-1] + len(part))
-        own = "".join(line.key) if line.key else None  # the line is this phrase on its own
         used = set()
         for n in sizes:
             for start in range(len(line.parts) - n + 1):
                 piece = text[ends[start]:ends[start + n]]
-                if piece in wanted and piece != own:
+                if piece in wanted:
                     used.add(piece)
         for piece in used:
             inside[piece].add(line.who)
@@ -611,7 +620,7 @@ def _game_candidates(game, lines, min_people, min_videos, min_before, known):
         if not summary["baseline"]:
             return "first look", None
         if not now_people:
-            return "fading", 0.0
+            return "older", 0.0
         # How many times as many of the people send it now as before. One person is added
         # to each side, so a phrase is only new when the earlier lines were enough to show
         # it, had it been as common then
@@ -620,8 +629,15 @@ def _game_candidates(game, lines, min_people, min_videos, min_before, known):
             return ("new" if then == 0 else "rising"), rise
         fall = (then / then_people) / ((now + 1) / now_people)
         if fall >= RISE and surprise(then, now, then_people, now_people) >= SURE:
-            return "fading", rise
-        return "steady", rise
+            return "older", rise
+        # No clear change. That only makes it steady when the lines could have shown one:
+        # had it been as common all along, at least MIN_EXPECTED of its senders would be on
+        # each side. With too few lines on one side (one game's last days had 591), it's
+        # older when it was more common before, else a first look
+        share_now = now_people / (now_people + then_people)
+        if min(share_now, 1 - share_now) * (now + then) >= MIN_EXPECTED:
+            return "steady", rise
+        return ("older" if then / then_people > now / now_people else "first look"), rise
 
     candidates = []
     for key in heads:

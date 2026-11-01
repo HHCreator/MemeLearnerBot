@@ -266,7 +266,11 @@ class PhraseTest(unittest.TestCase):
                 text = "怎么翻"  # the same as 怎么翻的
             elif i < 160:
                 text = "怎么输的"  # a variant of it
-            elif i < 185:
+            elif i < 190:
+                # Danmu that contain it: more send them than it, but on their own, so they
+                # aren't discussion that uses it
+                text = "这怎么翻的" if i < 180 else "我先来怎么翻的"
+            elif i < 210:
                 text, video = "这个视频第一", "BV1new0"  # one video's own thing
             elif i < 225:
                 text = "老马又来了"  # as common as before
@@ -283,8 +287,8 @@ class PhraseTest(unittest.TestCase):
         found, summary = surf.find_candidates(lines, days=7, now=NOW, min_before=50,
                                               known=surf.known_phrases(), english_words={"nice"})
         by_phrase = {c["phrase"]: c for c in found}
-        self.assertEqual(set(by_phrase), {"阿一古", "正义必胜", "怎么翻的", "老马又来了",
-                                          "千言万语感谢现役"})
+        self.assertEqual(set(by_phrase), {"阿一古", "正义必胜", "怎么翻的", "我先来怎么翻的",
+                                          "老马又来了", "千言万语感谢现役"})
         ayigu = by_phrase["阿一古"]
         self.assertEqual((ayigu["status"], ayigu["people"], ayigu["people_before"]),
                          ("new", 30, 0))
@@ -295,12 +299,13 @@ class PhraseTest(unittest.TestCase):
         self.assertEqual(len(bare), surf.ALONE_EXAMPLES)  # then the phrase on its own
         self.assertEqual(by_phrase["正义必胜"]["status"], "new")
         fan = by_phrase["怎么翻的"]  # the way most write it
-        self.assertEqual((fan["people"], fan["variants"]),
-                         (25, [{"phrase": "怎么输的", "people": 10}]))
+        self.assertEqual((fan["people"], fan["alone"]), (25, 1.0))
+        self.assertEqual(fan["variants"], [{"phrase": "这怎么翻的", "people": 20},
+                                           {"phrase": "怎么输的", "people": 10}])
         self.assertEqual(by_phrase["老马又来了"]["status"], "steady")
         faded = by_phrase["千言万语感谢现役"]
         self.assertEqual((faded["status"], faded["people_recent"], faded["people_before"]),
-                         ("fading", 0, 40))
+                         ("older", 0, 40))
         self.assertEqual(faded["variants"], [{"phrase": "千言万语赶紧退役", "people": 10}])
         self.assertEqual(found[0]["phrase"], "老马又来了")  # the most people, in most videos
         self.assertTrue(summary["cs2"]["baseline"])
@@ -322,8 +327,22 @@ class PhraseTest(unittest.TestCase):
         lines += [("cs2", f"BV1new{i % 2}", message(f"r{i}", "好家伙" if i > 3 else "神中神",
                                                     NOW - DAY)) for i in range(300)]
         found, _ = surf.find_candidates(lines, days=7, now=NOW, min_before=50)
-        # 4 people: listed, but it could be chance that nobody sent it before
-        self.assertEqual([(c["phrase"], c["status"]) for c in found], [("神中神", "steady")])
+        # 4 people: listed, but too few to tell whether nobody sent it before
+        self.assertEqual([(c["phrase"], c["status"]) for c in found], [("神中神", "first look")])
+
+    def test_too_few_recent_lines_dont_make_an_older_phrase_steady(self):
+        # Lots from before, little from the last days: 40 of 3000 people said 我们是路边
+        # before, so about one of 60 would have now, had it stayed as common
+        lines = [("valorant", f"BV1old{i % 4}", message(
+            f"b{i}", "我们是路边" if i < 40 else "退役" if i < 640 else f"第{i}局这个烟给得真好",
+            NOW - 20 * DAY)) for i in range(3000)]
+        lines += [("valorant", f"BV1new{i % 2}", message(
+            f"r{i}", "退役" if i < 12 else f"第{i}局这个闪给得真好", NOW - DAY)) for i in range(60)]
+        found, _ = surf.find_candidates(lines, days=7, now=NOW, min_before=50, known=set(),
+                                        english_words=set())
+        status = {c["phrase"]: c["status"] for c in found}
+        self.assertEqual(status["我们是路边"], "older")  # none now: too few to say steady
+        self.assertEqual(status["退役"], "steady")  # 20% of the people, then and now
 
     def test_surprise(self):
         self.assertAlmostEqual(surf.surprise(10, 0, 100, 100), 10 * 0.30103, places=3)

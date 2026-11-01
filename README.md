@@ -77,8 +77,8 @@ A meme is a dict:
 
 `phrase` is lowercase and half-width, the way the bot finds it; `meaning` (Chinese) and
 `english` are "" until someone fills them in. A candidate has the phrase, its game, how new
-it is (`new`, `rising`, `steady`, `fading`, or a `first look` when there's nothing to compare
-with yet), how many `people` send it on its own and in how many `videos`, the share of the
+it is (`new`, `rising`, `steady`, `older`, or a `first look` when there's too little to
+compare with yet), how many `people` send it on its own and in how many `videos`, the share of the
 people using it who send it on its own (`alone`), its `variants` and example lines (see
 `find_candidates()` in `memelearner/surf.py`). Once judged it also has `judge`: the
 `verdict` (`meme`, `untested`, `not a meme` or `watching`), what `kind` of phrase the model
@@ -128,7 +128,8 @@ from LoL and Valorant videos), ig牛逼, 正义必胜, 阿一古 and 屏蔽w wer
 to 100% of the people who sent them, while champions, teams and game words (奥拉夫, blg,
 号种子) almost never were: they sit inside longer lines, which is discussion. So a phrase
 is a whole danmu of up to 12 characters that at least 3 different people send, in at least
-2 videos, and that at least half of the people who use it at all send on its own. A danmu
+2 videos, and that at least half of the people who use it at all send on its own (a danmu
+that many send on their own, like 这怎么翻的, doesn't count as using 怎么翻的). A danmu
 that repeats itself counts once (正义必胜正义必胜 is 正义必胜, 阿一古！！！ is 阿一古), and so
 does one with a mood word at its end (怎么翻的 and 怎么翻). Digits only (666), English words
 (nice) and single characters don't count. Variants of one pattern, like 千言万语感谢现役 and
@@ -137,8 +138,10 @@ people send. A slang word people only ever write inside longer lines isn't found
 
 **How new.** Each phrase's share of the people writing in the last 7 days is compared with
 its share before that: `new` (nobody sent it before), `rising` (at least 3 times as common),
-`fading` (3 times rarer now), or `steady`, and only by more than chance, so a phrase a
-handful of people send stays `steady` until more do. The first run has nothing to compare
+`older` (3 times rarer now) or `steady`, and only by more than chance. `steady` also needs
+enough lines on both sides to show a change: when too few people would have sent it on one
+side, had it been as common there, it is a `first look` (a phrase only a handful of people
+send yet), or `older` when it was more common before (most of a game's danmu are old). The first run has nothing to compare
 with, so it also reads as many older videos (posted 30 to 90 days ago) to learn what
 people were already saying; after that, each run's lines become the next runs' "before".
 Phrases already learned or turned down, everyday ones in
