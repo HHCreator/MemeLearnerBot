@@ -1,6 +1,7 @@
 # MemeLearnerBot
 A bot that reads Bilibili by itself for the newest gaming memes (CS2, League of Legends,
-Valorant, Dota 2), and an entry point other apps use to learn the memes it found. The first
+Valorant, Dota 2), has a local AI model tell the memes from names and explain them, and
+gives other apps an entry point to learn the memes you approve. The first
 app meant to use it is [StupidTransilator](https://github.com/HHCreator/StupidTransilator),
 the stupid English-Chinese translator; the bot started there and moved here so the two can
 be developed separately.
@@ -18,19 +19,22 @@ py surf.py --no-fetch             # don't visit Bilibili; list again from what w
 ```
 
 `py surf.py` is short for `py -m memelearner learn`. What it lists are candidates: it can't
-tell a meme from a team, a player or a champion (金克丝) by itself, so you look through them
-and decide:
+tell a meme from a team, a player or a champion (金克丝) by itself. A local AI model can
+judge them first (see [The judge](#the-judge)), and you decide:
 
 ```
-py -m memelearner candidates                        # what the last run found
-py -m memelearner accept 阿一古 --meaning "..."      # learn it as a meme
+py -m memelearner judge                             # the model judges what the last run found
+py -m memelearner candidates                        # what the last run found, with verdicts
+py -m memelearner accept 阿一古                       # learn it as a meme, with the judge's meaning
+py -m memelearner accept 阿一古 --meaning "..."      # ... or with your own
 py -m memelearner reject 金克丝 --reason "a champion"  # not a meme: never list it again
 py -m memelearner forget 金克丝                      # undo accept or reject
 py -m memelearner memes                             # the memes learned so far
 ```
 
-`accept` takes the games, a few example lines and their videos from the last run, and can
-take an English gloss too (`--english`). The learned memes are kept in
+`accept` takes the games, a few example lines and their videos from the last run, and the
+judge's meaning and English gloss when it found the phrase a meme; `--meaning` and
+`--english` give your own instead. The learned memes are kept in
 `memelearner/data/memes.json`, which is committed: push it, and every app that uses the bot
 gets them.
 
@@ -52,6 +56,8 @@ memelearner.lookup("绷不住了")            # one learned meme, or None (any c
 memelearner.find("这下真的绷不住了")       # the learned memes in a text, in order
 memelearner.candidates()                # what the last run found, not looked at yet
 memelearner.learn(games=["lol"], known=my_words)  # read Bilibili now: takes minutes
+memelearner.judge()                     # a local model judges the candidates: minutes too
+memelearner.watching()                  # what the model wasn't sure of yet
 memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
 memelearner.reject("下路")              # not a meme: never list it again
 ```
@@ -71,10 +77,15 @@ A meme is a dict:
 `phrase` is lowercase and half-width, the way the bot finds it; `meaning` (Chinese) and
 `english` are "" until someone fills them in. A candidate has the phrase, its game, whether
 it is `new`, `rising` or a `first look` (nothing to compare with yet), how many people and
-videos used it, and example lines (see `find_candidates()` in `memelearner/surf.py`).
+videos used it, and example lines (see `find_candidates()` in `memelearner/surf.py`). Once
+judged it also has `judge`: the `verdict` (`meme`, `not a meme` or `watching`), what `kind`
+of phrase the model said it is, its `meaning`, `english` and `literal` meaning, `why`, the
+blind `test` and the write-ups it used (`sources`); see `judge()` in `memelearner/judging.py`.
+`judge()` raises `memelearner.ModelUnavailable` when Ollama isn't running or doesn't have
+the model.
 
-**Any language: the command line.** `memes`, `lookup`, `find` and `candidates` take
-`--json` and print what the Python functions return, in UTF-8. `lookup` exits with 1 when
+**Any language: the command line.** `memes`, `lookup`, `find`, `candidates` and `watching`
+take `--json` and print what the Python functions return, in UTF-8. `lookup` exits with 1 when
 the phrase isn't a learned meme.
 
 ```
@@ -135,6 +146,51 @@ seeds when a game runs dry. The bot says when it found nothing for a game.
 The phrases, with up to 8 example lines each and the videos they came from, are saved to
 `memelearner/.cache/surf/candidates.json` for `py -m memelearner candidates`.
 
+## The judge
+
+The bot only counts, so it lists team names (fpx) and everyday words (下路) beside the
+memes. A local AI model looks through the candidates first: is each a meme, a name (a team,
+a player, a champion) or an everyday word, and what does a meme mean?
+
+```
+py -m memelearner judge             # judge what the last run found (seconds per phrase)
+py surf.py --judge                  # read Bilibili, then judge what it found
+py -m memelearner watching          # what the model wasn't sure of yet
+py -m memelearner judge --again     # judge everything again, say with another model
+```
+
+It needs [Ollama](https://ollama.com) running on this computer, with the model downloaded:
+`ollama pull deepseek-r1:14b`. To use another model, add `--model qwen3:14b` or set the
+`MEMELEARNER_MODEL` environment variable.
+
+**Why trust it.** A model only knows the memes from before it was trained, and memes change
+faster than that, so the judge never goes by what the model remembers:
+
+- It takes up to 16 different lines that use the phrase from what the bot read, and gives
+  the model every other one, with what 萌娘百科 and 维基百科 write about the phrase now. The
+  model says what kind of phrase it is and, for a meme, writes what it means there, only
+  from what it got.
+- Then a blind test: a second question, which never saw those lines or the write-ups, gets
+  the other lines and two meanings, the model's and the literal one, and says which one
+  each line means. The meaning passes when at least 2 lines, and three quarters of the
+  lines that picked a meaning, pick it.
+- What the model can't tell, or a meaning that doesn't pass or can't be tested (too few
+  lines say more than the phrase itself), goes on the watching list. It is judged again
+  once 50% more people use it.
+
+So "meme" means the meaning fits real lines it wasn't written from. Names and everyday
+words come out as "not a meme". The judge never learns or turns down anything itself:
+you do, with `accept` and `reject`.
+
+**The look-ups.** 萌娘百科 often writes up new internet memes within days, and 维基百科
+knows the teams, players and tournaments, which helps tell names from memes. Both are read
+through their MediaWiki API, which is made for programs: one request at a time, two seconds
+apart, with a User-Agent that names the bot. A site that refuses is left alone for the rest
+of the run. 小鸡词典 and 百度百科 have no API for programs, so they aren't read.
+`--no-lookup` judges from the lines alone. Write-ups are kept for 3 days and verdicts for
+good in `memelearner/.cache/surf/judge.json`, so a phrase is only asked about again when
+there's more to go on.
+
 ## Files
 
 | File | What it is |
@@ -142,6 +198,8 @@ The phrases, with up to 8 example lines each and the videos they came from, are 
 | `memelearner/__init__.py` | the entry point other apps use |
 | `memelearner/cli.py` | the command line (`py -m memelearner`) |
 | `memelearner/surf.py` | the bot: find videos, read them, find new and rising phrases |
+| `memelearner/judging.py` | the judge: a local model tells memes from names and explains them |
+| `memelearner/wiki.py` | what 萌娘百科 and 维基百科 write about a phrase |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
@@ -152,5 +210,6 @@ The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs
 
 ## Tests
 
-`py -m unittest` runs the offline tests; they never visit Bilibili. GitHub runs them on each
+`py -m unittest` runs the offline tests; they never visit Bilibili or the wikis, nor ask a
+real model. GitHub runs them on each
 push and pull request, on Windows and Linux.

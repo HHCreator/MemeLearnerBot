@@ -9,6 +9,8 @@ apps learn them from it. Other apps only need what is in this file.
     memelearner.find("这下真的绷不住了")       # the learned memes in a text, in order
     memelearner.candidates()                # what the last run found, not looked at yet
     memelearner.learn(games=["lol"])        # read Bilibili now (takes minutes)
+    memelearner.judge()                     # a local model tells memes from names (minutes)
+    memelearner.watching()                  # what the model wasn't sure of yet
     memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
     memelearner.reject("下路")              # not a meme: never list it again
 
@@ -23,7 +25,8 @@ A meme is a dict:
      "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"]}   videos those came from
 
 A candidate is a phrase the bot found new or rising, with its numbers and example lines
-(see surf.find_candidates()). Apps that aren't written in Python get the same through the
+(see surf.find_candidates()), and once judged, the local model's verdict and meaning
+("judge", see judging.judge()). Apps that aren't written in Python get the same through the
 command line with --json (cli.py), or read data/memes.json, which holds the learned memes
 (its format is in store.py). API_VERSION changes when a field changes meaning or goes away;
 a new field doesn't change it.
@@ -32,14 +35,15 @@ a new field doesn't change it.
 import contextlib
 import io
 
-from . import store, surf
+from . import judging, store, surf
+from .judging import ModelUnavailable, watching
 from .store import find, forget, lookup, memes, reject
 
 __version__ = "0.1.0"
 API_VERSION = 1
 
-__all__ = ["memes", "lookup", "find", "candidates", "learn", "accept", "reject", "forget",
-           "API_VERSION"]
+__all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "watching", "accept",
+           "reject", "forget", "ModelUnavailable", "API_VERSION"]
 
 
 def candidates(game=None):
@@ -51,7 +55,7 @@ def candidates(game=None):
 
 
 def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.MIN_PEOPLE,
-          fetch=True, known=(), quiet=False):
+          fetch=True, known=(), judge=False, quiet=False):
     """Read Bilibili for new memes now, and return the candidates it found (also saved for
     candidates()). It waits 5 to 7 seconds between requests, so this takes minutes: about
     half a minute per video, 20 minutes for all games. Bilibili refusing or not answering
@@ -60,25 +64,48 @@ def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.M
     games: some of cs2, lol, valorant, dota2 (all by default); videos: videos read per game;
     days: how recent "new" is; people: different people who must use a phrase; fetch=False
     finds phrases again in what was read before, without visiting Bilibili; known: phrases
-    your app knows already, left out like the learned ones; quiet: print nothing.
+    your app knows already, left out like the learned ones; judge: then have the local
+    model judge them, as judge() does (raises ModelUnavailable when it can't be asked; the
+    candidates are saved all the same); quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
         found, _ = surf.learn(games, days, videos, people, fetch, known)
+        if judge and found:
+            found = judging.judge(games)
     return found
+
+
+def judge(games=None, model=None, look_up=True, again=False, quiet=False):
+    """Have a local model (through Ollama) judge the last run's candidates: is each a meme,
+    a name or an everyday word, and what does a meme mean? Returns the candidates, each
+    with its verdict as "judge" (also saved for candidates()); see judging.py for how it
+    works and what a verdict holds. It takes a few seconds per candidate.
+
+    games: only these games' candidates; model: an Ollama model (MEMELEARNER_MODEL, or
+    deepseek-r1:14b); look_up=False doesn't look the phrases up on the wikis; again=True
+    judges again what was judged before. Raises ModelUnavailable when Ollama isn't running
+    or doesn't have the model; the verdicts given until then are kept. quiet: print nothing.
+    """
+    with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
+        return judging.judge(games, model or judging.MODEL, look_up, again)
 
 
 def accept(phrase, meaning="", english="", game=None):
     """Learn a phrase as a meme, usually one of candidates(), and return the meme.
 
     When the phrase was a candidate in the last run, its games, example lines and videos
-    come from there. Accepting it again updates it: a meaning or English gloss given
-    replaces the old one.
+    come from there, and when the judge found it a meme, so do its meaning and English
+    gloss, unless you give them. Accepting it again updates it: a meaning or English gloss
+    given replaces the old one.
     """
     key = store.normal(phrase)
     last = surf._load_json(surf.CANDIDATES_FILE, {})
     urls = {bvid: video.get("url") for bvid, video in (last.get("videos") or {}).items()}
     found = [c for c in last.get("candidates") or [] if c["phrase"] == key]
     examples = [example for c in found for example in c["examples"]][:store.EXAMPLES]
+    if not (meaning and english) and not store.lookup(key):
+        judged = judging.meaning_of(key)
+        meaning, english = meaning or judged[0], english or judged[1]
     return store.accept(key, meaning, english,
                         games=[c["game"] for c in found] + ([game] if game else []),
                         examples=[example["text"] for example in examples],
