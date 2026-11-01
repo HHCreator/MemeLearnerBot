@@ -1,0 +1,9 @@
+{
+ "_comment": "Where the meme bot (py surf.py) looks on Bilibili. For each game: words, which a video's title must contain (any case) to count as that game's, so add teams, players and tournaments to catch more; and seeds, links to a few recent videos of the game (match replays, popular clips with lots of danmu; BV links or b23.tv share links) that it starts from. It follows the related videos beside them to the newest busy ones, and remembers what it read for next time, so seeds are only needed to start, or when a game runs dry.",
+ "bilibili": {
+  "cs2": {"words": ["CS2", "CSGO", "CS:GO", "反恐精英"], "seeds": []},
+  "lol": {"words": ["英雄联盟", "LOL", "LPL", "LCK", "全球总决赛"], "seeds": ["https://www.bilibili.com/video/BV17XxP6CE7n", "https://www.bilibili.com/video/BV1Eas967EY9", "https://www.bilibili.com/video/BV1wNHw6PEdQ", "https://www.bilibili.com/video/BV1woHM6XEtP"]},
+  "valorant": {"words": ["无畏契约", "瓦罗兰特", "VALORANT", "VCT"], "seeds": ["https://www.bilibili.com/video/BV17vxq6NEBi", "https://www.bilibili.com/video/BV1t6x76FEHd", "https://www.bilibili.com/video/BV1vcaY6YEQQ", "https://www.bilibili.com/video/BV199h969EbR", "https://www.bilibili.com/video/BV1CvaN6iE9t"]},
+  "dota2": {"words": ["DOTA", "刀塔"], "seeds": []}
+ }
+}
