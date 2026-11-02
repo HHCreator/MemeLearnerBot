@@ -1,7 +1,8 @@
 """The command line: py -m memelearner COMMAND, or memelearner COMMAND once pip-installed.
 
     py -m memelearner learn                    read Bilibili, then list the phrases people send
-    py -m memelearner judge                    a local model tells memes from names
+    py -m memelearner judge                    a model tells memes from names
+    py -m memelearner compare qwen3:14b deepseek/deepseek-flash   several models side by side
     py -m memelearner candidates               what the last run found, to look through
     py -m memelearner watching                 what the model wasn't sure of yet
     py -m memelearner accept 阿一古 --meaning "..."   learn a phrase as a meme
@@ -57,7 +58,7 @@ def _judge(games, model=judging.MODEL, again=False):
     try:
         judging.judge(games, model, again)
     except ModelUnavailable as error:
-        print(f"Couldn't ask the local model: {error}.")
+        print(f"Couldn't ask the model: {error}.")
         return False
     print('Learn one with: py -m memelearner accept PHRASE (it takes the judge\'s meaning '
           'unless it is only a guess, or give your own with --meaning); turn one down with: '
@@ -99,6 +100,15 @@ def _learn(args):
 def _judge_command(args):
     if not _judge(args.games, args.model, args.again):
         sys.exit(1)
+
+
+def _compare(args):
+    try:
+        judging.compare(args.models, args.games, args.top, args.add)
+    except ModelUnavailable as error:
+        sys.exit(f"Couldn't compare: {error}.")
+    except KeyboardInterrupt:
+        sys.exit(f"Stopped. What was judged so far is in {judging.comparison_file('md')}")
 
 
 def _watching(args):
@@ -196,23 +206,34 @@ def parser():
                        help="files or folders whose phrases aren't news, like another app's "
                        "word tables (.json or .txt; also MEMELEARNER_KNOWN)")
     learn.add_argument("--judge", action="store_true",
-                       help="then have the local model judge what was found (see judge)")
+                       help="then have the model judge what was found (see judge)")
     learn.set_defaults(run=_learn)
 
-    judge = sub.add_parser("judge", help="have a local model tell memes from names, game "
-                           "words and everyday words, and explain them")
+    judge = sub.add_parser("judge", help="have a model tell memes from names, game words and "
+                           "everyday words, and explain them")
     judge.add_argument("--games", nargs="+", metavar="GAME", help="only these games' phrases")
     judge.add_argument("--model", default=judging.MODEL,
-                       help="the Ollama model (default %(default)s; also MEMELEARNER_MODEL)")
+                       help="an Ollama model like qwen3:14b, or an online one like "
+                       "deepseek/deepseek-flash (default %(default)s; also MEMELEARNER_MODEL)")
     judge.add_argument("--again", action="store_true", help="judge again what was judged before")
     judge.set_defaults(run=_judge_command)
+
+    side = sub.add_parser("compare", help="judge the same phrases with several models, side by "
+                          "side, to pick one (the verdicts judge keeps don't change)")
+    side.add_argument("models", nargs="+", metavar="MODEL",
+                      help="Ollama models (qwen3:14b) or online ones (deepseek/deepseek-flash)")
+    side.add_argument("--games", nargs="+", metavar="GAME", help="only these games' phrases")
+    side.add_argument("--top", type=int, metavar="N", help="only each game's N best phrases")
+    side.add_argument("--add", action="store_true", help="keep the other models of the last "
+                      "comparison of the same phrases, so these are added to it")
+    side.set_defaults(run=_compare)
 
     show = sub.add_parser("candidates", help="the phrases the last run found, to look through")
     show.add_argument("--game", help="only this game's")
     show.add_argument("--json", action="store_true", help="print JSON")
     show.set_defaults(run=_candidates)
 
-    unsure = sub.add_parser("watching", help="the phrases the local model wasn't sure of yet")
+    unsure = sub.add_parser("watching", help="the phrases the model wasn't sure of yet")
     unsure.add_argument("--game", help="only this game's")
     unsure.add_argument("--json", action="store_true", help="print JSON")
     unsure.set_defaults(run=_watching)

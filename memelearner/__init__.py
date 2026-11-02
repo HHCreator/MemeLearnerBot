@@ -9,7 +9,7 @@ apps learn them from it. Other apps only need what is in this file.
     memelearner.find("这下真的绷不住了")       # the learned memes in a text, in order
     memelearner.candidates()                # what the last run found, not looked at yet
     memelearner.learn(games=["lol"])        # read Bilibili now (takes minutes)
-    memelearner.judge()                     # a local model tells memes from names (minutes)
+    memelearner.judge()                     # a model tells memes from names (minutes)
     memelearner.watching()                  # what the model wasn't sure of yet
     memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
     memelearner.reject("下路")              # not a meme: never list it again
@@ -26,7 +26,7 @@ A meme is a dict:
 
 A candidate is a short danmu that many people send on their own, with how new it is, its
 numbers, its variants and example lines (see surf.find_candidates()), and once judged, the
-local model's verdict and meaning ("judge", see judging.judge()). Apps that aren't written
+model's verdict and meaning ("judge", see judging.judge()). Apps that aren't written
 in Python get the same through the command line with --json (cli.py), or read
 data/memes.json, which holds the learned memes (its format is in store.py). API_VERSION
 changes when a field changes meaning or goes away; a new field doesn't change it.
@@ -39,7 +39,7 @@ from . import judging, store, surf
 from .judging import ModelUnavailable, watching
 from .store import find, forget, lookup, memes, reject
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 API_VERSION = 2  # 2: a candidate is a phrase people send on their own, new or not
 
 __all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "watching", "accept",
@@ -77,16 +77,18 @@ def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.M
 
 
 def judge(games=None, model=None, again=False, quiet=False):
-    """Have a local model (through Ollama) judge the last run's candidates: is each a meme,
-    a name, a game word or an everyday word, and what does a meme mean? Returns the
-    candidates, each with its verdict as "judge" (also saved for candidates()); see
-    judging.py for how it works and what a verdict holds. It takes a few seconds per
-    candidate.
+    """Have a model judge the last run's candidates: is each a meme, a name, a game word or
+    an everyday word, and what does a meme mean? Returns the candidates, each with its
+    verdict as "judge" (also saved for candidates()); see judging.py for how it works and
+    what a verdict holds. It takes a few seconds per candidate.
 
-    games: only these games' candidates; model: an Ollama model (MEMELEARNER_MODEL, or
+    games: only these games' candidates; model: an Ollama model on this computer, or an
+    online one named PROVIDER/MODEL like deepseek/deepseek-flash, which reads your key from
+    an environment variable (DEEPSEEK_API_KEY) (default: MEMELEARNER_MODEL, or
     deepseek-r1:14b); again=True judges again what was judged before. Raises
-    ModelUnavailable when Ollama isn't running or doesn't have the model; the verdicts given
-    until then are kept. quiet: print nothing.
+    ModelUnavailable when the model can't be asked (Ollama isn't running or doesn't have it;
+    an online one has no key, refuses it or doesn't answer); the verdicts given until then
+    are kept. quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
         return judging.judge(games, model or judging.MODEL, again)
