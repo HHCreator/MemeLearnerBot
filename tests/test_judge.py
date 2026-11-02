@@ -21,12 +21,14 @@ from memelearner import cli, judging, store, surf
 DAY = 86400
 AYIGU = "主播的口头禅，看到好操作时喊"
 CHANT = "观众一起刷的口号，给喜欢的队伍打气"
+SNOW = "「这是雪豹」的谐音，拿来开玩笑"
 
 
 class FakeModel:
     """Stands in for judging._ask: answers the explaining and the testing questions. 阿一古 is
     a meme whose meaning fits, fpx a name, 怎么翻 a meme whose meaning doesn't fit, 正义必胜 a
-    chant that is only ever sent on its own, and the answer about 神中神 isn't JSON."""
+    chant that is only ever sent on its own, 芝士雪豹 a meme someone explains, 吓哭了 a meme
+    the model can't explain, and the answer about 神中神 isn't JSON."""
 
     ANSWERS = {
         "阿一古": {"kind": "meme", "meaning": AYIGU, "english": "a streamer's catchphrase",
@@ -36,6 +38,10 @@ class FakeModel:
                 "why": "猜的"},
         "正义必胜": {"kind": "meme", "meaning": CHANT, "english": "justice will win",
                  "literal": "正义的一方一定会赢", "why": "很多人一起刷"},
+        "芝士雪豹": {"kind": "meme", "meaning": SNOW, "english": "a pun on 'this is a snow leopard'",
+                 "literal": "奶酪做的雪豹", "why": "有人解释了它是谐音"},
+        "吓哭了": {"kind": "meme", "meaning": "", "english": "scared to tears", "literal": "",
+                "why": "大家一起刷，但看不出在说什么"},
     }
 
     def __init__(self):
@@ -80,9 +86,10 @@ class JudgeTest(unittest.TestCase):
             self.addCleanup(patcher.stop)
         self.now = time.time()
 
-    def write_run(self, people=None):
+    def write_run(self, people=None, more=None):
         """What a run read and found: lines using 阿一古, fpx, 怎么翻, 正义必胜 and 神中神 under
-        two LoL videos, and the five as candidates."""
+        two LoL videos, and the five as candidates; more: {phrase: (its lines in the first
+        video, in the second)} for more candidates."""
         lines = {
             "BV1aaaaaaaaa": ["阿一古阿一古 又来了", "这波阿一古了兄弟们", "阿一古！！！", "主播又在阿一古",
                              "阿一古来了家人们", "fpx加油", "FPX 这波可以", "这局怎么翻",
@@ -92,6 +99,9 @@ class JudgeTest(unittest.TestCase):
                              "fpxs是谁", "还能怎么翻啊", "落后一万怎么翻", "这还怎么翻",
                              "神中神了家人们", "正义必胜正义必胜", "正义必胜！"],
         }
+        for in_a, in_b in (more or {}).values():
+            lines["BV1aaaaaaaaa"] += in_a
+            lines["BV1bbbbbbbbb"] += in_b
         videos = {}
         for bvid, texts in lines.items():
             videos[bvid] = {"game": "lol", "title": f"英雄联盟 {bvid[-1]} 组比赛",
@@ -114,7 +124,8 @@ class JudgeTest(unittest.TestCase):
                             if phrase == "正义必胜" else [],
                             "examples": [{"text": phrase, "video": bvid, "kind": "danmu",
                                           "sent": "2026-10-31"} for bvid in videos]}
-                           for phrase in ["阿一古", "fpx", "怎么翻", "正义必胜", "神中神"]]})
+                           for phrase in ["阿一古", "fpx", "怎么翻", "正义必胜", "神中神"]
+                           + list(more or {})]})
 
     def judge(self, **options):
         with contextlib.redirect_stdout(io.StringIO()):
@@ -145,6 +156,8 @@ class JudgeTest(unittest.TestCase):
         self.write_run()
         chant = self.judge()["正义必胜"]
         self.assertEqual((chant["verdict"], chant["meaning"]), ("untested", CHANT))
+        # Nothing showed the model what it means: the meaning is only a guess
+        self.assertEqual((chant["guess"], chant["explanations"]), (True, []))
         self.assertNotIn("正义必胜", self.model.tested)  # no longer lines to test it on
         self.assertNotIn("test", chant)
         self.assertEqual(self.model.explained["正义必胜"]["variants"], ["正义必输"])
@@ -192,9 +205,43 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(memelearner.accept("阿一古", meaning="我自己的意思")["meaning"], "我自己的意思")
         self.assertEqual(memelearner.accept("阿一古")["meaning"], "我自己的意思")  # yours stays
         self.assertEqual(memelearner.accept("fpx")["meaning"], "")  # not a meme: no meaning
-        self.assertEqual(memelearner.accept("正义必胜")["meaning"], CHANT)  # untested: you decide
+        self.assertEqual(memelearner.accept("正义必胜")["meaning"], "")  # only a guess: not taken
         memelearner.reject("怎么翻", "an everyday phrase")
         self.assertEqual([v["phrase"] for v in memelearner.watching()], ["神中神"])
+
+    def test_lines_that_explain_a_phrase_are_told_apart_from_questions_and_opinions(self):
+        for line in ["芝士雪豹是这是雪豹的谐音", "阿一古的意思是韩语的哎呦", "出自去年的世界赛",
+                     "yyds=永远的神", "阿一古是什么意思？韩语哎呦的意思"]:
+            self.assertTrue(judging.explains(line), line)
+        for line in ["芝士雪豹是什么梗？", "求科普阿一古", "阿一古的意思是？", "这就是阿一古的意思吗",
+                     "我的意思是阿一古太强了", "阿一古！这波是指挥的问题", "阿一古阿一古 又来了"]:
+            self.assertFalse(judging.explains(line), line)
+
+    def test_a_meaning_someone_explains_goes_to_the_model_and_accept_takes_it(self):
+        self.write_run(more={"芝士雪豹": (["芝士雪豹是这是雪豹的谐音", "芝士雪豹", "芝士雪豹是什么梗？"],
+                                       ["芝士雪豹！", "我的意思是芝士雪豹太好笑了"])})
+        lines = judging.usage_lines({("lol", "芝士雪豹")})[("lol", "芝士雪豹")]
+        self.assertEqual(lines, ["芝士雪豹是这是雪豹的谐音",  # the line that explains it first
+                                 "我的意思是芝士雪豹太好笑了", "芝士雪豹是什么梗？", "芝士雪豹！"])
+        snow = self.judge()["芝士雪豹"]
+        asked = self.model.explained["芝士雪豹"]
+        self.assertEqual(asked["explanations"], ["芝士雪豹是这是雪豹的谐音"])
+        self.assertNotIn("芝士雪豹是这是雪豹的谐音", asked["lines"])
+        # Two other longer lines are too few to test on, but the meaning isn't just a guess
+        self.assertEqual((snow["verdict"], snow["meaning"], snow["guess"]),
+                         ("untested", SNOW, False))
+        self.assertIn("from 1 line explaining it, like 芝士雪豹是这是雪豹的谐音",
+                      judging.untested(snow))
+        self.assertEqual(memelearner.accept("芝士雪豹")["meaning"], SNOW)
+
+    def test_a_meme_the_model_cant_explain_has_no_meaning(self):
+        self.write_run(more={"吓哭了": (["吓哭了", "吓哭了吓哭了"], ["吓哭了！", "真的吓哭了"])})
+        scared = self.judge()["吓哭了"]
+        self.assertEqual((scared["verdict"], scared["meaning"], scared["english"], scared["guess"]),
+                         ("untested", "", "", False))
+        self.assertEqual(judging.untested(scared),
+                         "meaning unknown: nobody explains it in what the bot read")
+        self.assertEqual(memelearner.accept("吓哭了")["meaning"], "")
 
     def test_without_ollama_nothing_is_judged(self):
         self.write_run()
@@ -253,12 +300,13 @@ class JudgeTest(unittest.TestCase):
         code, printed = self.run_cli("judge")
         self.assertEqual(code, 0)
         self.assertIn(f"meme        阿一古  {AYIGU}", printed)
-        self.assertIn("1 look like memes, 1 look like memes whose meaning couldn't be tested, "
-                      "1 are names, game words or everyday words, 2 are on the watching list",
-                      printed)
+        self.assertIn("1 look like memes, 1 look like memes whose meaning couldn't be tested (1 "
+                      "of them with only a guess or no meaning), 1 are names, game words or "
+                      "everyday words, 2 are on the watching list", printed)
+        self.assertIn(f"untested    正义必胜  only the model's guess: {CHANT}", printed)
         code, printed = self.run_cli("candidates")
         self.assertIn(f"-> a meme: {AYIGU}", printed)
-        self.assertIn(f"-> a meme, meaning not tested: {CHANT}", printed)
+        self.assertIn(f"-> a meme, only the model's guess: {CHANT}", printed)
         self.assertIn("-> not a meme: a name", printed)
         self.assertIn("90% on its own", printed)
         self.assertIn("also 正义必输", printed)

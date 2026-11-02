@@ -34,8 +34,8 @@ py -m memelearner memes                             # the memes learned so far
 ```
 
 `accept` takes the games, a few example lines and their videos from the last run, and the
-judge's meaning and English gloss when it found the phrase a meme (tested or not);
-`--meaning` and `--english` give your own instead. The learned memes are kept in
+judge's meaning and English gloss when it found the phrase a meme, unless that meaning is
+only the model's guess; `--meaning` and `--english` give your own instead. The learned memes are kept in
 `memelearner/data/memes.json`, which is committed: push it, and every app that uses the bot
 gets them.
 
@@ -82,7 +82,8 @@ compare with yet), how many `people` send it on its own and in how many `videos`
 people using it who send it on its own (`alone`), its `variants` and example lines (see
 `find_candidates()` in `memelearner/surf.py`). Once judged it also has `judge`: the
 `verdict` (`meme`, `untested`, `not a meme` or `watching`), what `kind` of phrase the model
-said it is, its `meaning`, `english` and `literal` meaning, `why`, and the blind `test`; see
+said it is, its `meaning`, `english` and `literal` meaning, whether that meaning is only a
+`guess`, the `explanations` it was shown, `why`, and the blind `test`; see
 `judge()` in `memelearner/judging.py`. `judge()` raises `memelearner.ModelUnavailable` when
 Ollama isn't running or doesn't have the model.
 
@@ -182,18 +183,23 @@ It needs [Ollama](https://ollama.com) running on this computer, with the model d
 **Why trust it.** A model only knows the memes from before it was trained, and memes change
 faster than that, so the judge never goes by what the model remembers:
 
-- It takes up to 16 different lines that use the phrase from what the bot read: the ones
-  that say more than the phrase first (主播又在阿一古了), then a few that are just the
-  phrase. The model gets half of the longer lines, a few short ones, how many people send
-  it on its own, its variants and the titles of its videos. It says what kind of phrase it
-  is and, for a meme, writes what it means there, only from what it got.
+- It takes up to 16 different lines that use the phrase from what the bot read: first up
+  to 4 where people explain it (出自…, 谐音…, 阿一古的意思是…; questions like 是什么梗 and
+  opinions like 我的意思是 don't count), then the others that say more than the phrase
+  (主播又在阿一古了), then a few that are just the phrase. The model gets the explaining
+  lines, half of the other longer lines, a few short ones, how many people send it on its
+  own, its variants and the titles of its videos. It says what kind of phrase it is and,
+  for a meme, writes what it means there, only from what it got, or no meaning when it
+  can't tell.
 - Then a blind test: a second question, which never saw those lines, gets the other longer
   lines and two meanings, the model's and the literal one, and says which one each line
   means. The meaning passes when at least 2 lines, and three quarters of the lines that
   picked a meaning, pick it.
-- Many memes are only ever sent on their own, so no line shows what they mean. When fewer
+- Many memes are only ever sent on their own, so few lines show what they mean. When fewer
   than 3 lines say more than the phrase, its meaning can't be tested: the verdict is
-  "untested", with the model's meaning for you to check.
+  "untested". If some lines explain it, the meaning comes from them, and `candidates` shows
+  one of them. If none does, the meaning is only the model's guess: it is shown as one, and
+  `accept` doesn't take it, so give the meaning yourself with `--meaning`.
 - What the model can't tell, or a meaning that doesn't pass, goes on the watching list.
   Untested and watching phrases are judged again once 50% more people send them.
 

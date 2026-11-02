@@ -43,9 +43,10 @@ def _show_candidate(c):
     example = c["examples"][0]["text"] if c["examples"] else ""
     verdict = c.get("judge") or {}
     said = {"meme": f"  -> a meme: {verdict.get('meaning', '')}",
-            "untested": f"  -> a meme, meaning not tested: {verdict.get('meaning', '')}",
             "not a meme": "  -> not a meme: " + judging.NOT_MEMES.get(verdict.get("kind"), "?"),
             "watching": "  -> watching"}.get(verdict.get("verdict"), "")
+    if verdict.get("verdict") == "untested":
+        said = "  -> a meme, " + judging.untested(verdict)
     print(f"  {c['game']:<9} {how:<12} {c['phrase']}  ({c['people']} people{alone}, "
           f"{c['videos']} videos{also})  e.g. {example[:40]}{said}")
 
@@ -59,7 +60,8 @@ def _judge(games, model=judging.MODEL, again=False):
         print(f"Couldn't ask the local model: {error}.")
         return False
     print('Learn one with: py -m memelearner accept PHRASE (it takes the judge\'s meaning '
-          'unless you give --meaning); turn one down with: py -m memelearner reject PHRASE')
+          'unless it is only a guess, or give your own with --meaning); turn one down with: '
+          'py -m memelearner reject PHRASE')
     return True
 
 

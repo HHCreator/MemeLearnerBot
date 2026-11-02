@@ -96,8 +96,9 @@ def accept(phrase, meaning="", english="", game=None):
     """Learn a phrase as a meme, usually one of candidates(), and return the meme.
 
     When the phrase was a candidate in the last run, its games, example lines and videos
-    come from there, and when the judge found it a meme (tested or not), so do its meaning
-    and English gloss, unless you give them. Accepting it again updates it: a meaning or
+    come from there, and when the judge found it a meme and its meaning isn't only a guess
+    (it was tested, or lines explained it), so do its meaning and English gloss, unless you
+    give them. Accepting it again updates it: a meaning or
     English gloss given replaces the old one.
     """
     key = store.normal(phrase)
