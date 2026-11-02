@@ -9,6 +9,13 @@ is used. The bot sees what anyone sees on a video page without logging in.
     video_info(bvid)                       a video's title, ids, parts and counts
     danmu(cid)                             the danmu (弹幕) on one part of a video
     comments(aid)                          the hot comments under a video, with their replies
+    video_detail(bvid)                     a video's page: info, description, tags, subtitles
+                                           and related videos, in one request
+    subtitle_text(url)                     the text of one of a video's subtitle tracks
+    audio_url(bvid, cid)                   where the smallest audio stream of a video is
+    download(url, path)                    save an audio stream to a file
+
+The last four are for the videos that explain memes (explainers.py).
 
 danmu() and comments() return messages as dicts: {"id", "kind", "who", "text", "sent"}, where
 "who" is a short hash of the sender (enough to count different people; the real id is never
@@ -32,6 +39,7 @@ import hashlib
 import hmac
 import html
 import json
+import os
 import random
 import re
 import time
@@ -277,21 +285,25 @@ def _video(item):
     }
 
 
-def search_videos(keyword, since, until, order="dm", page=1):
-    """Videos found by a search word, posted between the unix times since and until.
+def search_videos(keyword, since=None, until=None, order="dm", page=1):
+    """Videos found by a search word, posted between the unix times since and until (any
+    time when they aren't given).
 
     order: dm (most danmu first), click (most played), pubdate (newest), scores (most
-    comments). Bilibili often answers a visitor's search with a captcha (Captcha).
+    comments), totalrank (the best match first). Bilibili often answers a visitor's search
+    with a captcha (Captcha).
     """
-    data = _request("/x/web-interface/wbi/search/type",
-                    {"search_type": "video", "keyword": keyword, "order": order, "page": page,
-                     "pubtime_begin_s": int(since), "pubtime_end_s": int(until)}, signed=True)
+    params = {"search_type": "video", "keyword": keyword, "order": order, "page": page}
+    if since is not None and until is not None:
+        params.update(pubtime_begin_s=int(since), pubtime_end_s=int(until))
+    data = _request("/x/web-interface/wbi/search/type", params, signed=True)
     videos = []
     for item in (data or {}).get("result") or []:
         if item.get("type") != "video" or not item.get("bvid"):
             continue
         video = _video(item)
-        if since <= video["pubdate"] <= until:  # in case the search ignores the time range
+        # in case the search ignores the time range
+        if since is None or until is None or since <= video["pubdate"] <= until:
             videos.append(video)
     return videos
 
@@ -417,3 +429,146 @@ def comments(aid, pages=3):
             break
         messages += found
     return messages
+
+
+# -- videos that explain memes (explainers.py) --------------------------------------------
+
+PAGE = "https://www.bilibili.com/video/{bvid}/"
+PLAYINFO = re.compile(r"window\.__playinfo__\s*=\s*(\{.*?\})\s*</script>", re.S)
+MAX_DOWNLOAD = 20_000_000  # bytes of audio saved at most: 64 kbit/s is 0.5 MB a minute
+
+
+def _fetch_file(url, path, limit):
+    """Save what an address holds to a file, at most limit bytes; return how many it saved,
+    or None when there was more. Tests replace this."""
+    request = urllib.request.Request(url, headers=HEADERS)
+    saved = 0
+    with urllib.request.urlopen(request, timeout=30) as response, open(path, "wb") as f:
+        while True:
+            chunk = response.read(65536)
+            if not chunk:
+                return saved
+            saved += len(chunk)
+            if saved > limit:
+                return None
+            f.write(chunk)
+
+
+def _get(url, cookies=None):
+    """GET an address outside the API, like a video's page or a subtitle file, waiting its
+    turn like every request. Returns the body as text. Raises Blocked when Bilibili refuses
+    a bot (HTTP 412 or 429), and Error for any other HTTP error."""
+    _wait_turn()
+    try:
+        body, encoding = _fetch(url, cookies=cookies)
+    except urllib.error.HTTPError as error:
+        if error.code in (412, 429):
+            raise Blocked(f"Bilibili refused {url[:60]} (HTTP {error.code})") from None
+        raise Error(f"{url[:60]}: HTTP {error.code}") from None
+    return _decompress(body, encoding).decode("utf-8", "replace")
+
+
+def _tracks(items):
+    """The subtitle tracks a visitor can read, from a list of them: [{"lan", "url", "ai"}],
+    the ones made by people before the ones Bilibili's AI made, Chinese first."""
+    tracks = []
+    for item in items or []:
+        if not isinstance(item, dict) or not item.get("subtitle_url"):
+            continue  # a track with no address is one only logged-in viewers get
+        url = item["subtitle_url"]
+        lan = str(item.get("lan") or "")
+        tracks.append({"lan": lan, "url": "https:" + url if url.startswith("//") else url,
+                       "ai": bool(item.get("ai_type")) or lan.startswith("ai-")})
+    return sorted(tracks, key=lambda track: (track["ai"],
+                                             not track["lan"].replace("ai-", "").startswith("zh")))
+
+
+def video_detail(bvid):
+    """What a video's page shows, in one request (view/detail, which a visitor gets without
+    a captcha): {"bvid", "aid", "title", "author", "pubdate", "duration" (seconds),
+    "desc", "tags", "plays", "parts": [cid, ...], "subtitles" (the tracks a visitor can
+    read, see _tracks(); Bilibili only gives its AI subtitles to logged-in viewers, so this
+    is often empty), "related" (the videos beside it, like related_videos())}."""
+    data = _request("/x/web-interface/view/detail", {"bvid": bvid}) or {}
+    view = data.get("View") if isinstance(data.get("View"), dict) else {}
+    if not view.get("aid"):
+        raise Error(f"/x/web-interface/view/detail: no video {bvid}")
+    stat = view.get("stat") or {}
+    parts = [page["cid"] for page in view.get("pages") or [] if page.get("cid")]
+    desc = str(view.get("desc") or "").strip()
+    return {
+        "bvid": bvid,
+        "aid": view["aid"],
+        "title": view.get("title", ""),
+        "author": (view.get("owner") or {}).get("name", ""),
+        "pubdate": view.get("pubdate", 0),
+        "duration": view.get("duration", 0),
+        "desc": "" if desc == "-" else desc,  # "-" is what the page shows for none
+        "tags": [tag["tag_name"] for tag in data.get("Tags") or []
+                 if isinstance(tag, dict) and tag.get("tag_name")],
+        "plays": _number(stat.get("view")),
+        "parts": parts or ([view["cid"]] if view.get("cid") else []),
+        "subtitles": _tracks((view.get("subtitle") or {}).get("list")),
+        "related": [_video(item) for item in data.get("Related") or []
+                    if isinstance(item, dict) and item.get("bvid")],
+    }
+
+
+def subtitle_text(url):
+    """The text of a subtitle track (a JSON file of lines with their times), the lines
+    joined by spaces."""
+    try:
+        lines = json.loads(_get(url)).get("body") or []
+    except (ValueError, AttributeError):
+        raise Error(f"the subtitles at {url[:60]} aren't JSON") from None
+    return " ".join(str(line.get("content") or "").strip() for line in lines
+                    if isinstance(line, dict) and line.get("content"))
+
+
+def _smallest_audio(dash):
+    """The address of the audio stream with the fewest bits per second in a player answer's
+    "dash" part, or None."""
+    streams = [stream for stream in (dash or {}).get("audio") or [] if isinstance(stream, dict)]
+    for stream in sorted(streams, key=lambda stream: stream.get("bandwidth") or 10 ** 9):
+        urls = ([stream.get("baseUrl") or stream.get("base_url")] +
+                list(stream.get("backupUrl") or stream.get("backup_url") or []))
+        found = next((url for url in urls if url), None)
+        if found:
+            return found
+    return None
+
+
+def audio_url(bvid, cid):
+    """Where the smallest audio stream of a video is (cid is the part, usually the first),
+    so the bot can hear what the video says without its pictures. It reads the video's page
+    the way a browser does, which carries the player's streams (window.__playinfo__), and
+    asks the player's API when the page doesn't. None when the video has no separate audio
+    (some old ones)."""
+    try:
+        found = PLAYINFO.search(_get(PAGE.format(bvid=bvid), cookies=_visitor_cookies()))
+        address = _smallest_audio((json.loads(found.group(1)).get("data") or {}).get("dash")
+                                  if found else None)
+        if address:
+            return address
+    except (Error, Blocked, ValueError, AttributeError, OSError):
+        pass  # the page changed, refused or didn't answer: the API is the other way
+    data = _request("/x/player/wbi/playurl", {"bvid": bvid, "cid": cid, "qn": 16, "fnval": 16,
+                                              "fnver": 0, "fourk": 0}, signed=True) or {}
+    return _smallest_audio(data.get("dash"))
+
+
+def download(url, path, limit=MAX_DOWNLOAD):
+    """Save an audio stream to a file, waiting its turn like every request; raises Error
+    when it is bigger than limit bytes (the file is then removed)."""
+    _wait_turn()
+    try:
+        saved = _fetch_file(url, path, limit)
+    except urllib.error.HTTPError as error:
+        raise Error(f"the audio stream answered HTTP {error.code}") from None
+    if saved is None:
+        try:
+            os.remove(path)
+        except OSError:
+            pass
+        raise Error(f"the audio stream is bigger than {limit // 1_000_000} MB")
+    return saved
