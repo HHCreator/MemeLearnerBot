@@ -171,8 +171,10 @@ def find_videos(game, source, videos, now, days, count, search=None):
     They come from related videos: the lists Bilibili shows beside a video, which a visitor
     gets without a captcha. It follows the seeds first, then the newest videos found, then
     the newest ones read before (videos, from videos.json), up to EXPAND lists. The search is
-    tried once per run (search is a dict shared by the games: {"refused": bool}).
+    tried once per run (search is a dict shared by the games: {"refused": bool}). Videos in
+    those lists that explain memes are kept for explainers.py.
     """
+    from . import explainers  # here: explainers.py uses this module
     since = now - days * DAY
     search = {} if search is None else search
     found = {}
@@ -222,6 +224,7 @@ def find_videos(game, source, videos, now, days, count, search=None):
         except bilibili.Error as error:
             print(f"  couldn't list the videos related to {bvid}: {error}")
             continue
+        explainers.remember(related)  # videos that explain memes, for explain to look through
         for video in related:
             add(video)
 
