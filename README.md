@@ -1,6 +1,6 @@
 # MemeLearnerBot
 A bot that reads Bilibili by itself for the newest gaming memes (CS2, League of Legends,
-Valorant, Dota 2), has a local AI model tell the memes from names and explain them, and
+Valorant, Dota 2), has an AI model tell the memes from names and explain them, and
 gives other apps an entry point to learn the memes you approve. The first
 app meant to use it is [StupidTransilator](https://github.com/HHCreator/StupidTransilator),
 the stupid English-Chinese translator; the bot started there and moved here so the two can
@@ -20,7 +20,7 @@ py surf.py --no-fetch             # don't visit Bilibili; list again from what w
 
 `py surf.py` is short for `py -m memelearner learn`. What it lists are candidates: short
 danmu that many people send on their own. Most memes are like that, but so are cheers
-(ig加油) and everyday words (笑死), and the bot can't tell them apart by itself. A local AI
+(ig加油) and everyday words (笑死), and the bot can't tell them apart by itself. An AI
 model can judge them first (see [The judge](#the-judge)), and you decide:
 
 ```
@@ -57,7 +57,7 @@ memelearner.lookup("绷不住了")            # one learned meme, or None (any c
 memelearner.find("这下真的绷不住了")       # the learned memes in a text, in order
 memelearner.candidates()                # what the last run found, not looked at yet
 memelearner.learn(games=["lol"], known=my_words)  # read Bilibili now: takes minutes
-memelearner.judge()                     # a local model judges the candidates: minutes too
+memelearner.judge()                     # a model judges the candidates: minutes too
 memelearner.watching()                  # what the model wasn't sure of yet
 memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
 memelearner.reject("下路")              # not a meme: never list it again
@@ -85,7 +85,8 @@ people using it who send it on its own (`alone`), its `variants` and example lin
 said it is, its `meaning`, `english` and `literal` meaning, whether that meaning is only a
 `guess`, the `explanations` it was shown, `why`, and the blind `test`; see
 `judge()` in `memelearner/judging.py`. `judge()` raises `memelearner.ModelUnavailable` when
-Ollama isn't running or doesn't have the model.
+the model can't be asked (Ollama isn't running or doesn't have it; an online model has no
+key, refuses it or doesn't answer).
 
 **Any language: the command line.** `memes`, `lookup`, `find`, `candidates` and `watching`
 take `--json` and print what the Python functions return, in UTF-8. `lookup` exits with 1 when
@@ -165,7 +166,7 @@ that use it inside something longer first) and the videos they came from, are sa
 ## The judge
 
 The bot only counts, so it lists cheers (ig加油) and everyday words (笑死) beside the memes.
-A local AI model looks through the candidates first: is each a meme, a name (a team, a
+An AI model looks through the candidates first: is each a meme, a name (a team, a
 player, a champion), a game word (a role, a seed) or an everyday word, and what does a
 meme mean?
 
@@ -176,9 +177,48 @@ py -m memelearner watching          # what the model wasn't sure of yet
 py -m memelearner judge --again     # judge everything again, say with another model
 ```
 
-It needs [Ollama](https://ollama.com) running on this computer, with the model downloaded:
-`ollama pull deepseek-r1:14b`. To use another model, add `--model qwen3:14b` or set the
-`MEMELEARNER_MODEL` environment variable.
+**Which model.** By default it asks deepseek-flash (DeepSeek-V4.1-Flash), one of DeepSeek's
+online models, which are far bigger than a model that fits on a graphics card. Of five
+models compared on the 60 phrases of a real run, it gave the most right meanings and no
+wrong ones (see Picking a model below). It needs an API key:
+
+1. Make an account on [DeepSeek's platform](https://platform.deepseek.com), top it up (a few
+   dollars go a long way, see below) and create an API key.
+2. Put the key in an environment variable on your computer, never in a file in this folder,
+   which could end up on GitHub: run `setx DEEPSEEK_API_KEY sk-...` once, then open a new
+   terminal.
+
+Another model: add `--model deepseek/deepseek-v4-pro` (DeepSeek-V4-Pro: bigger, about 4 times
+the price), or a model on this computer through [Ollama](https://ollama.com), like `--model
+qwen3:14b` (start Ollama and run `ollama pull qwen3:14b` first). A local model is free and
+works offline, but it knows far less slang. The `MEMELEARNER_MODEL` environment variable
+changes the default.
+
+The judge sends DeepSeek the lines and video titles it shows the model, never who sent
+them, and asks without DeepSeek's "thinking", which is slower and costs more. Judging the
+60 phrases of a run takes about 100 answers and 60,000 tokens: about 1.3 US cents with
+Flash and 5 with Pro at full price (2026-11-02). The prices are on DeepSeek's site, and they
+halve outside 9:00-12:00 and 14:00-18:00 Beijing time on weekdays. The judge says how many
+tokens it used.
+
+**Picking a model.** `compare` judges the same phrases with several models, from the same
+lines, and writes each phrase with every model's verdict to
+`memelearner/.cache/surf/compare.md`, to read side by side. The verdicts `judge` keeps don't
+change. The models are asked one after another, so Ollama loads each once. While it runs
+(and while `judge` runs) Windows doesn't go to sleep, and it saves after every phrase: if a
+comparison stops anyway, run the same command with `--add` and it carries on where it stopped.
+
+```
+py -m memelearner compare deepseek-r1:14b qwen3:14b qwen3.5:9b
+py -m memelearner compare deepseek/deepseek-flash --add   # add a model to the last comparison
+py -m memelearner compare qwen3:14b deepseek/deepseek-flash --top 10   # each game's 10 best
+```
+
+The comparison behind the default (2026-11-02): five models judged the 60 phrases of a run
+(LoL and Valorant), and 46 of them could be checked against what the phrase really means.
+deepseek-flash got 31 right and none wrong, deepseek-v4-pro 25 right and none wrong,
+qwen3:14b 12 right and 5 wrong, deepseek-r1:14b 9 right and 11 wrong, and qwen3.5:9b 1 right
+and 5 wrong. The local models filed memes like 阿一古 and 得分通道关闭 as names or game words.
 
 **Why trust it.** A model only knows the memes from before it was trained, and memes change
 faster than that, so the judge never goes by what the model remembers:
@@ -220,7 +260,7 @@ led to Olaf Scholz), which misled the model more than they helped.
 | `memelearner/__init__.py` | the entry point other apps use |
 | `memelearner/cli.py` | the command line (`py -m memelearner`) |
 | `memelearner/surf.py` | the bot: find videos, read them, find the phrases people send on their own |
-| `memelearner/judging.py` | the judge: a local model tells memes from names and explains them |
+| `memelearner/judging.py` | the judge: a model tells memes from names and explains them; compare |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
@@ -231,5 +271,6 @@ The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs
 
 ## Tests
 
-`py -m unittest` runs the offline tests; they never visit Bilibili nor ask a real model.
+`py -m unittest` runs the offline tests; they never visit Bilibili nor ask a real model
+(fakes of Ollama and of DeepSeek's API answer instead).
 GitHub runs them on each push and pull request, on Windows and Linux.

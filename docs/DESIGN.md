@@ -1,6 +1,6 @@
 # MemeLearnerBot 设计说明
 
-这份文档说明梗机器人是怎么设计的：有哪些部分、一次运行经过哪些步骤、本地模型怎么帮忙判断、别的程序怎么用它学到的梗。代码里的注释讲细节，这里讲整体。
+这份文档说明梗机器人是怎么设计的：有哪些部分、一次运行经过哪些步骤、模型怎么帮忙判断、别的程序怎么用它学到的梗。代码里的注释讲细节，这里讲整体。
 
 机器人原来在翻译器（[StupidTransilator](https://github.com/HHCreator/StupidTransilator)）里（PR #8 和 PR #9），2026 年 11 月搬到这个仓库，单独开发：翻译器和别的程序只通过下面第 5 节的入口用它，不再改同一个仓库、来回合并分支。
 
@@ -18,7 +18,7 @@ MemeLearnerBot/
     ├── __main__.py    py -m memelearner
     ├── cli.py         命令行：learn、judge、candidates、watching、accept、reject、forget、memes、lookup、find
     ├── surf.py        梗机器人：找 B 站上很多人单独发的说法
-    ├── judging.py     本地模型判断候选：是梗、名字、游戏术语还是普通的话，梗是什么意思（第 3 节）
+    ├── judging.py     模型（本地的或在线的）判断候选：是梗、名字、游戏术语还是普通的话，梗是什么意思；比较几个模型（第 3 节）
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评（只读）
     ├── store.py       学到的梗和不要的说法，存在 data/memes.json
     ├── data/          梗、每个游戏的起点视频、日常说法、英文常用词
@@ -36,7 +36,7 @@ flowchart TD
     C --> D["3 找说法：很多人单独发的整条短弹幕，同一个句式的放在一起"]
     D --> E["4 新不新：和以前比，新的、变多、差不多还是变少"]
     E --> F[".cache/surf/candidates.json：候选、例句、来自哪些视频"]
-    F --> J["6 本地模型判断（可选，第 3 节）：是梗、名字、术语还是普通的话"]
+    F --> J["6 模型判断（可选，第 3 节）：是梗、名字、术语还是普通的话"]
     J --> G["人看候选：accept 学下来 / reject 不要"]
     G --> H["data/memes.json：学到的梗，别的程序读它"]
 ```
@@ -50,9 +50,9 @@ flowchart TD
 - **第一次运行没有「以前」可比**，所以会多读同样多的旧视频（30 到 90 天前发布的）当基准。以后每次运行，之前读到的句子慢慢变成「以前」，基准越来越大，用的人不多的新梗也能认出来。
 - **已经知道的不算新闻**（`known_phrases()`）：学到的梗和 reject 过的说法（`data/memes.json`）、`data/surf_common.txt` 里的日常说法，还有别的程序已经知道的词：`learn(known=...)` 直接给，或者 `--known` / 环境变量 `MEMELEARNER_KNOWN` 指向它的词表文件（.json 的键和值都算，.txt 每行一个，文件夹就是里面的 .json 和 .txt，不进子文件夹）。在翻译器里的时候机器人直接读翻译器的词表；搬出来以后不再认识翻译器的代码，要用它的词表就 `--known G:\SBtranslator\sbtranslator\data`。2026 年 11 月 1 日用旧的找法和 Hao 电脑上读到的约 10 万条弹幕比过：加不加翻译器的词表，33 个候选里只差 blg 这种一两个。
 
-## 3. 本地模型判断（`judging.py`）
+## 3. 模型判断（`judging.py`）
 
-机器人只会数数：它列出来的候选里有梗（阿一古），也有加油的话（ig加油）和普通的话（笑死）。`py -m memelearner judge`（或者 `py surf.py --judge`）让本地模型先看一遍每个候选：是梗、名字、游戏术语、普通的话，还是看不出来；是梗的话写出意思。模型通过 Ollama 跑，默认 deepseek-r1:14b，`--model` 或环境变量 `MEMELEARNER_MODEL` 可以换（比如 qwen3:14b）。
+机器人只会数数：它列出来的候选里有梗（阿一古），也有加油的话（ig加油）和普通的话（笑死）。`py -m memelearner judge`（或者 `py surf.py --judge`）让模型先看一遍每个候选：是梗、名字、游戏术语、普通的话，还是看不出来；是梗的话写出意思。模型可以是电脑上的本地模型，也可以是在线模型（见下面的「用哪个模型」）。
 
 模型只知道训练以前的梗，梗又变得很快，所以判断从来不靠模型自己记得的东西：
 
@@ -72,7 +72,11 @@ flowchart TD
 - **不查网上的资料**。第一版会查萌娘百科和维基百科（MediaWiki API）。在 Hao 的电脑上真的跑了以后：萌娘百科不让没登录的程序用 API（`action-notallowed`），维基百科搜出来的是不相干的页面（奥拉夫搜到德国前总理朔尔茨，克斯搜到皮克斯），反而把模型带偏了。所以去掉了。
 - **人来决定**。模型不学也不扔任何东西。`accept` 没给 `--meaning` 的时候用模型写的意思和英文，只是猜的不用；已经学过的梗不会被模型的意思覆盖。
 
-需要电脑上开着 Ollama，并且下载了模型（`ollama pull deepseek-r1:14b`）；没开的话 `judge` 说清楚原因，候选不变。请求的设置跟翻译器的 `check.py` 一样：`format: json`，`think: false`（不让 DeepSeek-R1 先想一大段），旧版 Ollama 不认 think 就去掉再问。一个候选要问模型一到两次，每次几秒。
+- **用哪个模型**。默认是在线模型 `deepseek/deepseek-flash`（DeepSeek-V4.1-Flash，`DEFAULT_MODEL`），`--model` 或环境变量 `MEMELEARNER_MODEL` 可以换。2026-11-02 用一次真实运行的 60 个说法（英雄联盟和无畏契约）比了五个模型，能对答案的有 46 个：deepseek-flash 对 31 个、错 0 个，deepseek-v4-pro 对 25 个、错 0 个，本地的 qwen3:14b 对 12 个、错 5 个，deepseek-r1:14b 对 9 个、错 11 个，qwen3.5:9b 对 1 个、错 5 个。本地模型常把梗（阿一古、得分通道关闭）当成名字或游戏术语。在线模型的名字是「提供方/模型」：`deepseek/deepseek-flash` 和 `deepseek/deepseek-v4-pro`（DeepSeek-V4-Pro，大约贵 4 倍）走 DeepSeek 的 API（OpenAI 的格式，`https://api.deepseek.com`）。它们比显卡放得下的模型大得多，懂的网络用语也多得多，但要花钱（判一次 60 个说法，Flash 大约 1.3 美分，Pro 大约 5 美分），句子要发到 DeepSeek。本地模型通过 Ollama 在电脑上跑，不花钱、不用联网，比较里最好的是 qwen3:14b（`LOCAL_MODEL`）；16 GB 显存的显卡放得下 14B 的 4 位量化模型。
+- **在线模型的密钥和请求**。密钥从环境变量 `DEEPSEEK_API_KEY` 读（Windows 上 `setx DEEPSEEK_API_KEY sk-...`，再开一个新终端），不写进任何文件，也就不会进 git；判断前先用它取一次模型列表（`/models`），密钥不对或者模型名字写错，一开始就知道。`APIS` 里加一行（地址和放密钥的环境变量）就能接别的 OpenAI 格式的提供方。请求用 JSON 模式（`response_format`，提供方不认就去掉再问），关掉 thinking（更快、更便宜），只发模型要看的句子、标题和人数，不发是谁发的。服务忙（429、5xx）或者没回答，就等 5、10、20 秒再问，最多问 4 次；回答是空白的（DeepSeek 的模型没写出 JSON 时会这样）也再问。被内容审核挡掉的不再问（问了也一样）。密钥不对（401）、余额用完（402）就停下说清楚原因，已经判完的结论留着。每次判断最后说用了多少 token（`usage`）。
+- **比较模型**（`compare()`）。`py -m memelearner compare 模型1 模型2 ...` 用几个模型判同一批候选：每个模型拿到的句子、标题和问题都一样，一个模型判完再换下一个（Ollama 一次只放一个模型，来回换要重新加载）。结果写进缓存文件夹的 `compare.json` 和 `compare.md`：每个说法下面列出每个模型的结论和意思，几个模型说的种类不一样的标 ≠，最前面是每个模型各种结论的个数、用了多久和多少 token。它不改 judge.json 和候选里的结论。`--top N` 每个游戏只比前 N 个；`--add` 接着上一次比较（要是同一批说法）：新的模型加进去，慢的本地模型不用再跑一遍，上次中途停了的模型从停下的地方接着判。每判完一个说法就存一次，用不了的模型（没下载、没密钥）跳过并说原因。比较和 `judge` 跑的时候让 Windows 不睡眠（`SetThreadExecutionState`，屏幕还是可以关）：第一次真实比较跑到一半，电脑睡着了，比较就停了。
+
+用本地模型的话，需要电脑上开着 Ollama，并且下载了模型（`ollama pull qwen3:14b`）；没开的话 `judge` 说清楚原因，候选不变。请求的设置跟翻译器的 `check.py` 一样：`format: json`，`think: false`（不让 DeepSeek-R1 先想一大段），旧版 Ollama 不认 think 就去掉再问。一个候选要问模型一到两次，每次几秒。
 
 ## 4. 学到的梗（`store.py`、`data/memes.json`）
 
@@ -103,7 +107,7 @@ flowchart TD
 
 - `find(text)` 找一句话里学到的梗，按出现的顺序，每个只给一次；重叠的时候长的优先（「这下真的绷不住了」里是「绷不住了」，不是「不住」）；字母组成的梗要是一个完整的词（「zywoo yyds」里有 yyds，「yydsx」里没有）。
 - `learn()` 要读 B 站，所以要几分钟（每个视频大约半分钟，四个游戏全读大约 20 分钟）；B 站拒绝或者连不上只会停止读，不会让调用失败。`quiet=True` 不打印进度。
-- `judge()` 让本地模型判断上一次运行的候选（第 3 节），每个候选几秒；Ollama 没开或者没有这个模型时抛出 `memelearner.ModelUnavailable`，已经判完的结论会留着。`learn(judge=True)` 读完 B 站接着判断。候选多了一个 `judge` 字段。
+- `judge()` 让模型判断上一次运行的候选（第 3 节），每个候选几秒；模型用不了（Ollama 没开或者没有这个模型；在线模型没有密钥、密钥不对、余额用完或者一直不回答）时抛出 `memelearner.ModelUnavailable`，已经判完的结论会留着。`learn(judge=True)` 读完 B 站接着判断。候选多了一个 `judge` 字段。
 - 版本：`memelearner.API_VERSION` 和文件里的 `version` 只在某个字段改了意思或者去掉的时候才变；加新字段不变，所以用的程序要忽略不认识的字段。`API_VERSION` 2（2026 年 11 月）：候选改成很多人单独发的说法，不管新不新（`status` 多了 steady 和 older），`people` 是单独发它的人数，还多了 `alone`、`variants`、`people_recent`。
 
 ## 6. 数据文件
@@ -121,7 +125,7 @@ flowchart TD
 - **单独一个仓库。** 机器人和翻译器各改各的，不用每次都合并对方的分支。翻译器要什么只走第 5 节的入口。
 - **门面。** 别的程序只依赖 `memelearner` 包最上面那几个函数、命令行的 `--json` 输出和 `memes.json` 的格式；`surf.py`、`bilibili.py` 里面怎么改都没关系。
 - **看单独发的弹幕，不切长句。** 梗是大家一整条刷出来的，名字和术语是讨论里顺带说的（第 2 节）。从长句里切片段，列出来的就是讨论；看整条弹幕，列出来的大多是梗、口号和反应。
-- **人来决定什么是梗。** 机器人只会数数：它分不清梗、加油的话和普通的话。所以它只列候选，`accept` 之后才算学到。本地模型帮忙判断（第 3 节），也只是在候选和 `accept` 之间加了一步，入口没变。
+- **人来决定什么是梗。** 机器人只会数数：它分不清梗、加油的话和普通的话。所以它只列候选，`accept` 之后才算学到。模型帮忙判断（第 3 节），也只是在候选和 `accept` 之间加了一步，入口没变。
 - **不信模型的记忆。** 模型的知识停在训练那天，新梗它要么不知道，要么记的是老意思。所以它只能根据现在的句子写意思，有人解释的就照解释写，再用它没见过的另一半句子盲测；测不过就进观察名单，不当成梗。没有句子能测的，标成 untested，让人看；连解释都没有的，意思标成猜的，不进词典。
 - **学到的东西进 git，读到的不进。** 梗是成果，要分享；弹幕又多又只对分析有用，留在本地。
 - **不需要装别的包。** 跟翻译器一样只用 Python 自带的库，pip 安装和打包成 exe 都简单。
@@ -135,6 +139,7 @@ flowchart TD
 | 机器人更敏感或更保守 | `surf.py` 开头的 `MIN_PEOPLE`、`MIN_VIDEOS`、`MIN_ALONE`、`MAX_SHORT`、`RISE`、`SURE` |
 | 不要列别的程序已经知道的词 | `--known 词表文件或文件夹`，或环境变量 `MEMELEARNER_KNOWN` |
 | 每个梗多存几句例句 | `store.py` 的 `EXAMPLES` |
-| 本地模型判断更严或更松 | `judging.py` 开头的 `LINES`、`EXPLANATIONS`、`MIN_FITS`、`FIT_SHARE`、`AGAIN_PEOPLE` |
+| 模型判断更严或更松 | `judging.py` 开头的 `LINES`、`EXPLANATIONS`、`MIN_FITS`、`FIT_SHARE`、`AGAIN_PEOPLE` |
 | 哪些句子算「在解释」 | `judging.py` 开头的 `EXPLAINS`（解释用的词）和 `ASKS`（问的词） |
-| 换一个本地模型 | `judge --model 名字`，或者环境变量 `MEMELEARNER_MODEL` |
+| 换一个模型 | 默认的是 `judging.py` 的 `DEFAULT_MODEL`（deepseek/deepseek-flash）；`judge --model 名字`（在线的 deepseek/deepseek-v4-pro，本地的 qwen3:14b）或者环境变量 `MEMELEARNER_MODEL` 可以换；先用 `compare` 比一比 |
+| 接别的在线模型 | `judging.py` 开头的 `APIS`：提供方的地址和放密钥的环境变量 |
