@@ -4,7 +4,7 @@ explains them.
     py -m memelearner judge          judge what the last run found
     py surf.py --judge               read Bilibili, then judge what it found
     memelearner.judge()              the same from another app
-    py -m memelearner compare deepseek-r1:14b qwen3:14b    several models, side by side
+    py -m memelearner compare qwen3:14b deepseek/deepseek-flash   several models, side by side
 
 The bot itself only counts (surf.py): it lists the short danmu that people send on their
 own, and those can be memes (阿一古), cheers (ig加油) or everyday words (笑死). The judge asks
@@ -48,14 +48,16 @@ It doesn't look phrases up online. The first version did, and on a real run 萌�
 programs that aren't logged in, while 维基百科's search found unrelated pages (奥拉夫 led to
 Olaf Scholz) that misled the model more than they helped.
 
-Models. A local model runs on this computer through Ollama (https://ollama.com), which must
-be running with the model downloaded (ollama pull deepseek-r1:14b, the default). An online
-model is named PROVIDER/MODEL, like deepseek/deepseek-flash: the judge sends it the lines
-and video titles (never who sent them) with your API key, which it reads from an
-environment variable (DEEPSEEK_API_KEY), so the key never goes into a file. Use another
-model with --model or MEMELEARNER_MODEL. compare() judges the same candidates with several
-models from the same lines, to pick one, without changing the verdicts judge() keeps. A
-judge run takes a few seconds per candidate.
+Models. The default is deepseek/deepseek-flash, one of DeepSeek's online models: of five
+models compared on the 60 phrases of a real run (2026-11-02), it gave the most right
+meanings and no wrong ones. An online model is named PROVIDER/MODEL: the judge sends it the
+lines and video titles (never who sent them) with your API key, which it reads from an
+environment variable (DEEPSEEK_API_KEY), so the key never goes into a file. A local model
+runs on this computer through Ollama (https://ollama.com), which must be running with the
+model downloaded (ollama pull qwen3:14b, the best local one in that comparison): free and
+offline, but it knows far less slang. Use another model with --model or MEMELEARNER_MODEL.
+compare() judges the same candidates with several models from the same lines, to pick one,
+without changing the verdicts judge() keeps. A judge run takes a few seconds per candidate.
 """
 
 import collections
@@ -78,7 +80,9 @@ OLLAMA_URL = "http://127.0.0.1:11434"  # where Ollama listens on this computer
 # is (in OpenAI's format), and the environment variable that holds your key for it. Set
 # the key on your computer (setx DEEPSEEK_API_KEY sk-...), never in a file here.
 APIS = {"deepseek": ("https://api.deepseek.com", "DEEPSEEK_API_KEY")}
-MODEL = os.environ.get("MEMELEARNER_MODEL", "deepseek-r1:14b")
+DEFAULT_MODEL = "deepseek/deepseek-flash"  # judged best of five on a real run (2026-11-02)
+LOCAL_MODEL = "qwen3:14b"  # the best of the models in that comparison that run on this computer
+MODEL = os.environ.get("MEMELEARNER_MODEL", "").strip() or DEFAULT_MODEL
 TIMEOUT = 300  # seconds for one answer; the first one also loads the model
 ANSWER_TOKENS = 1000  # most an online model may write in one answer (they take about 200)
 RETRIES = 3  # times an online model is asked again when it is busy or answers blank
@@ -193,7 +197,8 @@ def _key(model):
     key = os.environ.get(variable, "").strip()
     if not key:
         raise ModelUnavailable(f"{model} is an online model: put your API key in the "
-                               f"{variable} environment variable first (see the README)")
+                               f"{variable} environment variable first (see the README), or "
+                               f"judge on this computer with --model {LOCAL_MODEL}")
     return key
 
 
@@ -585,9 +590,10 @@ def _still_good(old, candidate, model):
         candidate.get("people", 0) < AGAIN_PEOPLE * max(1, old.get("people", 0))
 
 
-def judge(games=None, model=MODEL, again=False):
+def judge(games=None, model=None, again=False):
     """Judge the last run's candidates (only some games' when games is given) that aren't
-    learned or turned down yet. Returns them, each with a "judge" dict:
+    learned or turned down yet, with model (default: MODEL). Returns them, each with a
+    "judge" dict:
 
         {"verdict": "meme", "untested", "not a meme" or "watching",
          "kind": "meme", "name", "term", "everyday" or "unclear",   what the model said it is
@@ -603,6 +609,7 @@ def judge(games=None, model=MODEL, again=False):
     Earlier verdicts are kept unless again is True (see _still_good()). Raises
     ModelUnavailable when the model can't be asked; the verdicts given until then are kept.
     """
+    model = model or MODEL
     last = surf._load_json(surf.CANDIDATES_FILE, {})
     done = store.phrases()
     games = None if games is None else {game.lower() for game in games}

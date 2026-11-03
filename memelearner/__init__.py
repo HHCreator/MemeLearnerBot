@@ -65,8 +65,8 @@ def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.M
     days: how recent "new" is; people: different people who must send a phrase on its own
     (in at least two videos); fetch=False
     finds phrases again in what was read before, without visiting Bilibili; known: phrases
-    your app knows already, left out like the learned ones; judge: then have the local
-    model judge them, as judge() does (raises ModelUnavailable when it can't be asked; the
+    your app knows already, left out like the learned ones; judge: then have the model
+    judge them, as judge() does (raises ModelUnavailable when it can't be asked; the
     candidates are saved all the same); quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
@@ -82,10 +82,10 @@ def judge(games=None, model=None, again=False, quiet=False):
     verdict as "judge" (also saved for candidates()); see judging.py for how it works and
     what a verdict holds. It takes a few seconds per candidate.
 
-    games: only these games' candidates; model: an Ollama model on this computer, or an
-    online one named PROVIDER/MODEL like deepseek/deepseek-flash, which reads your key from
-    an environment variable (DEEPSEEK_API_KEY) (default: MEMELEARNER_MODEL, or
-    deepseek-r1:14b); again=True judges again what was judged before. Raises
+    games: only these games' candidates; model: an online model named PROVIDER/MODEL, which
+    reads your key from an environment variable (DEEPSEEK_API_KEY), or an Ollama model on
+    this computer like qwen3:14b (default: MEMELEARNER_MODEL, or deepseek/deepseek-flash);
+    again=True judges again what was judged before. Raises
     ModelUnavailable when the model can't be asked (Ollama isn't running or doesn't have it;
     an online one has no key, refuses it or doesn't answer); the verdicts given until then
     are kept. quiet: print nothing.

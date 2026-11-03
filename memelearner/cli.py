@@ -52,7 +52,7 @@ def _show_candidate(c):
           f"{c['videos']} videos{also})  e.g. {example[:40]}{said}")
 
 
-def _judge(games, model=judging.MODEL, again=False):
+def _judge(games, model=None, again=False):
     """Judge the last run's candidates and say what to do next; False when the model
     couldn't be asked."""
     try:
@@ -214,8 +214,9 @@ def parser():
                            "everyday words, and explain them")
     judge.add_argument("--games", nargs="+", metavar="GAME", help="only these games' phrases")
     judge.add_argument("--model", default=judging.MODEL,
-                       help="an Ollama model like qwen3:14b, or an online one like "
-                       "deepseek/deepseek-flash (default %(default)s; also MEMELEARNER_MODEL)")
+                       help="an online model like deepseek/deepseek-v4-pro, or an Ollama "
+                       "model on this computer like qwen3:14b (default %(default)s; also "
+                       "MEMELEARNER_MODEL)")
     judge.add_argument("--again", action="store_true", help="judge again what was judged before")
     judge.set_defaults(run=_judge_command)
 

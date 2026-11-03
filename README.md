@@ -177,25 +177,29 @@ py -m memelearner watching          # what the model wasn't sure of yet
 py -m memelearner judge --again     # judge everything again, say with another model
 ```
 
-**Which model.** By default it asks deepseek-r1:14b on this computer, through
-[Ollama](https://ollama.com): start Ollama and download the model first (`ollama pull
-deepseek-r1:14b`). Any Ollama model works: add `--model qwen3:14b`, or set the
-`MEMELEARNER_MODEL` environment variable. It can also ask DeepSeek's online models, which are
-far bigger than a model that fits on a graphics card:
+**Which model.** By default it asks deepseek-flash (DeepSeek-V4.1-Flash), one of DeepSeek's
+online models, which are far bigger than a model that fits on a graphics card. Of five
+models compared on the 60 phrases of a real run, it gave the most right meanings and no
+wrong ones (see Picking a model below). It needs an API key:
 
 1. Make an account on [DeepSeek's platform](https://platform.deepseek.com), top it up (a few
    dollars go a long way, see below) and create an API key.
 2. Put the key in an environment variable on your computer, never in a file in this folder,
    which could end up on GitHub: run `setx DEEPSEEK_API_KEY sk-...` once, then open a new
    terminal.
-3. Judge with `--model deepseek/deepseek-flash` (DeepSeek-V4.1-Flash) or
-   `--model deepseek/deepseek-v4-pro` (DeepSeek-V4-Pro: bigger, about 4 times the price).
+
+Another model: add `--model deepseek/deepseek-v4-pro` (DeepSeek-V4-Pro: bigger, about 4 times
+the price), or a model on this computer through [Ollama](https://ollama.com), like `--model
+qwen3:14b` (start Ollama and run `ollama pull qwen3:14b` first). A local model is free and
+works offline, but it knows far less slang. The `MEMELEARNER_MODEL` environment variable
+changes the default.
 
 The judge sends DeepSeek the lines and video titles it shows the model, never who sent
 them, and asks without DeepSeek's "thinking", which is slower and costs more. Judging the
-60 phrases of a run takes about 100 answers and roughly 100,000 tokens: a few cents with
-Flash, a little more with Pro (the prices are on DeepSeek's site; they halve outside
-9:00-12:00 and 14:00-18:00 Beijing time on weekdays). The judge says how many tokens it used.
+60 phrases of a run takes about 100 answers and 60,000 tokens: about 1.3 US cents with
+Flash and 5 with Pro at full price (2026-11-02). The prices are on DeepSeek's site, and they
+halve outside 9:00-12:00 and 14:00-18:00 Beijing time on weekdays. The judge says how many
+tokens it used.
 
 **Picking a model.** `compare` judges the same phrases with several models, from the same
 lines, and writes each phrase with every model's verdict to
@@ -209,6 +213,12 @@ py -m memelearner compare deepseek-r1:14b qwen3:14b qwen3.5:9b
 py -m memelearner compare deepseek/deepseek-flash --add   # add a model to the last comparison
 py -m memelearner compare qwen3:14b deepseek/deepseek-flash --top 10   # each game's 10 best
 ```
+
+The comparison behind the default (2026-11-02): five models judged the 60 phrases of a run
+(LoL and Valorant), and 46 of them could be checked against what the phrase really means.
+deepseek-flash got 31 right and none wrong, deepseek-v4-pro 25 right and none wrong,
+qwen3:14b 12 right and 5 wrong, deepseek-r1:14b 9 right and 11 wrong, and qwen3.5:9b 1 right
+and 5 wrong. The local models filed memes like 阿一古 and 得分通道关闭 as names or game words.
 
 **Why trust it.** A model only knows the memes from before it was trained, and memes change
 faster than that, so the judge never goes by what the model remembers:

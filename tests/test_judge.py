@@ -136,6 +136,8 @@ class JudgeTest(unittest.TestCase):
                                   os.path.join(surf_dir, "candidates.json")),
                 mock.patch.dict(os.environ, {surf.KNOWN_ENV: ""}),
                 mock.patch.object(judging, "_ask", self.model),
+                # Most tests judge with a local model; the default is online (test_the_default...)
+                mock.patch.object(judging, "MODEL", "deepseek-r1:14b"),
                 mock.patch.object(judging, "_get_json",
                                   lambda path: {"models": [{"name": "deepseek-r1:14b"}]}),
                 mock.patch.object(judging, "usage", collections.defaultdict(collections.Counter)),
@@ -426,6 +428,28 @@ class JudgeTest(unittest.TestCase):
         for path in (judging.judge_file(), surf.CANDIDATES_FILE):
             with open(path, encoding="utf-8") as f:
                 self.assertNotIn(KEY, f.read())
+
+    def test_the_default_is_deepseek_flash_online_and_without_a_key_it_says_what_to_do(self):
+        self.write_run()
+        self.assertEqual(judging.DEFAULT_MODEL, "deepseek/deepseek-flash")
+        with mock.patch.object(judging, "MODEL", judging.DEFAULT_MODEL):
+            api = FakeDeepSeek(self.model)
+            with self.online(api, key=""):
+                with self.assertRaisesRegex(memelearner.ModelUnavailable,
+                                            "DEEPSEEK_API_KEY environment variable first .see "
+                                            "the README., or judge on this computer with "
+                                            "--model qwen3:14b"):
+                    self.judge()
+                code, printed = self.run_cli("judge")
+            self.assertEqual(code, 1)
+            self.assertIn("--model qwen3:14b", printed)
+            self.assertEqual(api.requests, [])
+            with self.online(api):
+                verdicts = self.judge()
+                code, printed = self.run_cli("judge", "--help")
+        self.assertEqual(verdicts["阿一古"]["model"], "deepseek/deepseek-flash")
+        self.assertEqual({chat["model"] for chat in api.chats()}, {"deepseek-flash"})
+        self.assertIn("(defaultdeepseek/deepseek-flash;", "".join(printed.split()))  # wrapped
 
     def test_an_online_model_needs_a_key_that_works_and_a_model_its_api_has(self):
         self.write_run()
