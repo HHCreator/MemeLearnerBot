@@ -200,7 +200,9 @@ Flash, a little more with Pro (the prices are on DeepSeek's site; they halve out
 **Picking a model.** `compare` judges the same phrases with several models, from the same
 lines, and writes each phrase with every model's verdict to
 `memelearner/.cache/surf/compare.md`, to read side by side. The verdicts `judge` keeps don't
-change. The models are asked one after another, so Ollama loads each once.
+change. The models are asked one after another, so Ollama loads each once. While it runs
+(and while `judge` runs) Windows doesn't go to sleep, and it saves after every phrase: if a
+comparison stops anyway, run the same command with `--add` and it carries on where it stopped.
 
 ```
 py -m memelearner compare deepseek-r1:14b qwen3:14b qwen3.5:9b

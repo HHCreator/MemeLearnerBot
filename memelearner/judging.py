@@ -59,10 +59,13 @@ judge run takes a few seconds per candidate.
 """
 
 import collections
+import contextlib
+import ctypes
 import hashlib
 import json
 import os
 import re
+import sys
 import time
 import urllib.error
 import urllib.parse
@@ -81,6 +84,8 @@ ANSWER_TOKENS = 1000  # most an online model may write in one answer (they take 
 RETRIES = 3  # times an online model is asked again when it is busy or answers blank
 RETRY_WAIT = 5  # seconds before asking it again, doubling each time
 BUSY = (429, 500, 502, 503, 504)  # what an online API answers when it is busy: ask again
+STAY_AWAKE = 0x80000001  # Windows: ES_CONTINUOUS | ES_SYSTEM_REQUIRED, no sleeping
+MAY_SLEEP = 0x80000000  # Windows: ES_CONTINUOUS, sleeping is up to the computer again
 LINES = 16  # lines that use a phrase, from what the bot read: the longer ones split in two
 EXPLANATIONS = 4  # lines that explain a phrase (出自…, 谐音…, …的意思), shown to the model first
 BARE_LINES = 4  # lines that are just the phrase, shown to the model as they were written
@@ -727,23 +732,44 @@ def meaning_of(phrase):
     return best.get("meaning", ""), best.get("english", "")
 
 
+def _execution_state(flags):
+    """Tell Windows whether this computer must stay awake (SetThreadExecutionState); does
+    nothing elsewhere. Tests replace this."""
+    if sys.platform == "win32":
+        ctypes.windll.kernel32.SetThreadExecutionState(ctypes.c_uint(flags))
+
+
+@contextlib.contextmanager
+def awake():
+    """Keep Windows from going to sleep while the models judge (a comparison stopped
+    halfway when the computer fell asleep); the screen can still turn off."""
+    _execution_state(STAY_AWAKE)
+    try:
+        yield
+    finally:
+        _execution_state(MAY_SLEEP)
+
+
 # -- comparing models ---------------------------------------------------------------------
 
 def compare(models, games=None, top=None, add=False):
     """Judge the last run's candidates (those not learned or turned down yet; only some
     games' when games is given, and only each game's top best when top is given) with each
     model, from the same lines, to see which one judges best. The verdicts judge() keeps
-    don't change. A model that can't be asked is left out. With add, the other models of the
-    last comparison stay in it, when it was of the same phrases. Saves compare.json, and
-    compare.md to read, in the cache folder, and returns
+    don't change. A model that can't be asked is left out. With add, the last comparison is
+    kept when it was of the same phrases: its other models stay in it, and a model that is
+    in it already is only asked about the phrases it didn't judge (it stopped, or the
+    computer did). Keeps Windows awake meanwhile. Saves compare.json, and compare.md to
+    read, in the cache folder, after each phrase, and returns
 
         {"made", "run": when the last run found the candidates,
-         "models": the models asked, one after another (after the ones kept with add),
+         "models": the models, in the order they were asked,
          "candidates": [{"phrase", "game", "people", "videos", "alone", "variants",
                          "lines": the lines every model was shown}],
          "verdicts": {model: {"game:phrase": its verdict, see judge()}},
-         "stats": {model: {"seconds", "calls", "input", "cached", "output": see usage,
-                           "stopped": why it stopped answering, when it did}}}
+         "stats": {model: {"seconds", "calls", "input", "cached", "output": see usage
+                           (for all its runs, with add), "stopped": why it stopped
+                           answering, when it did}}}
 
     or None when there's nothing to judge. Raises ModelUnavailable when no model can be
     asked.
@@ -791,31 +817,16 @@ def compare(models, games=None, top=None, add=False):
         if before.get("run") == result["run"] and [(c["game"], c["phrase"]) for c in
                                                    before.get("candidates") or []] == \
                 [(c["game"], c["phrase"]) for c in wanted]:
-            kept = [model for model in before.get("models") or [] if model not in asking]
-            result["models"] = kept + asking
-            for model in kept:
+            had = before.get("models") or []
+            result["models"] = had + [model for model in asking if model not in had]
+            for model in had:
                 result["verdicts"][model] = (before.get("verdicts") or {}).get(model) or {}
                 result["stats"][model] = (before.get("stats") or {}).get(model) or {}
         else:
             print("The last comparison was of other phrases, so it isn't kept.")
-    for model in asking:  # one model at a time: Ollama holds one model in memory at a time
-        print(f"\n{model}:")
-        verdicts = result["verdicts"][model] = {}
-        stats = result["stats"][model] = {}
-        spent_before, start = collections.Counter(usage[model]), time.time()
-        try:
-            for c in wanted:
-                verdicts[f"{c['game']}:{c['phrase']}"] = verdict = judge_one(
-                    c, *shown[(c["game"], c["phrase"])], model)
-                show(dict(c, judge=verdict))
-        except ModelUnavailable as error:
-            stats["stopped"] = str(error)
-            print(f"{model} stopped answering: {error}")
-        finally:  # keep what was judged so far, even when the run is stopped
-            spent = usage[model] - spent_before
-            stats.update(seconds=round(time.time() - start),
-                         **{k: spent[k] for k in ("calls", "input", "cached", "output")})
-            _save_comparison(result)
+    with awake():
+        for model in asking:  # one at a time: Ollama holds one model in memory at a time
+            _compare_one(model, wanted, shown, result)
     print(f"\n{'':<26}{'meme':>6}{'untested':>10}{'not a meme':>12}{'watching':>10}"
           f"{'minutes':>9}")
     for model in result["models"]:
@@ -825,6 +836,37 @@ def compare(models, games=None, top=None, add=False):
               + (f"   {_spent(model, collections.Counter(stats))}" if online(model) else ""))
     print(f"\nEach phrase with every model's verdict, side by side: {comparison_file('md')}")
     return result
+
+
+def _compare_one(model, wanted, shown, result):
+    """Have one model judge the candidates it hasn't judged in result yet, saving result
+    after each one, so a stopped run keeps what was judged."""
+    verdicts = result["verdicts"].setdefault(model, {})
+    stats = result["stats"].setdefault(model, {})
+    stats.pop("stopped", None)
+    todo = [c for c in wanted if f"{c['game']}:{c['phrase']}" not in verdicts]
+    print(f"\n{model}:" + (f" {len(verdicts)} phrases judged before, {len(todo)} to go"
+                           if verdicts else ""))
+    spent_before, start = collections.Counter(usage[model]), time.time()
+    had = {k: stats.get(k, 0) for k in ("seconds", "calls", "input", "cached", "output")}
+
+    def keep():
+        spent = usage[model] - spent_before
+        stats.update(seconds=had["seconds"] + round(time.time() - start),
+                     **{k: had[k] + spent[k] for k in ("calls", "input", "cached", "output")})
+        _save_comparison(result)
+
+    try:
+        for c in todo:
+            verdicts[f"{c['game']}:{c['phrase']}"] = verdict = judge_one(
+                c, *shown[(c["game"], c["phrase"])], model)
+            show(dict(c, judge=verdict))
+            keep()
+    except ModelUnavailable as error:
+        stats["stopped"] = str(error)
+        print(f"{model} stopped answering: {error}")
+    finally:  # keep what was judged so far, even when the run is stopped
+        keep()
 
 
 def comparison_file(extension="json"):

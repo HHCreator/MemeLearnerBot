@@ -56,12 +56,13 @@ class FakeModel:
         self.calls = 0
         self.asked = []  # (model, "explain" or "test", phrase, question), in order
         self.answers_for = {}  # {model: {phrase: answer}}: what another model says instead
-        self.stop_after = {}  # {model: n}: that model stops answering after n questions
+        self.stop_after = {}  # {model: n}: that model stops answering after n questions,
+        self.stop_error = judging.ModelUnavailable("Ollama answered 500: out of memory")  # so
 
     def __call__(self, messages, model):
         self.calls += 1
         if len([m for m, *_ in self.asked if m == model]) >= self.stop_after.get(model, 1e9):
-            raise judging.ModelUnavailable("Ollama answered 500: out of memory")
+            raise self.stop_error
         question = json.loads(messages[1]["content"])
         phrase = question["phrase"]
         answers = dict(self.ANSWERS, **self.answers_for.get(model, {}))
@@ -126,6 +127,7 @@ class JudgeTest(unittest.TestCase):
         self.addCleanup(folder.cleanup)
         surf_dir = os.path.join(folder.name, "surf")
         self.model = FakeModel()
+        self.awake = []  # what Windows was told: stay awake, may sleep
         for patcher in (
                 mock.patch.object(store, "MEMES_FILE", os.path.join(folder.name, "memes.json")),
                 mock.patch.object(surf, "SURF_DIR", surf_dir),
@@ -138,7 +140,8 @@ class JudgeTest(unittest.TestCase):
                                   lambda path: {"models": [{"name": "deepseek-r1:14b"}]}),
                 mock.patch.object(judging, "usage", collections.defaultdict(collections.Counter)),
                 mock.patch.object(judging, "_no_json_mode", set()),
-                mock.patch.object(judging, "RETRY_WAIT", 0)):
+                mock.patch.object(judging, "RETRY_WAIT", 0),
+                mock.patch.object(judging, "_execution_state", self.awake.append)):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.now = time.time()
@@ -579,6 +582,37 @@ class JudgeTest(unittest.TestCase):
         self.assertIn("The last comparison was of other phrases, so it isn't kept.", printed)
         self.assertEqual(surf._load_json(judging.comparison_file(), {})["models"], ["qwen3:14b"])
 
+    def test_a_stopped_comparison_carries_on_where_it_stopped_and_windows_stays_awake(self):
+        self.write_run()
+        self.model.stop_after["qwen3:14b"] = 3
+        self.model.stop_error = KeyboardInterrupt()  # the run is stopped, or the computer is
+        with self.two_models():
+            code, printed = self.run_cli("compare", "deepseek-r1:14b", "qwen3:14b")
+        self.assertIn("Stopped. What was judged so far is in", str(code))
+        self.assertEqual(self.awake, [judging.STAY_AWAKE, judging.MAY_SLEEP])
+        saved = surf._load_json(judging.comparison_file(), {})
+        self.assertEqual(len(saved["verdicts"]["deepseek-r1:14b"]), 5)
+        self.assertEqual(list(saved["verdicts"]["qwen3:14b"]), ["lol:阿一古", "lol:fpx"])
+        # Again with --add: deepseek-r1:14b has judged them all, and qwen3:14b carries on
+        self.model.asked.clear()
+        self.model.stop_after.clear()
+        with self.two_models():
+            code, printed = self.run_cli("compare", "deepseek-r1:14b", "qwen3:14b", "--add")
+        self.assertEqual(code, 0)
+        self.assertIn("qwen3:14b: 2 phrases judged before, 3 to go", printed)
+        self.assertEqual({(model, phrase) for model, kind, phrase, _ in self.model.asked
+                          if kind == "explain"},
+                         {("qwen3:14b", phrase) for phrase in ("怎么翻", "正义必胜", "神中神")})
+        saved = surf._load_json(judging.comparison_file(), {})
+        self.assertEqual(saved["models"], ["deepseek-r1:14b", "qwen3:14b"])
+        self.assertEqual(len(saved["verdicts"]["qwen3:14b"]), 5)
+        self.assertNotIn("stopped", saved["stats"]["qwen3:14b"])
+
+    def test_judging_keeps_windows_awake_until_it_is_done(self):
+        self.write_run()
+        self.run_cli("judge")
+        self.assertEqual(self.awake, [judging.STAY_AWAKE, judging.MAY_SLEEP])
+
     def test_compare_works_with_online_models_too(self):
         self.write_run()
         with self.online(FakeDeepSeek(self.model)), \
@@ -590,6 +624,16 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual((stats["calls"], stats["input"], stats["cached"], stats["output"]),
                          (3, 3000, 1800, 300))  # 阿一古 explained and tested, fpx explained
         self.assertIn("deepseek/deepseek-v4-pro read 3,000 tokens", printed.getvalue())
+
+
+
+class AwakeTest(unittest.TestCase):
+    def test_telling_windows_to_stay_awake_works_and_does_nothing_elsewhere(self):
+        # On Windows (as on GitHub's Windows runner) this really calls Windows
+        judging._execution_state(judging.STAY_AWAKE)
+        judging._execution_state(judging.MAY_SLEEP)
+        with judging.awake():
+            pass
 
 
 if __name__ == "__main__":

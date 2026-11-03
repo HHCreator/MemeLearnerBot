@@ -56,7 +56,8 @@ def _judge(games, model=judging.MODEL, again=False):
     """Judge the last run's candidates and say what to do next; False when the model
     couldn't be asked."""
     try:
-        judging.judge(games, model, again)
+        with judging.awake():  # a run can take a while: Windows mustn't sleep meanwhile
+            judging.judge(games, model, again)
     except ModelUnavailable as error:
         print(f"Couldn't ask the model: {error}.")
         return False
@@ -224,8 +225,9 @@ def parser():
                       help="Ollama models (qwen3:14b) or online ones (deepseek/deepseek-flash)")
     side.add_argument("--games", nargs="+", metavar="GAME", help="only these games' phrases")
     side.add_argument("--top", type=int, metavar="N", help="only each game's N best phrases")
-    side.add_argument("--add", action="store_true", help="keep the other models of the last "
-                      "comparison of the same phrases, so these are added to it")
+    side.add_argument("--add", action="store_true", help="keep the last comparison of the same "
+                      "phrases: add these models to it, and let a model in it that stopped carry "
+                      "on where it stopped")
     side.set_defaults(run=_compare)
 
     show = sub.add_parser("candidates", help="the phrases the last run found, to look through")
