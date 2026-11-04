@@ -10,6 +10,7 @@
     py -m memelearner memes                    the memes learned so far
     py -m memelearner lookup 绷不住了            one learned meme
     py -m memelearner find "这下真的绷不住了"     the learned memes in a text
+    py -m memelearner live https://live.bilibili.com/6 --until 22:55   record a live room's danmu
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
 learn --judge also judges what it found. candidates, watching, memes, lookup and find take
@@ -173,6 +174,19 @@ def _find(args):
         _show_meme(meme)
 
 
+def _live(args):
+    from . import bilibili, live
+    try:
+        until = live.end_time(args.until, args.hours)
+        live.record(args.room, until)
+    except ValueError as error:
+        sys.exit(str(error))
+    except live.NeedBrotli as error:
+        sys.exit(str(error))
+    except (bilibili.Error, bilibili.Blocked, OSError, KeyError, TypeError) as error:
+        sys.exit(f"Couldn't open the live room: {error!r}")
+
+
 def parser():
     commands = argparse.ArgumentParser(
         prog="memelearner", description="The meme bot: finds the newest gaming memes on "
@@ -243,6 +257,15 @@ def parser():
     one.add_argument("phrase")
     one.add_argument("--json", action="store_true", help="print JSON (null when there's none)")
     one.set_defaults(run=_lookup)
+
+    watch = sub.add_parser("live", help="record a live room's danmu as a visitor (no login, "
+                           "sends nothing), to find phrases in later")
+    watch.add_argument("room", help="the room's link or number, like "
+                       "https://live.bilibili.com/6")
+    watch.add_argument("--until", metavar="HH:MM",
+                       help="stop at this time on this computer's clock, like 22:55")
+    watch.add_argument("--hours", type=float, metavar="N", help="stop after N hours")
+    watch.set_defaults(run=_live)
 
     scan = sub.add_parser("find", help="the learned memes in a text")
     scan.add_argument("text")
