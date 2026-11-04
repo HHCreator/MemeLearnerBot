@@ -12,7 +12,7 @@ import unittest
 import zlib
 from unittest import mock
 
-from memelearner import bilibili, live
+from memelearner import bilibili, live, surf
 
 from .test_surf import VISITOR, FakeBilibili
 
@@ -160,7 +160,7 @@ class RecordTest(unittest.TestCase):
         self.folder = folder.name
         for target, name, value in ((bilibili, "REQUEST_DELAY", 0),
                                     (bilibili, "REQUEST_JITTER", 0),
-                                    (live, "LIVE_DIR", self.folder),
+                                    (surf, "SURF_DIR", self.folder),
                                     (live, "_readable", lambda sock, wait: True),
                                     (live, "_stay_awake", lambda on: None),
                                     (live.time, "sleep", lambda seconds: None)):
@@ -271,3 +271,81 @@ class SliceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FindTest(unittest.TestCase):
+    """live.find(): a recording's phrases next to the replays read before it."""
+
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.folder = folder.name
+        for name, value in (("SURF_DIR", self.folder),
+                            ("VIDEOS_FILE", os.path.join(self.folder, "videos.json")),
+                            ("CANDIDATES_FILE", os.path.join(self.folder, "candidates.json"))):
+            patcher = mock.patch.object(surf, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.start = 1_800_000_000
+        # Two replays, read before: 正义必胜 is old news, 汽车人 is from Valorant's
+        replay = [{"id": f"d{i}", "kind": "danmu", "who": f"r{i}", "text": "正义必胜",
+                   "sent": self.start - 86400 - i} for i in range(40)]
+        replay += [{"id": f"x{i}", "kind": "danmu", "who": f"x{i}",
+                    "text": f"第{i}句很长的讨论弹幕说的是别的事情", "sent": self.start - 86400}
+                   for i in range(3000)]
+        surf._save_json(surf.VIDEOS_FILE, {"BV1": {"game": "lol"}, "BV2": {"game": "lol"},
+                                           "BV3": {"game": "valorant"}})
+        os.makedirs(os.path.join(self.folder, "bilibili"))
+        for bvid, rows in (("BV1", replay[:1520]), ("BV2", replay[1520:]),
+                           ("BV3", [{"id": "v", "kind": "danmu", "who": "v", "text": "汽车人",
+                                     "sent": self.start - 86400}])):
+            with open(surf.messages_path(bvid), "w", encoding="utf-8") as f:
+                f.write("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
+        # The recording: 肉鸽之神 is new and comes back in the second hour; 一时兴起 only
+        # in the first; 正义必胜 as before
+        rows = []
+        for i in range(30):
+            rows.append({"id": f"a{i}", "kind": "live", "who": f"p{i}", "text": "肉鸽之神",
+                         "sent": self.start + (0 if i < 15 else 3700) + i})
+            rows.append({"id": f"b{i}", "kind": "live", "who": f"q{i}", "text": "正义必胜！",
+                         "sent": self.start + 60 * i})
+            rows.append({"id": f"c{i}", "kind": "live", "who": f"s{i}", "text": "一时兴起",
+                         "sent": self.start + 10 + i})
+            rows.append({"id": f"g{i}", "kind": "live", "who": f"g{i}", "text": "肉鸽之神",
+                         "sent": self.start + 50 + i, "auto": 1})  # sent for a gift
+        os.makedirs(live.live_dir())
+        self.path = os.path.join(live.live_dir(), "6-20261103-1905.jsonl")
+        with open(self.path, "w", encoding="utf-8") as f:
+            f.write("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows))
+        surf._save_json(os.path.splitext(self.path)[0] + ".json", {"room": {
+            "title": "TES vs IG", "link": "https://live.bilibili.com/6", "game": "lol"}})
+
+    def test_new_phrases_are_the_ones_nobody_sent_before(self):
+        found, summary, compared = live.find(known=set())
+        status = {c["phrase"]: (c["status"], c["people"], c["videos"]) for c in found}
+        self.assertEqual(status["肉鸽之神"], ("new", 30, 2))  # gift danmu aren't counted
+        self.assertIn(status["正义必胜"][0], ("steady", "rising"))  # sent before: not new
+        self.assertNotIn("一时兴起", status)  # one hour only
+        self.assertNotIn("汽车人", status)  # another game's
+        self.assertEqual((compared["parts"], compared["danmu"], compared["senders"],
+                          compared["before"]), (2, 90, 90, 3040))
+
+    def test_the_recording_is_part_of_what_the_judge_reads(self):
+        videos = {video for game, video, _ in surf.load_messages() if video.startswith("live")}
+        self.assertEqual(videos, {"live:6-20261103-1905#1", "live:6-20261103-1905#2"})
+        self.assertEqual(live.video_entry("live:6-20261103-1905#2"),
+                         {"game": "lol", "author": "", "url": "https://live.bilibili.com/6",
+                          "title": "TES vs IG (live 6-20261103-1905, hour 2)"})
+
+    def test_saving_keeps_the_rooms_link_for_the_examples(self):
+        found, summary, compared = live.find(known=set())
+        surf.save(found, summary, 0, live=compared)
+        saved = surf._load_json(surf.CANDIDATES_FILE, {})
+        self.assertEqual(saved["live"]["recordings"], ["6-20261103-1905.jsonl"])
+        self.assertEqual(saved["videos"]["live:6-20261103-1905#1"]["url"],
+                         "https://live.bilibili.com/6")
+
+    def test_without_recordings_it_says_so(self):
+        os.remove(self.path)
+        with self.assertRaises(ValueError):
+            live.find()

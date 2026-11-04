@@ -57,7 +57,6 @@ try:  # optional: with it, the feed is asked for brotli-packed packets, like the
 except ImportError:  # pragma: no cover - depends on what is installed
     brotli = None
 
-LIVE_DIR = os.path.join(surf.SURF_DIR, "live")
 FALLBACK_HOST = {"host": "broadcastlv.chat.bilibili.com", "wss_port": 443}
 HEARTBEAT = 30  # seconds between heartbeats, like the live page
 SILENCE = 75  # seconds without a byte from Bilibili before the connection counts as dead
@@ -68,6 +67,8 @@ SAMPLES = 20  # DANMU_MSG messages kept as Bilibili sent them, to check their sh
 OTHER_SAMPLES = 2  # ... and of each other kind of message (at most OTHER_KINDS kinds)
 OTHER_KINDS = 40
 SLICE = 60  # minutes of a recording that count as one video when finding phrases
+LIVE_PEOPLE = 5  # different people who must send a phrase on its own, in a live room's run
+LIVE_TOP = 300  # phrases kept from a live room's run (new ones are often less common)
 
 OP_HEARTBEAT, OP_HEARTBEAT_REPLY, OP_MESSAGE, OP_AUTH, OP_AUTH_REPLY = 2, 3, 5, 7, 8
 HEADER = struct.Struct(">IHHII")  # packet length, header length, version, operation, sequence
@@ -84,6 +85,11 @@ class Refused(Exception):
 
 class Closed(Exception):
     """The connection to the danmu feed ended."""
+
+
+def live_dir():
+    """surf/live/ in the cache folder, where the recordings go."""
+    return os.path.join(surf.SURF_DIR, "live")
 
 
 # -- the room -----------------------------------------------------------------------------
@@ -521,15 +527,17 @@ def _stay_awake(on):
         pass
 
 
-def record(link, until=None, path=None, out=sys.stdout):
+def record(link, until=None, path=None, game="lol", out=sys.stdout):
     """Record a live room's danmu until the unix time until (None: until Ctrl+C); returns
-    the .jsonl file's path. Joins again by itself when the connection drops."""
+    the .jsonl file's path. Joins again by itself when the connection drops. game is what
+    the room is about, for finding phrases later."""
     room = room_info(room_of(link))
     started = time.strftime("%Y%m%d-%H%M")
     name = room["short_id"] or room["room_id"]
-    path = path or os.path.join(LIVE_DIR, f"{name}-{started}.jsonl")
+    path = path or os.path.join(live_dir(), f"{name}-{started}.jsonl")
     os.makedirs(os.path.dirname(path), exist_ok=True)
-    recording = Recording(path, dict(room, link=str(link)), out)
+    link = f"https://live.bilibili.com/{name}"
+    recording = Recording(path, dict(room, link=link, game=game), out)
     say = recording.say
     say(f"Room {name} (room {room['room_id']}): {room['title'] or '(no title)'}"
         + ("" if room["live"] else "  - not live right now, listening anyway"))
@@ -585,21 +593,40 @@ def record(link, until=None, path=None, out=sys.stdout):
 
 def recordings():
     """The .jsonl recordings in surf/live/, oldest first."""
+    folder = live_dir()
     try:
-        names = sorted(name for name in os.listdir(LIVE_DIR) if name.endswith(".jsonl"))
+        names = sorted(name for name in os.listdir(folder) if name.endswith(".jsonl"))
     except OSError:
         return []
-    return [os.path.join(LIVE_DIR, name) for name in names]
+    return [os.path.join(folder, name) for name in names]
 
 
-def slices(paths, game="lol", minutes=SLICE, people_only=True):
+def about(path):
+    """What ROOM-....json beside a recording says: {"room": {...}, "started", ...}."""
+    return surf._load_json(os.path.splitext(path)[0] + ".json", {})
+
+
+def video_entry(video):
+    """A video's entry, like videos.json's, for a part of a recording
+    ("live:6-20261103-1905#2"): the room's title and link."""
+    name, _, part = video[len("live:"):].partition("#")
+    room = about(os.path.join(live_dir(), name + ".jsonl")).get("room") or {}
+    return {"game": room.get("game", "lol"), "author": "",
+            "title": f"{room.get('title') or 'live room'} (live {name}, hour {part or 1})",
+            "url": room.get("link") or ""}
+
+
+def slices(paths, game=None, minutes=SLICE, people_only=True):
     """Yield (game, video, message) for the danmu in some recordings, like
-    surf.load_messages() does for replays. Each recording is cut into parts of `minutes`
-    from its first danmu, and each part counts as a video ("live:6-20261103-1905#2"), so a
-    phrase has to come back in a later part to count as sent in two videos. With
-    people_only, danmu Bilibili sent for gifts or lotteries and stickers are left out."""
+    surf.load_messages() does for replays; game is what each recording says it is about
+    (lol unless it says else) unless it's given. Each recording is cut into parts of
+    `minutes` from its first danmu, and each part counts as a video
+    ("live:6-20261103-1905#2"), so a phrase has to come back in a later part to count as
+    sent in two videos. With people_only, danmu Bilibili sent for gifts or lotteries and
+    stickers are left out."""
     for path in paths:
         name = os.path.splitext(os.path.basename(path))[0]
+        its_game = game or (about(path).get("room") or {}).get("game") or "lol"
         first = None
         try:
             f = open(path, encoding="utf-8")
@@ -617,4 +644,36 @@ def slices(paths, game="lol", minutes=SLICE, people_only=True):
                     continue
                 first = message["sent"] if first is None else first
                 part = int((message["sent"] - first) // (minutes * 60)) + 1
-                yield game, f"live:{name}#{part}", message
+                yield its_game, f"live:{name}#{part}", message
+
+
+def find(paths=None, minutes=SLICE, people=LIVE_PEOPLE, known=None, top=LIVE_TOP):
+    """The phrases people send on their own in some recordings (the last one by default),
+    and how new they are next to everything read before the first of them: the replays'
+    danmu and comments, and earlier recordings. Returns (candidates, summary, compared),
+    like surf.find_candidates(), where compared is {"recordings": [names], "start": unix
+    time, "parts": parts of `minutes`, "danmu": lines, "senders", "before": earlier lines}.
+    A phrase's "new" means nobody sent it in what was read before."""
+    paths = list(paths or recordings()[-1:])
+    if not paths:
+        raise ValueError("No recordings yet: record one with py -m memelearner live LINK")
+    live = list(slices(paths, minutes=minutes))
+    if not live:
+        raise ValueError(f"No danmu in {', '.join(paths)}")
+    start = min(message["sent"] for _, _, message in live)
+    games = {game for game, _, _ in live}
+    chosen = set(paths)
+    before = [(game, video, message) for game, video, message in surf.load_messages(live=False)
+              if game in games and 0 < message.get("sent", 0) < start]
+    before += [(game, video, message)
+               for game, video, message in slices([p for p in recordings() if p not in chosen],
+                                                  minutes=minutes)
+               if game in games and message["sent"] < start]
+    candidates, summary = surf.find_candidates(
+        live + before, days=0, now=start, min_people=people,
+        known=surf.known_phrases() if known is None else known, top=top)
+    compared = {"recordings": [os.path.basename(p) for p in paths], "start": int(start),
+                "parts": len({video for _, video, _ in live}), "danmu": len(live),
+                "senders": len({message["who"] for _, _, message in live}),
+                "before": len(before), "minutes": minutes}
+    return candidates, summary, compared

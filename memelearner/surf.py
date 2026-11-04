@@ -320,8 +320,10 @@ def fetch(games, sources, days, videos_per_game, now):
                   f"{videos[video['bvid']]['title'][:40]}")
 
 
-def load_messages(videos=None):
-    """Yield (game, bvid, message) for everything read so far."""
+def load_messages(videos=None, live=True):
+    """Yield (game, bvid, message) for everything read so far: the videos' danmu and
+    comments, then (with live) the live rooms recorded (live.py), where each hour counts as
+    a video ("live:6-20261103-1905#2")."""
     videos = _load_json(VIDEOS_FILE, {}) if videos is None else videos
     for bvid, video in videos.items():
         try:
@@ -331,6 +333,9 @@ def load_messages(videos=None):
                         yield video["game"], bvid, json.loads(line)
         except OSError:
             continue
+    if live:
+        from . import live as rooms  # live.py uses this module too
+        yield from rooms.slices(rooms.recordings())
 
 
 # -- finding phrases ----------------------------------------------------------------------
@@ -497,12 +502,12 @@ def _english_words():
 
 def find_candidates(messages, days=DAYS, now=None, min_people=MIN_PEOPLE,
                     min_videos=MIN_VIDEOS, min_before=MIN_BEFORE_MESSAGES, known=None,
-                    english_words=None):
+                    english_words=None, top=TOP):
     """Steps 3 and 4: the phrases people send on their own, for each game, and how new they
     are.
 
     messages is an iterable of (game, bvid, message). Returns (candidates, summary): the
-    candidates sorted best first, and per game {"videos", "recent", "before", "baseline"}
+    candidates sorted best first (top of them for each game), and per game {"videos", "recent", "before", "baseline"}
     (line counts, and whether there were enough earlier lines to compare with). A candidate:
 
         {"phrase": "阿一古", "game": "lol",
@@ -531,7 +536,7 @@ def find_candidates(messages, days=DAYS, now=None, min_people=MIN_PEOPLE,
     candidates, summary = [], {}
     for game, lines in by_game.items():
         found, summary[game] = _game_candidates(game, lines, min_people, min_videos,
-                                                min_before, known)
+                                                min_before, known, top)
         candidates += found
     candidates.sort(key=lambda c: -c["score"])
     return candidates, summary
@@ -545,7 +550,7 @@ def _keep(pool, line):
         texts[line.message["text"]] = line.message
 
 
-def _game_candidates(game, lines, min_people, min_videos, min_before, known):
+def _game_candidates(game, lines, min_people, min_videos, min_before, known, top=TOP):
     """find_candidates() for the lines of one game."""
     recent_people = {line.who for line in lines if line.recent}
     before_people = {line.who for line in lines if not line.recent}
@@ -656,7 +661,7 @@ def _game_candidates(game, lines, min_people, min_videos, min_before, known):
             "examples": _pick_examples(entry["examples"], inside_examples[key]),
         })
     candidates.sort(key=lambda c: -c["score"])
-    return candidates[:TOP], summary
+    return candidates[:top], summary
 
 
 def _written(entry):
@@ -739,18 +744,23 @@ def _pick_examples(alone, inside):
 
 # -- a whole run --------------------------------------------------------------------------
 
-def save(candidates, summary, days):
-    """Write surf/candidates.json: the phrases, their examples and the videos they're from."""
+def save(candidates, summary, days, **extra):
+    """Write surf/candidates.json: the phrases, their examples and the videos they're from
+    (and extra, like what a live room's run compared)."""
+    from . import live  # live.py uses this module too
     videos = _load_json(VIDEOS_FILE, {})
     used = {example["video"] for c in candidates for example in c["examples"]}
-    _save_json(CANDIDATES_FILE, {
+    for bvid in used:
+        if bvid not in videos and bvid.startswith("live:"):
+            videos[bvid] = live.video_entry(bvid)
+    _save_json(CANDIDATES_FILE, dict({
         "made": time.strftime("%Y-%m-%d %H:%M"),
         "days": days,
         "games": summary,
         "videos": {bvid: {k: videos[bvid].get(k) for k in ("game", "title", "author", "url")}
                    for bvid in sorted(used) if bvid in videos},
         "candidates": candidates,
-    })
+    }, **extra))
 
 
 def learn(games=None, days=DAYS, videos=VIDEOS_PER_GAME, people=MIN_PEOPLE, fetching=True,
