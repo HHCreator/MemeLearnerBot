@@ -319,8 +319,8 @@ def parser():
     heard = sub.add_parser("live-phrases", help="the phrases people send on their own in a "
                            "recording, and which are new next to what was read before")
     heard.add_argument("recordings", nargs="*", metavar="RECORDING",
-                       help="recordings (files in surf/live/, like 6-20261103-1905); the last "
-                       "one by default")
+                       help="recordings (files in surf/live/, like 6-20261103-1905); by "
+                       "default the last day's (all of it, when the recorder was restarted)")
     heard.add_argument("--all", action="store_true", help="every recording together")
     heard.add_argument("--slice", type=int, default=60, metavar="MINUTES",
                        help="minutes of a recording that count as one video (default "

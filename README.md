@@ -170,7 +170,7 @@ can record a live room the way a viewer who isn't logged in sees it, for hours, 
 ```
 py -m memelearner live https://live.bilibili.com/6 --until 22:55   # record until 10:55 pm
 py -m memelearner live 6 --hours 3                                 # ... or for 3 hours
-py -m memelearner live-phrases                 # the phrases in the last recording, new ones first
+py -m memelearner live-phrases                 # the phrases in the last day's recording, new first
 py -m memelearner live-phrases --all           # every recording together
 ```
 
@@ -192,7 +192,8 @@ are marked and not counted; combos (他们都在说 正义必胜 x120) are kept 
 spam doesn't count. In a recording each hour counts as a video (about a game and its break;
 `--slice 30` for half hours), so a phrase has to come back in a later hour.
 
-`live-phrases` compares the recording with everything read before it began: the replays of
+`live-phrases` takes the last day's recording (all of it, if the recorder was started
+again) and compares it with everything read before it began: the replays of
 the same game and earlier recordings. `new` means nobody sent it there. It lists the new,
 rising and first-look phrases (at least 5 people each, `--people`), then the 10 most sent old
 ones, and saves them as the candidates, so `judge` and `compare` work on them; `learn

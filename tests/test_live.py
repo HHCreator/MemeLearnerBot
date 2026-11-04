@@ -345,6 +345,12 @@ class FindTest(unittest.TestCase):
         self.assertEqual(saved["videos"]["live:6-20261103-1905#1"]["url"],
                          "https://live.bilibili.com/6")
 
+    def test_by_default_it_takes_the_last_days_recordings_together(self):
+        for name in ("6-20261102-1900.jsonl", "6-20261103-2010.jsonl"):
+            open(os.path.join(live.live_dir(), name), "w").close()
+        self.assertEqual([os.path.basename(p) for p in live.last_day()],
+                         ["6-20261103-1905.jsonl", "6-20261103-2010.jsonl"])
+
     def test_without_recordings_it_says_so(self):
         os.remove(self.path)
         with self.assertRaises(ValueError):

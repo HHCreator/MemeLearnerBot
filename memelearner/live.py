@@ -647,14 +647,24 @@ def slices(paths, game=None, minutes=SLICE, people_only=True):
                 yield its_game, f"live:{name}#{part}", message
 
 
+def last_day():
+    """The recordings of the room and day of the newest one (6-20261103-1905.jsonl and
+    6-20261103-2010.jsonl, when the recorder was started again), oldest first."""
+    found = recordings()
+    if not found:
+        return []
+    day = os.path.basename(found[-1]).rsplit("-", 1)[0]  # 6-20261103
+    return [path for path in found if os.path.basename(path).rsplit("-", 1)[0] == day]
+
+
 def find(paths=None, minutes=SLICE, people=LIVE_PEOPLE, known=None, top=LIVE_TOP):
-    """The phrases people send on their own in some recordings (the last one by default),
-    and how new they are next to everything read before the first of them: the replays'
-    danmu and comments, and earlier recordings. Returns (candidates, summary, compared),
-    like surf.find_candidates(), where compared is {"recordings": [names], "start": unix
-    time, "parts": parts of `minutes`, "danmu": lines, "senders", "before": earlier lines}.
-    A phrase's "new" means nobody sent it in what was read before."""
-    paths = list(paths or recordings()[-1:])
+    """The phrases people send on their own in some recordings (by default the last day's,
+    see last_day()), and how new they are next to everything read before the first of them:
+    the replays' danmu and comments, and earlier recordings. Returns (candidates, summary,
+    compared), like surf.find_candidates(), where compared is {"recordings": [names],
+    "start": unix time, "parts": parts of `minutes`, "danmu": lines, "senders", "before":
+    earlier lines}. A phrase's "new" means nobody sent it in what was read before."""
+    paths = list(paths or last_day())
     if not paths:
         raise ValueError("No recordings yet: record one with py -m memelearner live LINK")
     live = list(slices(paths, minutes=minutes))
