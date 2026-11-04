@@ -162,6 +162,44 @@ The 30 phrases with the most people for each game, with up to 8 example lines ea
 that use it inside something longer first) and the videos they came from, are saved to
 `memelearner/.cache/surf/candidates.json` for `py -m memelearner candidates`.
 
+## Live rooms
+
+A live stream's danmu show new memes as they start, before they reach the replays. The bot
+can record a live room the way a viewer who isn't logged in sees it, for hours, on its own:
+
+```
+py -m memelearner live https://live.bilibili.com/6 --until 22:55   # record until 10:55 pm
+py -m memelearner live 6 --hours 3                                 # ... or for 3 hours
+py -m memelearner live-phrases                 # the phrases in the last day's recording, new first
+py -m memelearner live-phrases --all           # every recording together
+```
+
+`live` never logs in and never sends anything. It joins the room's danmu feed like the
+live page does (a WebSocket, a heartbeat every 30 seconds), joins again by itself when the
+connection drops, keeps Windows awake, and stops at `--until` (this computer's clock), after
+`--hours` or on Ctrl+C. Each danmu goes to `memelearner/.cache/surf/live/ROOM-DATE-TIME.jsonl`
+as it comes, and the room, the counts and the first messages exactly as Bilibili sent them
+to a `.json` beside it. It prints a status line a minute.
+
+**Who sent it.** A visitor gets the sender's name hidden (张***) and no account number,
+but each danmu still carries the crc32 of the sender's account number, the same code a
+replay's danmu carry, so people are counted the same way. After 100 danmu it says whether
+the codes came; without them, senders are guessed from the hidden name, fan medal and level,
+and the people counts are rough. Danmu Bilibili sends for gifts and lotteries, and stickers,
+are marked and not counted; combos (他们都在说 正义必胜 x120) are kept beside them.
+
+**What counts as a video.** A phrase must be sent in at least 2 videos, so one moment's
+spam doesn't count. In a recording each hour counts as a video (about a game and its break;
+`--slice 30` for half hours), so a phrase has to come back in a later hour.
+
+`live-phrases` takes the last day's recording (all of it, if the recorder was started
+again) and compares it with everything read before it began: the replays of
+the same game and earlier recordings. `new` means nobody sent it there. It lists the new,
+rising and first-look phrases (at least 5 people each, `--people`), then the 10 most sent old
+ones, and saves them as the candidates, so `judge` and `compare` work on them; `learn
+--no-fetch` lists the usual ones again. The recordings are part of what the bot has read
+from then on, so the judge sees their lines too, and `learn` counts them with the last 7 days.
+
 ## The judge
 
 The bot only counts, so it lists cheers (ig加油) and everyday words (笑死) beside the memes.

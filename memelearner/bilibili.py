@@ -41,6 +41,7 @@ import urllib.request
 import zlib
 
 API = "https://api.bilibili.com"
+LIVE_API = "https://api.live.bilibili.com"  # live rooms (live.py)
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
                   "(KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
@@ -49,6 +50,8 @@ HEADERS = {
     "Accept": "application/json, text/plain, */*",
     "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
 }
+# ... and what a live room's page sends instead
+LIVE_HEADERS = {"Referer": "https://live.bilibili.com/", "Origin": "https://live.bilibili.com"}
 # Seconds between requests, plus up to REQUEST_JITTER at random. From Hao's PC, Bilibili
 # refused everything (HTTP 412, for about an hour) after 28 requests in under a minute.
 REQUEST_DELAY = 5
@@ -121,6 +124,8 @@ def sign(params, key, now=None):
 def _fetch(url, post=False, cookies=None):
     """Send one request; return (body bytes, Content-Encoding). Tests replace this."""
     headers = dict(HEADERS)
+    if url.startswith(LIVE_API):
+        headers.update(LIVE_HEADERS)
     if cookies:
         headers["Cookie"] = "; ".join(f"{k}={v}" for k, v in cookies.items())
     request = urllib.request.Request(url, data=b"" if post else None, headers=headers,
@@ -155,8 +160,9 @@ _VISITOR = object()  # "send the usual visitor cookies" (the default for _reques
 
 
 def _request(path, params=None, signed=False, raw=False, ok_codes=(0,), post=False,
-             cookies=_VISITOR, retries=RETRIES):
-    """Call an API path; return the answer's "data" (or the raw body with raw=True).
+             cookies=_VISITOR, retries=RETRIES, base=API):
+    """Call an API path (on base: API, or LIVE_API for live rooms); return the answer's
+    "data" (or the raw body with raw=True).
 
     Retries when Bilibili's risk control refuses the request, then raises Blocked; raises
     Error for any other error code, or an answer that isn't JSON.
@@ -168,7 +174,7 @@ def _request(path, params=None, signed=False, raw=False, ok_codes=(0,), post=Fal
         query = dict(params or {})
         if signed:
             query = sign(query, _wbi_key())
-        url = f"{API}{path}"
+        url = f"{base}{path}"
         if query:
             url += "?" + urllib.parse.urlencode(query, quote_via=urllib.parse.quote)
         _wait_turn()
