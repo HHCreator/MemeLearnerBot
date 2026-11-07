@@ -13,14 +13,16 @@ uses (bilibili.py), and writes each danmu to a file in the cache folder as it co
         sends for a viewer (gifts, lotteries), "sticker": 1 for a sticker, "weak": 1 when
         the sender's code was missing and "who" was guessed from what the room shows
     surf/live/ROOM-YYYYMMDD-HHMM.json     the room, start and end, counts, and the first
-                                          messages exactly as Bilibili sent them (to check
-                                          their shape)
+                                          messages as Bilibili sent them, to check their
+                                          shape, with who sent them blanked (scrub())
 
-Who sent a danmu: a visitor gets the name hidden (张***) and no account number, but each
-danmu carries the crc32 of the sender's account number, the same code a replay's danmu
-carry, so "who" is bilibili.user_hash() of it, just like for a replay. The real id is never
-kept. The first status lines say how many different senders there were, so a run shows at
-once whether Bilibili still sends the codes to visitors.
+Who sent a danmu: on the first real run (room 6, 2026-11-07) a visitor got each sender's
+account number and name in full. "who" is bilibili.user_hash() of the crc32 of the account
+number, the same code a replay's danmu carry, so people are counted the same way in both.
+Bilibili has hidden them from visitors before ([0, "张***"]); then the crc32 that each danmu
+also carries (info[0][7]) is used. The number and the name are never kept. The first status
+lines say how many different senders there were, so a run shows at once whether the codes
+came.
 
 How the feed works (what the live page does): ask api.live.bilibili.com for the room's real
 id (live.bilibili.com/6 is room 7734200) and for a token and the feed's servers
@@ -66,6 +68,10 @@ CHECK_AFTER = 100  # danmu after which it says whether the sender codes are ther
 SAMPLES = 20  # DANMU_MSG messages kept as Bilibili sent them, to check their shape
 OTHER_SAMPLES = 2  # ... and of each other kind of message (at most OTHER_KINDS kinds)
 OTHER_KINDS = 40
+# What tells who a viewer is, in the messages Bilibili sends: blanked in the samples (scrub())
+PRIVATE = {"uid", "mid", "uname", "name", "face", "pb", "user_hash", "reply_mid", "reply_uname",
+           "combo_id", "batch_combo_id"}  # a gift combo's id holds the account number
+HIDDEN = "hidden"
 SLICE = 60  # minutes of a recording that count as one video when finding phrases
 LIVE_PEOPLE = 5  # different people who must send a phrase on its own, in a live room's run
 LIVE_TOP = 300  # phrases kept from a live room's run (new ones are often less common)
@@ -245,6 +251,34 @@ def _at(items, index, default=None):
     return items[index] if isinstance(items, list) and len(items) > index else default
 
 
+def scrub(message):
+    """A copy of a raw message for the samples in the .json, without who sent it: account
+    numbers, names, faces, sender codes and protobuf parts ("pb") become "hidden". What
+    Bilibili itself left empty (0, "") stays, so a sample still shows what a visitor gets,
+    and so does the rest of its shape."""
+    def walk(value, key=None):
+        if key in PRIVATE:
+            return value if not value else HIDDEN
+        if isinstance(value, dict):
+            return {k: walk(v, k) for k, v in value.items()}
+        if isinstance(value, list):
+            return [walk(v) for v in value]
+        if key == "extra" and isinstance(value, str) and value:  # JSON inside the JSON
+            try:
+                return json.dumps(walk(json.loads(value)), ensure_ascii=False)
+            except ValueError:
+                return HIDDEN
+        return value
+
+    copy = walk(message)
+    info = copy.get("info") if isinstance(copy, dict) else None
+    for part, index in ((0, 7), (2, 0), (2, 1)):  # DANMU_MSG: the code, account number, name
+        row = _at(info, part)
+        if _at(row, index):
+            row[index] = HIDDEN
+    return copy
+
+
 def parse_danmu(message, now=None):
     """The record for a DANMU_MSG message, or None when it holds no text.
 
@@ -352,13 +386,13 @@ class Recording:
         keep = self.samples[kind]
         if kind == "DANMU_MSG":
             if len(keep) < SAMPLES:
-                keep.append(message)
+                keep.append(scrub(message))
             record = parse_danmu(message)
             if record:
                 self.danmu(record)
         else:
             if len(keep) < OTHER_SAMPLES and len(self.samples) <= OTHER_KINDS:
-                keep.append(message)
+                keep.append(scrub(message))
             if kind == "DM_INTERACTION":
                 for record in parse_combo(message):
                     self.combos += 1

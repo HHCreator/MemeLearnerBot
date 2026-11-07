@@ -178,14 +178,16 @@ py -m memelearner live-phrases --all           # every recording together
 live page does (a WebSocket, a heartbeat every 30 seconds), joins again by itself when the
 connection drops, keeps Windows awake, and stops at `--until` (this computer's clock), after
 `--hours` or on Ctrl+C. Each danmu goes to `memelearner/.cache/surf/live/ROOM-DATE-TIME.jsonl`
-as it comes, and the room, the counts and the first messages exactly as Bilibili sent them
-to a `.json` beside it. It prints a status line a minute.
+as it comes, and the room, the counts and the first messages as Bilibili sent them (with who
+sent them blanked) to a `.json` beside it. It prints a status line a minute.
 
-**Who sent it.** A visitor gets the sender's name hidden (张***) and no account number,
-but each danmu still carries the crc32 of the sender's account number, the same code a
-replay's danmu carry, so people are counted the same way. After 100 danmu it says whether
-the codes came; without them, senders are guessed from the hidden name, fan medal and level,
-and the people counts are rough. Danmu Bilibili sends for gifts and lotteries, and stickers,
+**Who sent it.** On the first real run (room 6, 7 November 2026) a visitor got each sender's
+account number and name in full. The bot keeps neither: as for a replay, it keeps a short hash
+of the crc32 of the account number (the code a replay's danmu carry), so people are counted
+the same way in both. If Bilibili hides them from visitors again (张***, account 0), each
+danmu still carries that crc32. After 100 danmu it says whether the codes came; without them,
+senders are guessed from the hidden name, fan medal and level, and the people counts are
+rough. Danmu Bilibili sends for gifts and lotteries, and stickers,
 are marked and not counted; combos (他们都在说 正义必胜 x120) are kept beside them.
 
 **What counts as a video.** A phrase must be sent in at least 2 videos, so one moment's

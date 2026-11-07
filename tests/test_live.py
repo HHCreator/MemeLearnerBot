@@ -20,16 +20,17 @@ CRC = "7c2c6a45"
 
 
 def danmu_msg(text, sent_ms, code=CRC, user_hash="2083285573", id_str="abc1", auto=0,
-              sticker=0, uid=0):
-    """A DANMU_MSG the way a visitor gets it: name hidden, account number 0."""
+              sticker=0, uid=0, name="张***"):
+    """A DANMU_MSG the way a visitor may get it: by default with the name hidden and the
+    account number 0 (on 2026-11-07 a visitor got both in full: pass uid and name)."""
     extra = {"send_from_me": False, "content": text, "user_hash": user_hash,
              "id_str": id_str, "dm_type": sticker, "hit_combo": 0}
     meta = [0, 1, 25, 16777215, sent_ms, 1730679990, 0, code, 0, auto, 0, "", sticker, "{}",
             "{}", {"extra": json.dumps(extra), "mode": 0, "show_player_type": 0,
-                   "user": {"uid": 0, "base": {"name": "张***"}}},
+                   "user": {"uid": uid, "base": {"name": name}}},
             {"activity_identity": ""}, 0]
     return {"cmd": "DANMU_MSG", "dm_v2": "",
-            "info": [meta, text, [uid, "张***", 0, 0, 0, 10000, 1, ""], [], [0, 0, 9868950],
+            "info": [meta, text, [uid, name, 0, 0, 0, 10000, 1, ""], [], [0, 0, 9868950],
                      ["", ""], 0, 0, None, {"ts": sent_ms // 1000, "ct": "AB"}, 0, 0]}
 
 
@@ -121,6 +122,28 @@ class ParseTest(unittest.TestCase):
         by_extra = live.parse_danmu(danmu_msg("a", 1, code="", user_hash="191882304"))
         self.assertEqual(by_uid["who"], by_code["who"])
         self.assertEqual(by_uid["who"], by_extra["who"])
+
+    def test_the_samples_keep_the_shape_but_not_who_sent_it(self):
+        message = danmu_msg("正义必胜", 1, code="0b6fe440", user_hash="191882304",
+                            uid=3493112492066879, name="真名字")
+        message["info"][0][15]["user"]["base"]["face"] = "https://i0.hdslb.com/bfs/face/x.jpg"
+        others = [{"cmd": "INTERACT_WORD_V2", "data": {"pb": "CNjQ5r0BEgnnnJ/lkI3lrZc="}},
+                  {"cmd": "ONLINE_RANK_V2", "data": {"list": [
+                      {"uid": 3493112492066879, "uname": "真名字", "face": "x", "rank": 1}]}}]
+        samples = [live.scrub(m) for m in [message] + others]
+        text = json.dumps(samples, ensure_ascii=False)
+        for private in ("3493112492066879", "真名字", "0b6fe440", "191882304", "face/x", "CNj"):
+            self.assertNotIn(private, text)
+        self.assertEqual(samples[0]["info"][1], "正义必胜")
+        self.assertEqual(samples[0]["info"][2][:2], ["hidden", "hidden"])
+        self.assertEqual(json.loads(samples[0]["info"][0][15]["extra"])["content"], "正义必胜")
+        self.assertEqual(samples[2]["data"]["list"][0]["rank"], 1)
+        # What Bilibili left empty stays, and the message itself is untouched
+        self.assertEqual(live.scrub(danmu_msg("x", 1, code=""))["info"][0][7], "")
+        self.assertEqual(live.scrub(danmu_msg("x", 1))["info"][2][0], 0)
+        self.assertEqual(message["info"][2][:2], [3493112492066879, "真名字"])
+        self.assertEqual(live.parse_danmu(message)["who"],
+                         bilibili.user_hash(bilibili.mid_hash(3493112492066879)))
 
     def test_without_codes_senders_are_guessed_and_marked(self):
         record = live.parse_danmu(danmu_msg("x", 1, code="", user_hash=""))
@@ -222,6 +245,7 @@ class RecordTest(unittest.TestCase):
                           info["joins"]), (2, 2, 1, 1, 2))
         self.assertEqual(info["room"]["room_id"], 7734200)
         self.assertEqual(len(info["samples"]["DANMU_MSG"]), 3)
+        self.assertNotIn(CRC, json.dumps(info["samples"]))  # samples don't say who sent them
         self.assertIn("ONLINE_RANK_COUNT", info["kinds"])
         self.assertIn("Stopped.", out.getvalue())
         self.assertIn("TES vs IG", out.getvalue())
