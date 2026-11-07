@@ -16,11 +16,10 @@ MemeLearnerBot/
 └── memelearner/       真正的代码（一个 Python 包）
     ├── __init__.py    门面：memes()、lookup()、find()、candidates()、learn()、judge()、watching()、accept()、reject()，别的程序只调用它
     ├── __main__.py    py -m memelearner
-    ├── cli.py         命令行：learn、judge、candidates、watching、accept、reject、forget、memes、lookup、find、live、live-phrases
+    ├── cli.py         命令行：learn、judge、candidates、watching、accept、reject、forget、memes、lookup、find
     ├── surf.py        梗机器人：找 B 站上很多人单独发的说法
     ├── judging.py     本地模型判断候选：是梗、名字、游戏术语还是普通的话，梗是什么意思（第 3 节）
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评（只读）
-    ├── live.py        录直播间的弹幕（游客身份，只看不发），再在录下来的弹幕里找说法（第 2 节末尾）
     ├── store.py       学到的梗和不要的说法，存在 data/memes.json
     ├── data/          梗、每个游戏的起点视频、日常说法、英文常用词
     └── .cache/surf/   读到的弹幕和评论、candidates.json、judge.json（不进 git）
@@ -29,6 +28,8 @@ MemeLearnerBot/
 ## 2. 一次运行（`surf.py` 和 `bilibili.py`）
 
 目标是自己去 B 站找最新的梗，列出来给人看。机器人找的是「很多人单独发出来」的短弹幕（候选），再标上新不新，由人决定哪些是梗：`accept` 学下来，`reject` 以后不再列。
+
+直播间的弹幕另外录：`py -m memelearner live` 像没登录的观众一样录一个直播间，`live-phrases` 在录下来的弹幕里找新说法。见 [LIVE.md](LIVE.md)（`live.py`）。
 
 ```mermaid
 flowchart TD
@@ -50,16 +51,6 @@ flowchart TD
 - **新不新**（`surprise()`）。比较最近 7 天和以前，单独发它的人占所有发言的人的比例：以前没人发过是 new，至少多 3 倍是 rising，少到三分之一以下是 older，其他是 steady。还做二项检验：假如它其实一直这么常见，这么大的变化碰巧出现的概率要小于 1/100（`SURE = 2`）。没有明显变化也不一定是 steady：要两边的句子都够多、能看出变化才算（假如它一直这么常见，两边各自至少有 `MIN_EXPECTED`（5）个人发过）。一边太少的时候，以前更常见的算 older，不然算 first look。比如 Hao 的电脑上无畏契约最近 7 天只有 591 条弹幕：「我们是路边」以前 40 个人发过、最近 0 个，就算 older，不算 steady。新不新只是标签，不再用来筛：英雄联盟的「以前」只是同一届世界赛的前几天，「变多」反映的是哪几支队、哪些英雄上场，不是梗。
 - **第一次运行没有「以前」可比**，所以会多读同样多的旧视频（30 到 90 天前发布的）当基准。以后每次运行，之前读到的句子慢慢变成「以前」，基准越来越大，用的人不多的新梗也能认出来。
 - **已经知道的不算新闻**（`known_phrases()`）：学到的梗和 reject 过的说法（`data/memes.json`）、`data/surf_common.txt` 里的日常说法，还有别的程序已经知道的词：`learn(known=...)` 直接给，或者 `--known` / 环境变量 `MEMELEARNER_KNOWN` 指向它的词表文件（.json 的键和值都算，.txt 每行一个，文件夹就是里面的 .json 和 .txt，不进子文件夹）。在翻译器里的时候机器人直接读翻译器的词表；搬出来以后不再认识翻译器的代码，要用它的词表就 `--known G:\SBtranslator\sbtranslator\data`。2026 年 11 月 1 日用旧的找法和 Hao 电脑上读到的约 10 万条弹幕比过：加不加翻译器的词表，33 个候选里只差 blg 这种一两个。
-
-### 直播间（`live.py`）
-
-新梗先出现在直播的弹幕里，过几天才进录播。`py -m memelearner live https://live.bilibili.com/6 --until 22:55` 像没登录的观众一样录一个直播间的弹幕，可以自己录几个小时，不用开着 Claude：
-
-- **只看不发。** 不登录、不发弹幕。和直播页面一样：先用 `room_init` 把短号换成真房间号（6 是 7734200），再用 WBI 签名的 `getDanmuInfo` 拿 token 和弹幕服务器，开 WebSocket（`wss://…/sub`），发 token 进房间，每 30 秒一个心跳。B 站的包有 16 字节的头（长度、头长度、版本、操作、序号），版本 2 是 zlib 压缩的一串包。Python 自带的库没有 WebSocket 客户端，所以 `live.py` 自己实现了 RFC 6455 的握手和帧（客户端发的帧要加掩码），不用装别的包；装了 brotli 就和页面一样要版本 3 的包。断线了自己重连（连续失败两次就换新 token），一直录到 `--until`、`--hours` 或者 Ctrl+C，期间不让 Windows 睡眠。
-- **谁发的。** 游客看到的名字是打码的（张***），账号是 0，但每条弹幕还带着发送者账号的 crc32（`info[0][7]`），和录播弹幕里的发送者哈希是同一种东西，所以照样能数不同的人。录到 100 条时会说码在不在；不在的话，就用打码的名字、粉丝牌和等级粗略地分人，人数就不准了。礼物和抽奖自动发的弹幕（`info[0][9]` 不是 0）和表情（`info[0][12]` 是 1）会标出来，不算数；「他们都在说」的合并计数（`DM_INTERACTION`）另外存着。
-- **存在哪。** `.cache/surf/live/房间-日期-时间.jsonl`，一行一条，格式和录播的一样（`id`、`kind: live`、`who`、`text`、`sent`）；旁边的 `.json` 记房间、开始时间、计数，和最先收到的几条原始消息，方便核对 B 站发来的格式。
-- **什么算一个视频。** 找说法要求至少出现在 2 个视频里，免得某一刻的刷屏也算。一场比赛只有一个直播，所以录下来的弹幕每 60 分钟算一个视频（差不多一局加中间休息，`--slice` 可以改），一个说法要在后面的一个小时里又出现才算。
-- **找新说法。** `py -m memelearner live-phrases` 拿最近一天录的弹幕（中途重开过也算在一起），和它开始以前读过的所有东西比：同一个游戏的录播弹幕和评论，还有更早的录播。以前没人发过的就是 new。列出 new、rising、first look（每个至少 5 个人，`--people`），再列 10 个发得最多的老说法，存成候选（candidates.json），这样 `judge` 和 `compare` 直接就能判断它们；`learn --no-fetch` 会再列回平常的候选。录下来的弹幕从此也算机器人读过的东西（`surf.load_messages()`），所以模型判断时能看到它们，`learn` 也把最近 7 天的录播算进去。
 
 ## 3. 本地模型判断（`judging.py`）
 

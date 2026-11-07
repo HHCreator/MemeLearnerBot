@@ -251,8 +251,9 @@ def parse_danmu(message, now=None):
     info[0] is [.., mode, size, color, time sent (ms), random id, .., sender's code (crc32
     of the account number, hex), .., auto (1 or 2: sent for a gift or a lottery), .., kind
     (0 text, 1 sticker, 2 voice), .., {"extra": JSON with "id_str", "user_hash" ...}];
-    info[1] is the text; info[2] is [account number, name, ...], which a visitor gets as
-    [0, "张***", ...]; info[3] the fan medal; info[4] the user level.
+    info[1] is the text; info[2] is [account number, name, ...], which a visitor may get as
+    [0, "张***", ...] (on 2026-11-07 a visitor got them in full); info[3] the fan medal;
+    info[4] the user level. Only a hash of the code is kept, never the name or number.
     """
     info = message.get("info")
     if not isinstance(info, list):
@@ -274,12 +275,12 @@ def parse_danmu(message, now=None):
     sent = sent / 1000 if isinstance(sent, (int, float)) and sent > 0 else (now or time.time())
 
     uid = _at(user, 0)
-    code = _at(meta, 7)
-    if isinstance(uid, int) and uid > 0:  # logged in, or Bilibili stops hiding it
+    if isinstance(uid, int) and uid > 0:  # Bilibili doesn't hide it (it didn't on 2026-11-07)
         code = bilibili.mid_hash(uid)
-    elif code in (None, "", 0, "0"):
-        code = extra.get("user_hash")
-        code = None if code in (None, "", 0, "0") else f"h{code}"
+    else:  # the crc32 in hex, sometimes with leading zeros (0b6fe440), or in "extra" in decimal
+        code = str(_at(meta, 7) or "").lower().lstrip("0")
+        if not code and str(extra.get("user_hash") or "").isdigit():
+            code = format(int(extra["user_hash"]), "x").lstrip("0")
     record = {"id": "", "kind": "live", "who": "", "text": text, "sent": round(sent, 3)}
     if code:
         record["who"] = bilibili.user_hash(code)

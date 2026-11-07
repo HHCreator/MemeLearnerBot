@@ -114,6 +114,14 @@ class ParseTest(unittest.TestCase):
         visitor = live.parse_danmu(danmu_msg("a", 1, code=bilibili.mid_hash(uid)))
         self.assertEqual(logged_in["who"], visitor["who"])
 
+    def test_a_zero_padded_code_is_the_same_person(self):
+        # From the first real recording: uid 3493112492066879 came with code 0b6fe440
+        by_uid = live.parse_danmu(danmu_msg("a", 1, code="0b6fe440", uid=3493112492066879))
+        by_code = live.parse_danmu(danmu_msg("a", 1, code="0b6fe440"))
+        by_extra = live.parse_danmu(danmu_msg("a", 1, code="", user_hash="191882304"))
+        self.assertEqual(by_uid["who"], by_code["who"])
+        self.assertEqual(by_uid["who"], by_extra["who"])
+
     def test_without_codes_senders_are_guessed_and_marked(self):
         record = live.parse_danmu(danmu_msg("x", 1, code="", user_hash=""))
         self.assertEqual(record["weak"], 1)
