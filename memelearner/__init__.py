@@ -85,10 +85,11 @@ def judge(games=None, model=None, again=False, quiet=False):
     games: only these games' candidates; model: an online model named PROVIDER/MODEL, which
     reads your key from an environment variable (DEEPSEEK_API_KEY), or an Ollama model on
     this computer like qwen3:14b (default: MEMELEARNER_MODEL, or deepseek/deepseek-flash);
-    again=True judges again what was judged before. Raises
-    ModelUnavailable when the model can't be asked (Ollama isn't running or doesn't have it;
-    an online one has no key, refuses it or doesn't answer); the verdicts given until then
-    are kept. quiet: print nothing.
+    again=True judges again what was judged before. When an online model can't be reached
+    (no internet, no key, a key it refuses or no balance left), qwen3:14b on this computer
+    judges instead (judging.LOCAL_MODEL), and each verdict's "model" says which one judged.
+    Raises ModelUnavailable when no model can be asked (Ollama isn't running or doesn't
+    have it, either); the verdicts given until then are kept. quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
         return judging.judge(games, model or judging.MODEL, again)

@@ -155,11 +155,12 @@ class JudgeTest(unittest.TestCase):
         lines = {
             "BV1aaaaaaaaa": ["阿一古阿一古 又来了", "这波阿一古了兄弟们", "阿一古！！！", "主播又在阿一古",
                              "阿一古来了家人们", "fpx加油", "FPX 这波可以", "这局怎么翻",
-                             "怎么翻盘啊", "神中神啊这操作", "正义必胜", "正义必胜"],
+                             "怎么翻盘啊", "神中神啊这操作", "正义必胜", "正义必胜", "这把怎么翻啊",
+                             "经济差这么多怎么翻"],
             "BV1bbbbbbbbb": ["阿一古真的绷不住", "听到阿一古就想笑", "阿一古", "阿一古",
                              "又是一句阿一古", "阿一古永远的神", "fpx要赢了", "fpx这波有点东西",
                              "fpxs是谁", "还能怎么翻啊", "落后一万怎么翻", "这还怎么翻",
-                             "神中神了家人们", "正义必胜正义必胜", "正义必胜！"],
+                             "神中神了家人们", "正义必胜正义必胜", "正义必胜！", "兄弟们这还能怎么翻"],
         }
         for in_a, in_b in (more or {}).values():
             lines["BV1aaaaaaaaa"] += in_a
@@ -333,11 +334,34 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(len(judging.usage_lines({("lol", "阿一古")}, limit=3)[("lol", "阿一古")]), 3)
 
     def test_the_longer_lines_are_split_between_explaining_and_testing(self):
-        self.assertEqual(judging._split(["1", "2", "3", "4"]), (["1", "3"], ["2", "4"]))
-        self.assertEqual(judging._split(["1", "2", "3"]), (["1"], ["2", "3"]))
-        self.assertEqual(judging._split(["1", "2"]), (["1", "2"], []))  # too few to test
+        lines = [str(n) for n in range(1, 10)]
+        self.assertEqual(judging._split(lines[:8]), (["1", "3", "5", "7"], ["2", "4", "6", "8"]))
+        self.assertEqual(judging._split(lines), (["1", "3", "5", "7", "9"], ["2", "4", "6", "8"]))
+        self.assertEqual(judging._split(lines[:7]), (lines[:7], []))  # 3 to test on: too few
+        self.assertEqual(judging._split(lines[:2]), (lines[:2], []))
         self.assertTrue(judging._says_more("这还怎么翻", "怎么翻的"))
         self.assertFalse(judging._says_more("怎么翻的啊！", "怎么翻的"))
+
+    def test_a_meaning_is_only_tested_on_4_lines_or_more(self):
+        crazy = {"kind": "meme", "meaning": "比赛打得离谱，离谱到好笑", "english": "absurd",
+                 "literal": "太不正常了", "why": "句子里都这么用"}
+        self.model.answers_for["deepseek-r1:14b"] = {"太变态了": crazy}
+        six = (["这波太变态了", "太变态了吧这操作", "太变态了兄弟"], ["真的太变态了", "太变态了这个打法", "也太变态了"])
+        self.write_run(more={"太变态了": six})
+        verdict = self.judge()["太变态了"]
+        # Half of 6 lines would leave 3 to test on: the model sees all 6, and there's no test
+        self.assertEqual(sorted(self.model.explained["太变态了"]["lines"]), sorted(six[0] + six[1]))
+        self.assertNotIn("太变态了", self.model.tested)
+        self.assertEqual((verdict["verdict"], verdict["meaning"], verdict["guess"]),
+                         ("untested", crazy["meaning"], True))
+        self.assertNotIn("test", verdict)
+        # With 8 lines, 4 test it, and here none of them picks the meaning
+        self.write_run(more={"太变态了": (six[0] + ["太变态了这也行"], six[1] + ["这也太变态了吧"])})
+        verdict = self.judge(again=True)["太变态了"]
+        self.assertEqual(len(self.model.tested["太变态了"]["lines"]), 4)
+        self.assertEqual((verdict["verdict"], verdict["test"]), ("watching",
+                                                                 {"lines": 4, "fits": 0,
+                                                                  "misses": 4}))
 
     def test_the_blind_test_reads_answers_written_in_different_ways(self):
         self.assertEqual([judging._pick(a) for a in ["A", " b", "A：这句是这个意思", "Both",
@@ -391,8 +415,12 @@ class JudgeTest(unittest.TestCase):
 
     @contextlib.contextmanager
     def online(self, api, key=KEY):
-        """Judge with the real _ask(), against a fake DeepSeek API, with key as the key."""
-        with mock.patch.object(judging, "_ask", ASK), \
+        """Ask online models with the real _ask(), against a fake DeepSeek API, with key as
+        the key; the FakeModel still answers for the models on this computer."""
+        def ask(messages, model):
+            return ASK(messages, model) if judging.online(model) else self.model(messages, model)
+
+        with mock.patch.object(judging, "_ask", ask), \
                 mock.patch.object(urllib.request, "urlopen", api), \
                 mock.patch.dict(os.environ, {"DEEPSEEK_API_KEY": key}):
             yield
@@ -429,34 +457,107 @@ class JudgeTest(unittest.TestCase):
             with open(path, encoding="utf-8") as f:
                 self.assertNotIn(KEY, f.read())
 
-    def test_the_default_is_deepseek_flash_online_and_without_a_key_it_says_what_to_do(self):
+    def test_the_default_is_deepseek_flash_and_without_a_key_qwen3_judges_instead(self):
         self.write_run()
         self.assertEqual(judging.DEFAULT_MODEL, "deepseek/deepseek-flash")
-        with mock.patch.object(judging, "MODEL", judging.DEFAULT_MODEL):
+        self.assertEqual(judging.LOCAL_MODEL, "qwen3:14b")
+        with mock.patch.object(judging, "MODEL", judging.DEFAULT_MODEL), self.two_models():
             api = FakeDeepSeek(self.model)
             with self.online(api, key=""):
-                with self.assertRaisesRegex(memelearner.ModelUnavailable,
-                                            "DEEPSEEK_API_KEY environment variable first .see "
-                                            "the README., or judge on this computer with "
-                                            "--model qwen3:14b"):
-                    self.judge()
                 code, printed = self.run_cli("judge")
-            self.assertEqual(code, 1)
-            self.assertIn("--model qwen3:14b", printed)
-            self.assertEqual(api.requests, [])
+            self.assertEqual(code, 0)
+            self.assertEqual(api.requests, [])  # nothing is sent without a key
+            self.assertIn("deepseek/deepseek-flash is an online model: put your API key in the "
+                          "DEEPSEEK_API_KEY environment variable first (see the README).\nSo "
+                          "qwen3:14b, the model on this computer, judges instead.\nJudging 5 "
+                          "phrases with qwen3:14b ...", printed)
+            self.assertIn("Judged by qwen3:14b. qwen3:14b judged instead of "
+                          "deepseek/deepseek-flash, which couldn't be reached; "
+                          "deepseek/deepseek-flash judges those phrases again once it can be.",
+                          printed)
+            self.assertNotIn("tokens", printed)  # DeepSeek wasn't asked anything
+            self.assertEqual({c["judge"]["model"] for c in memelearner.candidates()},
+                             {"qwen3:14b"})
+            code, printed = self.run_cli("candidates")
+            self.assertIn(f"-> a meme: {AYIGU}  (judged by qwen3:14b)", printed)
+            # With the key, deepseek-flash judges again what qwen3:14b judged
             with self.online(api):
                 verdicts = self.judge()
                 code, printed = self.run_cli("judge", "--help")
-        self.assertEqual(verdicts["阿一古"]["model"], "deepseek/deepseek-flash")
+        self.assertEqual({verdict["model"] for verdict in verdicts.values()},
+                         {"deepseek/deepseek-flash"})
         self.assertEqual({chat["model"] for chat in api.chats()}, {"deepseek-flash"})
         self.assertIn("(defaultdeepseek/deepseek-flash;", "".join(printed.split()))  # wrapped
+        self.assertIn("can'tbereached,qwen3:14bjudgesinstead", "".join(printed.split()))
+
+    def test_when_deepseek_stops_answering_qwen3_judges_the_rest(self):
+        self.write_run()
+        # The model list and 阿一古's two questions are answered, then the balance runs out
+        api = FakeDeepSeek(self.model, [None, None, None] + [402] * 10)
+        with self.online(api), self.two_models():
+            code, printed = self.run_cli("judge", "--model", "deepseek/deepseek-flash")
+        self.assertEqual(code, 0)
+        self.assertIn("deepseek/deepseek-flash: the balance has run out: top it up on the "
+                      "provider's site (HTTP 402: ", printed)
+        self.assertIn("So qwen3:14b, the model on this computer, judges the rest instead.",
+                      printed)
+        verdicts = {c["phrase"]: c["judge"] for c in memelearner.candidates()}
+        self.assertEqual(verdicts["阿一古"]["model"], "deepseek/deepseek-flash")
+        self.assertEqual({verdicts[phrase]["model"] for phrase in ("fpx", "怎么翻", "正义必胜", "神中神")},
+                         {"qwen3:14b"})
+        self.assertEqual(verdicts["fpx"]["verdict"], "not a meme")  # qwen3:14b's answer
+        self.assertIn("Judged by qwen3:14b (4 phrases) and deepseek/deepseek-flash (1 phrase). "
+                      "qwen3:14b judged instead of deepseek/deepseek-flash", printed)
+        self.assertIn("deepseek/deepseek-flash read 2,000 tokens", printed)  # its 2 answers
+        # Once DeepSeek answers again, it judges what qwen3:14b judged, and only that
+        self.model.asked.clear()
+        with self.online(FakeDeepSeek(self.model)), self.two_models():
+            verdicts = self.judge(model="deepseek/deepseek-flash")
+        self.assertEqual({verdict["model"] for verdict in verdicts.values()},
+                         {"deepseek/deepseek-flash"})
+        self.assertEqual({phrase for _, kind, phrase, _ in self.model.asked if kind == "explain"},
+                         {"fpx", "怎么翻", "正义必胜", "神中神"})
+
+    def test_standing_in_qwen3_keeps_deepseeks_verdicts_and_its_own(self):
+        self.write_run()
+        with self.online(FakeDeepSeek(self.model)), self.two_models():
+            self.judge(model="deepseek/deepseek-flash")
+        self.write_run(more={"吓哭了": (["吓哭了", "吓哭了吓哭了"], ["吓哭了！", "真的吓哭了"])})
+        self.model.asked.clear()
+        with self.online(FakeDeepSeek(self.model), key=""), self.two_models():
+            verdicts = self.judge(model="deepseek/deepseek-flash")
+            # Only the new phrase is judged, by qwen3:14b; deepseek-flash's verdicts stay
+            self.assertEqual({(model, phrase) for model, _, phrase, _ in self.model.asked},
+                             {("qwen3:14b", "吓哭了")})
+            self.assertEqual(verdicts["阿一古"]["model"], "deepseek/deepseek-flash")
+            self.assertEqual(verdicts["吓哭了"]["model"], "qwen3:14b")
+            # Still no key: what qwen3:14b judged isn't judged again
+            self.model.asked.clear()
+            self.judge(model="deepseek/deepseek-flash")
+            self.assertEqual(self.model.asked, [])
+            # Asked to, it judges everything again
+            verdicts = self.judge(model="deepseek/deepseek-flash", again=True)
+        self.assertEqual({verdict["model"] for verdict in verdicts.values()}, {"qwen3:14b"})
+
+    def test_compare_has_nobody_stand_in_for_a_model_it_cant_ask(self):
+        self.write_run()
+        with self.online(FakeDeepSeek(self.model), key=""), self.two_models(), \
+                contextlib.redirect_stdout(io.StringIO()) as printed:
+            result = judging.compare(["deepseek/deepseek-flash", "deepseek-r1:14b"], top=1)
+        self.assertEqual(result["models"], ["deepseek-r1:14b"])
+        self.assertIn("Leaving out deepseek/deepseek-flash: deepseek/deepseek-flash is an "
+                      "online model: put your API key", printed.getvalue())
+        self.assertEqual({model for model, *_ in self.model.asked}, {"deepseek-r1:14b"})
 
     def test_an_online_model_needs_a_key_that_works_and_a_model_its_api_has(self):
         self.write_run()
         api = FakeDeepSeek(self.model)
-        with self.online(api, key=" "):
+        with self.online(api, key=" "):  # and qwen3:14b isn't on this computer to stand in
             with self.assertRaisesRegex(memelearner.ModelUnavailable, "put your API key in "
-                                        "the DEEPSEEK_API_KEY environment variable"):
+                                        "the DEEPSEEK_API_KEY environment variable first .see "
+                                        "the README.; and qwen3:14b, which judges when it "
+                                        "can't be reached, can't be asked either: the model "
+                                        "qwen3:14b isn't downloaded: ollama pull qwen3:14b"):
                 self.judge(model="deepseek/deepseek-flash")
         self.assertEqual(api.requests, [])  # nothing is sent without a key
         for failures, said in (([401], "the API key in DEEPSEEK_API_KEY was refused"),

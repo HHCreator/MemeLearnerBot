@@ -29,7 +29,9 @@ change faster than that, so the judge never goes by what the model remembers:
                   saw, and two meanings in an order set by the phrase: the one from step 2
                   and the literal one (or "a name" when it has none). For each line it says
                   which one the phrase means there. The meaning passes when at least MIN_FITS
-                  lines, and FIT_SHARE of the lines that picked a meaning, pick it.
+                  lines, and FIT_SHARE of the lines that picked a meaning, pick it. The test
+                  only runs with at least MIN_TEST_LINES lines to test on; with fewer, all
+                  the longer lines go to step 2.
     4. Verdict    "meme": it passed the test; "untested": a meme to the model, but too few
                   lines say more than the phrase to test the meaning on (people mostly send
                   it on its own); its meaning comes from the lines that explain it, and when
@@ -49,15 +51,17 @@ programs that aren't logged in, while 维基百科's search found unrelated page
 Olaf Scholz) that misled the model more than they helped.
 
 Models. The default is deepseek/deepseek-flash, one of DeepSeek's online models: of five
-models compared on the 60 phrases of a real run (2026-11-02), it gave the most right
-meanings and no wrong ones. An online model is named PROVIDER/MODEL: the judge sends it the
-lines and video titles (never who sent them) with your API key, which it reads from an
-environment variable (DEEPSEEK_API_KEY), so the key never goes into a file. A local model
-runs on this computer through Ollama (https://ollama.com), which must be running with the
-model downloaded (ollama pull qwen3:14b, the best local one in that comparison): free and
-offline, but it knows far less slang. Use another model with --model or MEMELEARNER_MODEL.
-compare() judges the same candidates with several models from the same lines, to pick one,
-without changing the verdicts judge() keeps. A judge run takes a few seconds per candidate.
+models compared on the 60 phrases of a real run (2026-11-02, marked by hand), it scored
+best. An online model is named PROVIDER/MODEL: the judge sends it the lines and video
+titles (never who sent them) with your API key, which it reads from an environment
+variable (DEEPSEEK_API_KEY), so the key never goes into a file. A local model runs on this
+computer through Ollama (https://ollama.com), which must be running with the model
+downloaded (ollama pull qwen3:14b): free and offline, but it knows far less slang. When an
+online model can't be reached (no internet, no key, or no balance left), LOCAL_MODEL, the
+best local one in that comparison, judges instead by itself, and the judge says so. Use
+another model with --model or MEMELEARNER_MODEL. compare() judges the same candidates with
+several models from the same lines, to pick one, without changing the verdicts judge()
+keeps. A judge run takes a few seconds per candidate.
 """
 
 import collections
@@ -80,8 +84,9 @@ OLLAMA_URL = "http://127.0.0.1:11434"  # where Ollama listens on this computer
 # is (in OpenAI's format), and the environment variable that holds your key for it. Set
 # the key on your computer (setx DEEPSEEK_API_KEY sk-...), never in a file here.
 APIS = {"deepseek": ("https://api.deepseek.com", "DEEPSEEK_API_KEY")}
-DEFAULT_MODEL = "deepseek/deepseek-flash"  # judged best of five on a real run (2026-11-02)
-LOCAL_MODEL = "qwen3:14b"  # the best of the models in that comparison that run on this computer
+DEFAULT_MODEL = "deepseek/deepseek-flash"  # scored best of five on a real run (2026-11-02)
+LOCAL_MODEL = "qwen3:14b"  # the best of them that runs on this computer: it judges instead of
+                           # an online model that can't be reached
 MODEL = os.environ.get("MEMELEARNER_MODEL", "").strip() or DEFAULT_MODEL
 TIMEOUT = 300  # seconds for one answer; the first one also loads the model
 ANSWER_TOKENS = 1000  # most an online model may write in one answer (they take about 200)
@@ -97,11 +102,14 @@ LINE_LENGTH = 100  # characters kept of each line
 TITLES = 4  # titles of the videos a phrase was sent in, shown to the model
 MIN_FITS = 2  # test lines that must pick the meaning for it to pass
 FIT_SHARE = 0.75  # ... and the share of the test lines that picked a meaning
+MIN_TEST_LINES = 4  # lines to test a meaning on, or it isn't tested: on a real run, tests on
+                    # 2 or 3 lines threw out more right meanings than wrong ones
 AGAIN_PEOPLE = 1.5  # an untested or watching phrase is judged again once this many times as
                     # many send it
 TEXT_LENGTH = 120  # characters kept of what the model writes (a meaning, a reason)
-VERSION = 3  # judge.json's format; the verdicts in an older one are asked again
-                 # (3: the model is shown the lines that explain a phrase, and guesses are marked)
+VERSION = 4  # judge.json's format; the verdicts in an older one are asked again
+                 # (3: the model is shown the lines that explain a phrase, and guesses are marked;
+                 # 4: a meaning is only tested on MIN_TEST_LINES lines or more)
 
 GAMES = {"cs2": "CS2（反恐精英2）", "lol": "英雄联盟（LOL）", "valorant": "无畏契约（瓦罗兰特）",
          "dota2": "DOTA2（刀塔）"}
@@ -165,6 +173,12 @@ class ModelUnavailable(Exception):
     model has no key, refuses it, or doesn't answer."""
 
 
+class _Unreachable(ModelUnavailable):
+    """An online model can't be reached: there's no key, its API refuses the key or the
+    balance has run out, or it doesn't answer (no internet, or the API is down). judge()
+    then has LOCAL_MODEL judge instead."""
+
+
 class _Refused(ModelUnavailable):
     """An online API turned a request down, with an HTTP code (code) that asking again
     won't change."""
@@ -196,9 +210,8 @@ def _key(model):
     variable = online(model)[1]
     key = os.environ.get(variable, "").strip()
     if not key:
-        raise ModelUnavailable(f"{model} is an online model: put your API key in the "
-                               f"{variable} environment variable first (see the README), or "
-                               f"judge on this computer with --model {LOCAL_MODEL}")
+        raise _Unreachable(f"{model} is an online model: put your API key in the {variable} "
+                           f"environment variable first (see the README)")
     return key
 
 
@@ -326,8 +339,9 @@ def _ask_online(messages, model):
 
 def _call_online(model, url, body=None):
     """GET url, or POST body as JSON, to an online model's API with your key, and return its
-    JSON answer, asking again while the API is busy or doesn't answer. Raises _Refused when
-    it turns the request down, and ModelUnavailable when it never answers."""
+    JSON answer, asking again while the API is busy or doesn't answer. Raises _Unreachable
+    when there's no key, the API refuses it or the balance has run out, or it never answers,
+    and _Refused when it turns the request down for another reason."""
     key, host = _key(model), urllib.parse.urlsplit(url).netloc
     data = None if body is None else json.dumps(body, ensure_ascii=False).encode("utf-8")
     wait, problem = RETRY_WAIT, ""
@@ -343,6 +357,9 @@ def _call_online(model, url, body=None):
             return answer if isinstance(answer, dict) else {}
         except urllib.error.HTTPError as error:
             said = _said(error)
+            if error.code in (401, 402):  # the key, or the balance: asking again won't help
+                raise _Unreachable(f"{model}: {_refusal(model, error.code)} (HTTP "
+                                   f"{error.code}: {said})")
             if error.code not in BUSY:
                 raise _Refused(f"{model}: {_refusal(model, error.code)} (HTTP {error.code}: "
                                f"{said})", error.code)
@@ -351,7 +368,7 @@ def _call_online(model, url, body=None):
             problem = f"no answer from {host} ({getattr(error, 'reason', None) or error})"
         except ValueError:
             problem = f"{host} answered with something that isn't JSON"
-    raise ModelUnavailable(f"{model}: {problem}; asked {RETRIES + 1} times")
+    raise _Unreachable(f"{model}: {problem}; asked {RETRIES + 1} times")
 
 
 def _refusal(model, code):
@@ -467,18 +484,11 @@ def usage_lines(wanted, limit=LINES, found=None):
 
 def _split(lines):
     """The longer lines, split into the ones to explain from and the ones to test on: every
-    other one for the test, and at least MIN_FITS (of 3 lines, 1 explains and 2 test). With
-    MIN_FITS lines or fewer, all of them explain and there's no test."""
-    if len(lines) <= MIN_FITS:
+    other one for the test. When that leaves fewer than MIN_TEST_LINES to test on (fewer
+    than 8 lines), all of them explain and there's no test."""
+    if len(lines) // 2 < MIN_TEST_LINES:
         return list(lines), []
-    tests = list(range(1, len(lines), 2))
-    for index in range(len(lines) - 1, -1, -1):
-        if len(tests) >= MIN_FITS:
-            break
-        if index not in tests:
-            tests.append(index)
-    return ([line for n, line in enumerate(lines) if n not in tests],
-            [line for n, line in enumerate(lines) if n in tests])
+    return list(lines[0::2]), list(lines[1::2])
 
 
 def _how(candidate):
@@ -546,7 +556,7 @@ def judge_one(candidate, lines, titles, model):
         verdict["verdict"] = "not a meme"
         return verdict
     meaning = _text(answer.get("meaning"))
-    if kind != "meme" or (not meaning and len(testing) >= MIN_FITS):
+    if kind != "meme" or (not meaning and len(testing) >= MIN_TEST_LINES):
         # Unclear, or a meme with lines to test a meaning on, but no meaning to test
         verdict["why"] = verdict["why"] or "the lines don't show what it is"
         return verdict
@@ -555,9 +565,9 @@ def judge_one(candidate, lines, titles, model):
         literal = ""  # "none": the test's other choice is then "a name"
     if meaning:
         verdict.update(meaning=meaning, english=_text(answer.get("english")), literal=literal)
-    if len(testing) < MIN_FITS:
-        # Sent on its own: no lines to test the meaning on. A meaning no line explains is only
-        # the model's guess, and a meme the model can't explain has none.
+    if len(testing) < MIN_TEST_LINES:
+        # Mostly sent on its own: too few lines to test the meaning on. A meaning no line
+        # explains is only the model's guess, and a meme the model can't explain has none.
         verdict.update(verdict="untested", guess=bool(meaning) and not told)
         return verdict
     verdict["test"] = blind_test(phrase, meaning, verdict["literal"], testing, model)
@@ -604,12 +614,16 @@ def judge(games=None, model=None, again=False):
          "explanations": the lines explaining the phrase that the model was shown,
          "why": the model's reason, or why it's on the watching list,
          "test": {"lines", "fits", "misses"},                 the blind test, when it ran
-         "lines", "people", "model", "judged"}                what it went by, and when
+         "lines", "people", "model", "judged"}                what it went by, which model
+                                                              judged, and when
 
-    Earlier verdicts are kept unless again is True (see _still_good()). Raises
-    ModelUnavailable when the model can't be asked; the verdicts given until then are kept.
+    Earlier verdicts are kept unless again is True (see _still_good()). When an online model
+    can't be reached (no internet, no key, a key it refuses or no balance left), LOCAL_MODEL
+    on this computer judges instead from then on, by itself: the run says so, and the online
+    model judges those phrases again once it can be reached. Raises ModelUnavailable when
+    neither can be asked; the verdicts given until then are kept.
     """
-    model = model or MODEL
+    asked_for = model = model or MODEL
     last = surf._load_json(surf.CANDIDATES_FILE, {})
     done = store.phrases()
     games = None if games is None else {game.lower() for game in games}
@@ -623,10 +637,24 @@ def judge(games=None, model=None, again=False):
     key = lambda c: f"{c['game']}:{c['phrase']}"
     todo = {key(c) for c in wanted
             if again or not _still_good(data["judged"].get(key(c)), c, model)}
-    spent_before = collections.Counter(usage[model])
+    by_key = {key(c): c for c in wanted}
+    spent_before = collections.Counter(usage[asked_for])
+    instead = False  # whether LOCAL_MODEL judges, as asked_for can't be reached
+
+    def stand_in(error, rest=False):
+        """LOCAL_MODEL judges from now on, as the online model can't be reached (error). The
+        phrases still to judge: not the ones LOCAL_MODEL judged before and that stand."""
+        _offline(error, rest)
+        return {k for k in todo
+                if again or not _still_good(data["judged"].get(k), by_key[k], LOCAL_MODEL)}
+
     found, lines = {}, {}
     if todo:
-        check_model(model)
+        try:
+            check_model(model)
+        except _Unreachable as error:
+            todo, model, instead = stand_in(error), LOCAL_MODEL, True
+    if todo:
         print(f"Judging {len(todo)} phrases with {model} ...")
         asked = {(c["game"], c["phrase"]) for c in wanted if key(c) in todo}
         found = uses(asked)
@@ -638,9 +666,15 @@ def judge(games=None, model=None, again=False):
             # The lines from what the bot read, or the candidate's examples when that is gone
             used = lines.get(where) or \
                 [example["text"] for example in candidate.get("examples") or []]
+            titles = _titles(found.get(where) or [], videos)
             try:
-                data["judged"][key(candidate)] = judge_one(
-                    candidate, used, _titles(found.get(where) or [], videos), model)
+                try:
+                    data["judged"][key(candidate)] = judge_one(candidate, used, titles, model)
+                except _Unreachable as error:  # the online model stopped answering
+                    todo, model, instead = stand_in(error, rest=True), LOCAL_MODEL, True
+                    if key(candidate) in todo:
+                        data["judged"][key(candidate)] = judge_one(candidate, used, titles,
+                                                                   model)
             finally:
                 _save(last, data)  # keep the verdicts so far if the model stops answering
         candidate["judge"] = data["judged"][key(candidate)]
@@ -653,9 +687,34 @@ def judge(games=None, model=None, again=False):
           f"meaning couldn't be tested ({unknown} of them with only a guess or no meaning), "
           f"{verdicts['not a meme']} are names, game words or everyday words, "
           f"{verdicts['watching']} are on the watching list.")
-    if todo and online(model):
-        print(_spent(model, usage[model] - spent_before))
+    print(f"Judged by {_listed(collections.Counter(c['judge'].get('model') for c in wanted))}."
+          + (f" {LOCAL_MODEL} judged instead of {asked_for}, which couldn't be reached; "
+             f"{asked_for} judges those phrases again once it can be." if instead else ""))
+    spent = usage[asked_for] - spent_before
+    if online(asked_for) and spent["calls"]:
+        print(_spent(asked_for, spent))
     return wanted
+
+
+def _offline(error, rest=False):
+    """Say that LOCAL_MODEL judges instead of an online model that can't be reached (error),
+    the rest of the phrases when rest is True. Raises ModelUnavailable when LOCAL_MODEL can't
+    be asked either."""
+    try:
+        check_model(LOCAL_MODEL)
+    except ModelUnavailable as local:
+        raise ModelUnavailable(f"{error}; and {LOCAL_MODEL}, which judges when it can't be "
+                               f"reached, can't be asked either: {local}") from local
+    print(f"{error}.\nSo {LOCAL_MODEL}, the model on this computer, judges "
+          f"{'the rest ' if rest else ''}instead.")
+
+
+def _listed(by):
+    """{model: phrases} in words: "a", or "a (3 phrases) and b (1 phrase)"."""
+    if len(by) == 1:
+        return str(next(iter(by)))
+    named = [f"{model} ({n} phrase{'' if n == 1 else 's'})" for model, n in by.most_common()]
+    return ", ".join(named[:-1]) + " and " + named[-1]
 
 
 def _spent(model, spent):
@@ -763,7 +822,8 @@ def compare(models, games=None, top=None, add=False):
     """Judge the last run's candidates (those not learned or turned down yet; only some
     games' when games is given, and only each game's top best when top is given) with each
     model, from the same lines, to see which one judges best. The verdicts judge() keeps
-    don't change. A model that can't be asked is left out. With add, the last comparison is
+    don't change. A model that can't be asked is left out (no other model judges in its
+    place, as judge() would have LOCAL_MODEL do). With add, the last comparison is
     kept when it was of the same phrases: its other models stay in it, and a model that is
     in it already is only asked about the phrases it didn't judge (it stopped, or the
     computer did). Keeps Windows awake meanwhile. Saves compare.json, and compare.md to

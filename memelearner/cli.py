@@ -48,6 +48,8 @@ def _show_candidate(c):
             "watching": "  -> watching"}.get(verdict.get("verdict"), "")
     if verdict.get("verdict") == "untested":
         said = "  -> a meme, " + judging.untested(verdict)
+    if said and verdict.get("model") and verdict["model"] != judging.MODEL:
+        said += f"  (judged by {verdict['model']})"  # like the offline model, standing in
     print(f"  {c['game']:<9} {how:<12} {c['phrase']}  ({c['people']} people{alone}, "
           f"{c['videos']} videos{also})  e.g. {example[:40]}{said}")
 
@@ -216,7 +218,8 @@ def parser():
     judge.add_argument("--model", default=judging.MODEL,
                        help="an online model like deepseek/deepseek-v4-pro, or an Ollama "
                        "model on this computer like qwen3:14b (default %(default)s; also "
-                       "MEMELEARNER_MODEL)")
+                       f"MEMELEARNER_MODEL). When an online model can't be reached, "
+                       f"{judging.LOCAL_MODEL} judges instead")
     judge.add_argument("--again", action="store_true", help="judge again what was judged before")
     judge.set_defaults(run=_judge_command)
 
