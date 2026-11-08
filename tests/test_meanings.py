@@ -155,6 +155,20 @@ class MeaningsTest(unittest.TestCase):
         self.assertEqual((result["meaning"], result["missing"]), ("某一路接连被击杀", ["theshy"]))
         self.assertEqual(len(self.model.asked), 2)
 
+    def test_a_long_answer_is_cut_at_the_end_of_a_sentence_or_clause(self):
+        # The English glosses of a real run that were cut in the middle of a word at 200
+        cut = 'This is the "X-chu" meme, used to curse a player for playing like a beast—i.e., ' \
+              'performing badly or having a bad character; applied to "Chi," it means'
+        self.assertEqual(meanings._clean(cut, 140), 'This is the "X-chu" meme, used to curse a '
+                         'player for playing like a beast—i.e., performing badly or having a '
+                         'bad character.')
+        self.assertEqual(meanings._clean("A nickname. It is also a derogatory name, as X sounds "
+                                         "like a curse", 42), "A nickname. It is also a derogatory name.")
+        self.assertEqual(meanings._clean("指GEN中单选手Chovy发挥失常。弹幕用它调侃Chovy是否同意输掉比赛", 30),
+                         "指GEN中单选手Chovy发挥失常。")
+        self.assertEqual(meanings._clean("short enough", 40), "short enough")
+        self.assertEqual(meanings._clean(["not text"], 40), "")
+
     def test_when_the_model_writes_no_meaning_the_note_is_kept(self):
         self.model.answers["下雨了"] = [{"meaning": ""}, {"oops": "not what was asked"}]
         result = self.merge("下雨了", RAIN_NOTE, RAIN)
