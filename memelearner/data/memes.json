@@ -1,6 +1,748 @@
 {
  "_comment": "Memes learned by MemeLearnerBot (https://github.com/HHCreator/MemeLearnerBot). Change them with py -m memelearner accept, reject or forget; the format is in memelearner/store.py and the README.",
  "version": 1,
- "memes": {},
- "rejected": {}
+ "memes": {
+  "chooovy": {
+   "meaning": "chovy选手的一个称呼的一个变体",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "我chooooooovy！",
+    "chooooovy没声音阿",
+    "chooooooooooovy同意打野不同意啊"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "chovy同意了": {
+   "meaning": "chovy就是超威，和超威同意了是同一个梗",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "chovy同意了，他的队友没同意",
+    "chovy同意了，三叔也不会同意的",
+    "IG牛逼chovy同意了3-0速通GENG"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "ggg": {
+   "meaning": "就是一种对于gg的刷屏，表示想让现在正在进行的游戏赶紧结束",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "继续落后，gggggg",
+    "gggggggg下一把",
+    "这个GGG太猛了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "wei出": {
+   "meaning": "这是梗”X出“， 出 读作 chu， 和畜生的畜同音，这个梗是咒骂某选手玩的像个畜生（表现不佳或者人品很差）",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "wei出早打完了",
+    "wei出大问题了老想着开",
+    "真打不过一直喊wei出"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "三叔不同意": {
+   "meaning": "”三叔“ 指代的是canyon选手的外号，不同意是梗”XX不同意“的变体",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "超微同意，三叔不同意啊",
+    "超威同不同意不重要，关键三叔不同意",
+    "超威有点同意了，但是kiin和三叔不同意"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "三姆斯": {
+   "meaning": "“三姆斯”仍然是 canyon选手的其中一个外号， 来源于篮球选手詹姆斯经常找强力选手抱团，canyon转会geng就像詹姆斯一样抱团。 同时也是canyon的其中一个黑称，”X姆斯“同音”X母死“，咒骂其母亲死掉",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "不给三姆斯吗",
+    "三姆斯送一把",
+    "三姆斯吃到wei补"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "下雨了": {
+   "meaning": "这个梗一般只用在theshy选手或者类似theshy选手风格的选手进行比赛的场合",
+   "english": "A slang for a lane repeatedly dying or collapsing, like it's raining deaths.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "黑子一个都没了 下雨了也不见刷了 笑死",
+    "特地来看下雨了",
+    "下雨了啊一古"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "中华有尺": {
+   "meaning": "尺帝（ruler）选手曾在lpl打过两年，当时这句话是夸奖当时代表lpl赛区做出贡献的尺帝的夸奖，现在这句话是对于在lck赛区尺帝的反讽，嘲笑他作为对手却做出让自己可能输掉游戏的举动，好像仍然向着lpl做出贡献",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "中华有尺 这是哪一年",
+    "中路中华有尺",
+    "中华有尺，尺帝加油"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "亮剑": {
+   "meaning": "鼓励选手或队伍主动进攻、拿出看家本领放手一搏，不要保守防守。",
+   "english": "to go all out and fight aggressively, show your true strength",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "亮剑吧，打出自己的东西",
+    "不早点拿洛克亮剑",
+    "必须亮剑"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "人情局": {
+   "meaning": "指比赛双方出于人情、面子或利益而有意放水、不全力争胜的对局。",
+   "english": "a match where one side intentionally goes easy out of personal ties or favor",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "还好前面没看，人情局都赢不了，玩个der",
+    "3:0真尽力了，人情局都拿不下",
+    "看人情局了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "发狂了": {
+   "meaning": "指选手或队伍打法上头、冲动、失去理智地乱打。",
+   "english": "going berserk / playing recklessly on tilt",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "ig一直在打大龙，发狂了",
+    "看到这里关的，发狂了",
+    "巨魔发狂了，超高移速拿着大棒子就开始抡"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "吓哭了": {
+   "meaning": "夸张地表示被某操作或场面震撼、吓到，常带调侃意味。",
+   "english": "scared to tears (exaggerated reaction to something impressive or shocking)",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "提前吓哭了",
+    "嘉祺吓哭了手抖了",
+    "世界第一打野差距吓哭了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "复刻s7": {
+   "meaning": "指当前赛事走势让人联想到S7（2017年英雄联盟全球总决赛）的情形，常带担忧或调侃语气。",
+   "english": "A reference to the 2017 Worlds, used to say the current tournament is repeating that scenario.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "复刻S7 ？补药啊[生气]",
+    "复刻s7，明年该夺冠了",
+    "今年复刻s7"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "大超同意了": {
+   "meaning": "”大超“是chovy选手的其中一个外号，这仍然是”XX同意了“的一个变体",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "大超同意了，队友不同意",
+    "大超同意了，他队友今年不同意了",
+    "其实今天大超同意了，奈何有人兜底"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "就在今天": {
+   "meaning": "用来强调某件事就在当下发生、今天就是那个特别的日子，常带期待或激动的语气。",
+   "english": "It's happening today; today is the day.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "就在今天，今年真的不一样了",
+    "总有一天，就在今天",
+    "奇迹就在今天"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "尺出": {
+   "meaning": "来源同”wei出“",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "尺出送一下",
+    "尺出打不过jiaqi的",
+    "尺出会送的"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "干燥": {
+   "meaning": "在弹幕里用来形容某件事收益低、没效果、不划算，常和「不亏」「能接受」连用形成反讽。",
+   "english": "Used ironically to describe something as low-value, ineffective, or not worth it.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "干燥土龙",
+    "刚才守了一波先锋还干燥吗，太云了",
+    "人头很干燥，不亏"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "开一局": {
+   "meaning": "”开一局“是杜蕾斯赞助lpl的一个广告语，用杜蕾斯开一局，这句话也是一个梗，表示想跟某人进行性行为",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "再开一局",
+    "张总开一局",
+    "难道说要开一局了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "弱悲": {
+   "meaning": "指比赛里弱势一方落败、结局令人惋惜或无奈，常用来感叹弱队输掉比赛。",
+   "english": "a lament for the weaker side losing",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "弱悲结局",
+    "ig被打成弱悲了[喝彩][喝彩][喝彩]",
+    "弱悲啥，一开始就没建立优势"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "急急急": {
+   "meaning": "形容人着急、急躁，常用来调侃别人太急或自己很急。",
+   "english": "anxious; impatient; \"so urgent\"",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "急急急，IG爱急",
+    "能赢的局，拖住本身能稳住，就喜欢急，急急国王是吧",
+    "涅槃急急急"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "惊天大涅槃": {
+   "meaning": "任何“涅槃”组的选手发挥不佳是都可以用这个梗，尤其是Wei选手",
+   "english": "A mocking nickname for a jungler, used to criticize poor performance.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "惊天大涅槃回到了他熟悉的涅槃",
+    "惊天大涅槃来了",
+    "难怪 blg 不要惊天大涅槃"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "我的麦很炸吗": {
+   "meaning": "",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "我的麦很炸吗",
+    "我的麦很炸么",
+    "我的麦很炸嘛"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "打笑了": {
+   "meaning": "指某人（常是选手）被比赛局面或操作逗笑，多带调侃、看笑话的意味。",
+   "english": "to be made to laugh by the game, often mockingly",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "给三叔打笑了，切，不屑（￣へ￣）[笑哭]",
+    "三叔这种严肃的人都被打笑了",
+    "把viper打笑了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "把光借给ig": {
+   "meaning": "这是一个梗，但是是格式为“把光借给XX”的梗，具体出处来源于奥特曼和龙珠系列中路人将自己的力量借给主角让主角变强的梗",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "大家快把光借给IG",
+    "我们把光借给IG吧！！",
+    "把光借给ig！！！！别放弃！！"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "春风若有怜花意": {
+   "meaning": "theshy选手的其中一个梗，来源于theshy选手曾表达过如果在年轻一回的感概，但是因为刷频这句话的人太多引起了反感现在多用于调侃theshy选手输不起，怪别人年龄比自己小",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "kiin：春风若有怜花意",
+    "姜大哥尽力了，没办法对面kiin比shy哥大一岁，没办法触发春风若有怜花意",
+    "0/3我就哭老，1/3我就蝴蝶飞不过沧海，2/3我就春风若有怜花意，赢了我就登极境，"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "最后一舞": {
+   "meaning": "指某场比赛或某个阶段是最后一次登场、最后的拼搏，常带告别或放手一搏的意味。",
+   "english": "one last dance; the final run",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "姜最后一舞了",
+    "最后一舞 ig",
+    "就当最后一舞"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "杀尺帝": {
+   "meaning": "指在比赛中集中攻击或击杀选手尺帝（Ruler），常被当作口号刷，用来调侃针对他的打法。",
+   "english": "A chant about targeting and killing Ruler (the player).",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "杀尺帝！就杀尺帝！",
+    "26年了还在杀尺帝",
+    "杀尺帝就赢了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "桌子翻了": {
+   "meaning": "在比赛弹幕里刷的一种夸张说法，用来形容场面混乱、局势翻盘或现场出了状况，常和「翻了」「椅子翻了」「水杯翻了」连用。",
+   "english": "A hyperbolic chat phrase used to describe a chaotic or overturned situation, often chained with similar 'X flipped' phra",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "翻哪了桌子翻了",
+    "翻了翻了，桌子翻了！",
+    "水杯翻了，椅子翻了，桌子翻了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "梦回s7": {
+   "meaning": "指当前比赛或局势让人联想到S7（英雄联盟第七赛季）时的情形，常用来感叹仿佛回到了S7。",
+   "english": "feels like going back to Season 7",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "尺子梦回s7了",
+    "要梦回S7了",
+    "梦回s7，GG夺冠了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "涅槃打野": {
+   "meaning": "任何一个”涅槃“组的打野在发挥不佳时都可以使用这个梗",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "优势局在龙坑浪费时间，涅槃打野",
+    "第三局涅槃打野强行打龙段节奏",
+    "涅槃打野重生在世界赛"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "皮肤局": {
+   "meaning": "英雄联盟世界赛的冠军可以选择一个在世界赛期间使用过的英雄让官方明年出自己签名的冠军皮肤，所以在世界赛期间如果队伍在比分领先很多的情况下可能会选择一个英雄来获取明年让这个英雄出皮肤的资格，所以这个词表示这一局某队在已经稳赢的情况下打的随意，只是为了让这个英雄明年自己能够选皮肤",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "皮肤局也做不到吗",
+    "让一把，皮肤局",
+    "又是ig的一把皮肤局"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "真不一样了": {
+   "meaning": "用来调侃某位选手（如 Chovy/超威）今年表现或状态和以往不同，常带期待或反讽意味。",
+   "english": "A joking remark that a player (e.g., Chovy) is really different this year, often with expectation or irony.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "chovy今年真不一样了",
+    "超大哥真不一样了",
+    "今年超威是真不一样了，要进决赛了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "落鸟坡": {
+   "meaning": "指比赛中某处位置或某种失误/翻车场面，常用来调侃在那里出事或送掉的情况。",
+   "english": "A meme referring to a spot or a blunder/failure, used to mock someone messing up there.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "落鸟坡有说法的",
+    "wei两把带节奏纯拖队友发育 下路贪回合还学落鸟坡",
+    "落鸟坡凤凰也是鸟"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "蝴蝶飞不过沧海": {
+   "meaning": "在比赛语境里用来表达对某队或选手的惋惜、无奈，常指他们没能跨过难关、遗憾落败；也用作一种调侃式的固定句式。",
+   "english": "A poetic way of saying someone couldn't overcome an impossible hurdle, used to express regret or resignation about a tea",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "蝴蝶飞不过沧海，谁又忍心责怪",
+    "优势就奇迹团秀肌肉，神像尽显 输了就蝴蝶飞不过沧海",
+    "蝴蝶飞不过沧海，又有谁会去责怪"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "豹一豹": {
+   "meaning": "鼓励选手拿出豹女（奈德丽）这个英雄拼一把、不留遗憾的说法。",
+   "english": "A call to pick Nidalee and go all out, leaving no regrets.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "扛住，下把三叔就该豹一豹了",
+    "三叔准备豹一豹了😎",
+    "豹一豹啊，豹一豹"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "赢一把就行": {
+   "meaning": "可以是梗的同时也可以是日常用语",
+   "english": "Just win one game (lowering expectations to avoid a shutout)",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "blg赢一把就行了 怎么都比3：0强 而且对lck已经5：0了[捂脸]",
+    "赢一把就行了算完成任务了",
+    "赢一把就行加油！"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "超威今年真不一样了": {
+   "meaning": "对选手 Chovy（超威）的调侃式说法，指他今年表现或状态似乎和以往不同，常带反讽或期待意味。",
+   "english": "Chovy really seems different this year — a teasing remark about his changed form.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "都在调侃超威 今年真不一样了",
+    "超威今年真不一样了，真有夺冠像",
+    "我就说超威今年真不一样了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "超威同意了": {
+   "meaning": "指GEN中单选手Chovy（超威）在关键比赛中发挥失常、让对手获胜；弹幕用它调侃Chovy是否“同意”输掉比赛。",
+   "english": "A meme mocking Chovy for allegedly choking in important matches, as if he must 'agree' to lose.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "刚来，超威同意了没",
+    "超威同意了尺子没同意",
+    "Gen.G赢了真就超威同意了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "辛苦了ig": {
+   "meaning": "对 iG 战队（常指其表现不佳、失误多）的一种调侃式说法，表面说辛苦，实际带反讽或安慰意味。",
+   "english": "A sarcastic/consoling way of saying \"good effort, iG\" after poor play.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "geng辛苦了，ig不辛苦",
+    "0：3辛苦了IG",
+    "辛苦了ig一直送"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "还在洗": {
+   "meaning": "指责对方还在为选手或队伍的表现辩解、找理由开脱，常用于弹幕里反驳别人的辩护。",
+   "english": "still making excuses / still defending them",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "还在洗，承认零封很难吗",
+    "平分秋色，还在洗",
+    "还在洗，下路就是太急，上路各种理由"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "逗逗你的呀": {
+   "meaning": "在比赛语境里用来调侃某队或某人先输一局、之后才认真打，意思是前面只是随便玩玩、逗你一下，并非真打不过。",
+   "english": "just messing with you; only playing around (before getting serious)",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "还不送就能赢呢，本质从BLG手上偷来的赛区冠军，逗逗你的呀",
+    "knight：逗逗你的呀冰",
+    "geng:逗逗你的呀"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "高手不赢第一把": {
+   "meaning": "输掉第一局时的自我安慰或调侃，说真正的高手不赢第一把，先让一局。",
+   "english": "A self-comforting joke when losing the first game: real experts don't win the first round.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "高手不赢，第一把先让一局。",
+    "高手不赢第一把加油ig",
+    "没事，高手不赢第一把"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  }
+ },
+ "rejected": {
+  "ig冲啊": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "ig加油": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "ig加油加油加油": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "ig必胜": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "不买": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "几比几了": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "剑姬": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "加油ig": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "实时胜率": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "尽力就好": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "恭喜gen": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "戏耍": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "漂亮": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "相信ig": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "让2追3": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "让二追三": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "辛苦了": {
+   "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  }
+ }
 }
