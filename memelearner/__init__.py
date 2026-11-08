@@ -36,7 +36,7 @@ changes when a field changes meaning or goes away; a new field doesn't change it
 import contextlib
 import io
 
-from . import explainers, judging, store, surf
+from . import explainers, judging, meanings, store, surf
 from .judging import ModelUnavailable, watching
 from .store import find, forget, lookup, memes, reject
 
@@ -119,7 +119,7 @@ def explain(phrases=None, games=None, videos=explainers.VIDEOS, top=explainers.T
                                   again, hearing, judge)
 
 
-def accept(phrase, meaning="", english="", game=None):
+def accept(phrase, meaning="", english="", game=None, note="", model=None):
     """Learn a phrase as a meme, usually one of candidates(), and return the meme.
 
     When the phrase was a candidate in the last run, its games, example lines and videos
@@ -127,16 +127,31 @@ def accept(phrase, meaning="", english="", game=None):
     (it was tested, or lines explained it), so do its meaning and English gloss, unless you
     give them. Accepting it again updates it: a meaning or
     English gloss given replaces the old one.
+
+    note: your own note on it, like something to add to the meaning (一般只用在theshy选手的
+    比赛), or that it is the same meme as a learned one (和超威同意了是同一个梗). A model merges
+    it with the meaning (the one given, else the one learned before, else the judge's) into
+    one whole meaning, in which your note wins, and the note is kept as you wrote it (see
+    meanings.py). That asks model (default: the judge's, with qwen3:14b standing in when an
+    online one can't be reached) and takes seconds; it raises ModelUnavailable, learning
+    nothing, when no model can be asked.
     """
     key = store.normal(phrase)
     last = surf._load_json(surf.CANDIDATES_FILE, {})
     urls = {bvid: video.get("url") for bvid, video in (last.get("videos") or {}).items()}
     found = [c for c in last.get("candidates") or [] if c["phrase"] == key]
     examples = [example for c in found for example in c["examples"]][:store.EXAMPLES]
-    if not (meaning and english) and not store.lookup(key):
+    learned = store.lookup(key)
+    if not (meaning and english) and not learned:
         judged = judging.meaning_of(key)
         meaning, english = meaning or judged[0], english or judged[1]
+    if note.strip():
+        base = meaning or (learned or {}).get("meaning", "")
+        gloss = english or ("" if meaning else (learned or {}).get("english", ""))
+        merged = meanings.merge(key, note, base, gloss, model)
+        meaning, english = merged["meaning"], merged["english"]
     return store.accept(key, meaning, english,
                         games=[c["game"] for c in found] + ([game] if game else []),
                         examples=[example["text"] for example in examples],
-                        sources=[urls[e["video"]] for e in examples if urls.get(e["video"])])
+                        sources=[urls[e["video"]] for e in examples if urls.get(e["video"])],
+                        note=note)

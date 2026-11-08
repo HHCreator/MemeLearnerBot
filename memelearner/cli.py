@@ -7,6 +7,7 @@
     py -m memelearner candidates               what the last run found, to look through
     py -m memelearner watching                 what the model wasn't sure of yet
     py -m memelearner accept 阿一古 --meaning "..."   learn a phrase as a meme
+    py -m memelearner accept chovy同意了 --note "..."   ... merging your note with the meaning
     py -m memelearner reject 下路               turn a phrase down: it isn't listed again
     py -m memelearner forget 下路               undo accept or reject
     py -m memelearner memes                    the memes learned so far
@@ -29,7 +30,7 @@ import sys
 import time
 
 from . import (ModelUnavailable, accept, candidates, explainers, find, forget, judging, lookup,
-               memes, reject, store, surf, watching)
+               meanings, memes, reject, store, surf, watching)
 
 
 def _print_json(value):
@@ -168,9 +169,17 @@ def _candidates(args):
 
 
 def _accept(args):
-    meme = accept(args.phrase, meaning=args.meaning, english=args.english, game=args.game)
+    try:
+        meme = accept(args.phrase, meaning=args.meaning, english=args.english, game=args.game,
+                      note=args.note, model=args.model)
+    except ModelUnavailable as error:
+        sys.exit(f"Couldn't ask the model to merge your note: {error}. Nothing was learned.")
     print(f"Learned (saved to {store.MEMES_FILE}):")
     _show_meme(meme)
+    left_out = [word for word in meanings.kept(args.note)
+                if store.normal(word) not in store.normal(meme["meaning"])]
+    if left_out:
+        print(f"Check its meaning: it leaves out {', '.join(left_out)} of your note.")
 
 
 def _reject(args):
@@ -368,6 +377,14 @@ def parser():
                      help="what it means, in Chinese (default: the judge's, if it found one)")
     yes.add_argument("--english", default="", help="an English gloss (default: the judge's)")
     yes.add_argument("--game", help="a game it belongs to, besides the ones it was seen in")
+    yes.add_argument("--note", default="",
+                     help="your own note on it (what to add, or 和X是同一个梗): the model merges it "
+                     "with the meaning into one whole meaning, in which your note wins, and "
+                     "keeps it as you wrote it")
+    yes.add_argument("--model", default=judging.MODEL,
+                     help="the model that merges a --note (default %(default)s; also "
+                     f"MEMELEARNER_MODEL). When an online model can't be reached, "
+                     f"{judging.LOCAL_MODEL} does instead")
     yes.set_defaults(run=_accept)
 
     no = sub.add_parser("reject", help="turn a phrase down, so it isn't listed again")

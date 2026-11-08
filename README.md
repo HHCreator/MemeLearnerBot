@@ -29,6 +29,7 @@ py -m memelearner explain                           # read videos that explain t
 py -m memelearner candidates                        # what the last run found, with verdicts
 py -m memelearner accept 阿一古                       # learn it as a meme, with the judge's meaning
 py -m memelearner accept 阿一古 --meaning "..."      # ... or with your own
+py -m memelearner accept 下雨了 --note "..."         # ... or merged with your own note
 py -m memelearner reject 笑死 --reason "everyday"    # not a meme: never list it again
 py -m memelearner forget 笑死                        # undo accept or reject
 py -m memelearner memes                             # the memes learned so far
@@ -39,6 +40,17 @@ judge's meaning and English gloss when it found the phrase a meme, unless that m
 only the model's guess; `--meaning` and `--english` give your own instead. The learned memes are kept in
 `memelearner/data/memes.json`, which is committed: push it, and every app that uses the bot
 gets them.
+
+`--note` is for what you'd add to a meaning rather than a whole one: "这个梗一般只用在theshy
+选手的比赛", or "chovy就是超威，和超威同意了是同一个梗". The model merges it with the meaning
+(yours, the one learned before, or the judge's) into one whole meaning that someone who
+doesn't know the meme understands, and where they disagree, your note wins. When your note
+says the phrase is the same meme as a learned one (和X是同一个梗, 来源同"X"), or a variant of a
+pattern of them ("XX同意了"的变体), their meaning is what it means. Every name and quoted word
+of your note must be in the merged meaning: the model is asked again when one isn't, and
+`accept` says what it still leaves out. With nothing to merge it with, your note is the
+meaning, word for word. Your notes are kept as you wrote them, as `notes` in `memes.json`;
+the merging is in `memelearner/meanings.py`.
 
 ## Using it from another app
 
@@ -391,6 +403,7 @@ packages unless you want it to hear.
 | `memelearner/surf.py` | the bot: find videos, read them, find the phrases people send on their own |
 | `memelearner/judging.py` | the judge: a model tells memes from names and explains them; compare |
 | `memelearner/explainers.py` | finds, reads and sums up the videos that explain memes |
+| `memelearner/meanings.py` | merges your notes with the model's meanings |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
