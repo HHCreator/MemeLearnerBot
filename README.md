@@ -25,6 +25,7 @@ model can judge them first (see [The judge](#the-judge)), and you decide:
 
 ```
 py -m memelearner judge                             # the model judges what the last run found
+py -m memelearner explain                           # read videos that explain those memes
 py -m memelearner candidates                        # what the last run found, with verdicts
 py -m memelearner accept 阿一古                       # learn it as a meme, with the judge's meaning
 py -m memelearner accept 阿一古 --meaning "..."      # ... or with your own
@@ -58,6 +59,7 @@ memelearner.find("这下真的绷不住了")       # the learned memes in a text
 memelearner.candidates()                # what the last run found, not looked at yet
 memelearner.learn(games=["lol"], known=my_words)  # read Bilibili now: takes minutes
 memelearner.judge()                     # a model judges the candidates: minutes too
+memelearner.explain()                   # read videos that explain those memes: minutes
 memelearner.watching()                  # what the model wasn't sure of yet
 memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
 memelearner.reject("下路")              # not a meme: never list it again
@@ -83,11 +85,12 @@ people using it who send it on its own (`alone`), its `variants` and example lin
 `find_candidates()` in `memelearner/surf.py`). Once judged it also has `judge`: the
 `verdict` (`meme`, `untested`, `not a meme` or `watching`), what `kind` of phrase the model
 said it is, its `meaning`, `english` and `literal` meaning, whether that meaning is only a
-`guess`, the `explanations` it was shown, `why`, the blind `test`, and the `model` that
-judged it; see `judge()` in `memelearner/judging.py`. When the online model can't be
-reached, qwen3:14b on this computer judges instead (see Which model below); `judge()` raises
-`memelearner.ModelUnavailable` only when no model can be asked (Ollama isn't running or
-doesn't have it either).
+`guess`, the `explanations` it was shown, what the `videos` explaining it said, `why`, the
+blind `test`, and the `model` that judged it; see `judge()` in `memelearner/judging.py`.
+When the online model can't be reached, qwen3:14b on this computer judges instead (see
+Which model below); `judge()` raises `memelearner.ModelUnavailable` only when no model can
+be asked (Ollama isn't running or doesn't have it either), and `explain()` raises it when
+its model can't be asked.
 
 **Any language: the command line.** `memes`, `lookup`, `find`, `candidates` and `watching`
 take `--json` and print what the Python functions return, in UTF-8. `lookup` exits with 1 when
@@ -271,9 +274,69 @@ itself: you do, with `accept` and `reject`. Verdicts are kept in
 `memelearner/.cache/surf/judge.json`, so a phrase is only asked about again when there's
 more to go on.
 
-It doesn't look phrases up online. The first version did, but on a real run 萌娘百科
-refused programs that aren't logged in, and 维基百科's search found unrelated pages (奥拉夫
-led to Olaf Scholz), which misled the model more than they helped.
+It doesn't look phrases up in online encyclopedias. The first version did, but on a real
+run 萌娘百科 refused programs that aren't logged in, and 维基百科's search found unrelated
+pages (奥拉夫 led to Olaf Scholz), which misled the model more than they helped. Videos made
+to explain a meme work better: see the next part.
+
+## Videos that explain memes
+
+Bilibili is full of videos made to explain new memes (阿一古是什么梗？). They say what a meme
+means and where it comes from, which the danmu rarely do: most memes are sent on their own.
+So the bot reads them for the memes the judge found, and the judge goes by what they say:
+
+```
+py -m memelearner explain                    # the 10 memes whose meaning is least sure
+py -m memelearner explain 阿一古 怎么翻的      # only these
+py -m memelearner explain 阿一古 --video https://b23.tv/xxxx   # this video explains it
+py surf.py --explain                         # read Bilibili, judge, read explainers, judge again
+```
+
+For each phrase it:
+
+1. **Finds** videos whose titles name the phrase (or a variant) and look made to explain
+   something (是什么梗, 什么意思, 出处, 由来). They come from the links you give, from the
+   explainer videos the bot saw in related-video lists (the collector's and those beside
+   every explainer it reads, which a visitor gets without a captcha), and from Bilibili's
+   search for "阿一古是什么梗". The search is tried until Bilibili asks for a captcha once in
+   a run, then skipped (the bot never solves captchas), and for each phrase at most once a
+   week.
+2. **Reads** up to 2 of them per phrase, each video once, as any visitor who isn't logged in
+   sees them: the page (title, description, tags, the subtitles a visitor gets, related
+   videos), the hot comments and the danmu. That is 3 or 4 requests, 5 to 7 seconds apart.
+3. **Hears** a video when it has no subtitles, if Whisper is installed (see below): it saves
+   the smallest audio stream (about half a megabyte a minute, only for videos up to 10
+   minutes), a Whisper model on this computer writes down what is said, and the audio is
+   deleted. Nothing is uploaded anywhere.
+4. **Sums up** each video with the judge's model: does it explain the phrase, what does it
+   say the phrase means and where it comes from, and a line quoted from it (a quote that
+   isn't in the video is dropped). The model is told to write only what the video says.
+5. **Judges again** the phrases a video explains: the model gets the videos' summaries
+   beside the danmu, and a meaning a video backs isn't only a guess any more, so `accept`
+   takes it. `candidates` shows which video it came from.
+
+What it read stays in `memelearner/.cache/surf/explainers.json` and `explainers/`. A phrase
+no video explains is looked up again after a week; `--again` looks up everything again.
+
+**Hearing the videos (optional).** Most explainer videos are spoken, and Bilibili only gives
+its AI subtitles to logged-in viewers, which the bot never is. To hear them, install Whisper:
+
+```
+py -m pip install faster-whisper
+py -m pip install nvidia-cublas-cu12 nvidia-cudnn-cu12   # to use the graphics card
+```
+
+The first video heard downloads the Whisper model, `large-v3-turbo` (about 1.6 GB), into
+`memelearner/.cache/whisper`. It uses the graphics card when it can, else the processor (a
+few times slower). Set `MEMELEARNER_WHISPER` for another model (`medium`, `small`), or add
+`--no-audio` to read only the pages, comments and danmu. Without Whisper, that's all it does.
+
+**Why not BiliNote or SummifyAI.** Both (MIT) turn one video you give them into notes, and
+neither finds the videos for a phrase. BiliNote is a whole app (web pages, a database, a
+desktop client) that reads Bilibili's subtitles with a logged-in viewer's cookie and
+downloads with yt-dlp and ffmpeg; SummifyAI needs PyTorch and an online model. The bot does
+what they do for audio, with the same Whisper engine as BiliNote, and stays free of extra
+packages unless you want it to hear.
 
 ## Files
 
@@ -283,6 +346,7 @@ led to Olaf Scholz), which misled the model more than they helped.
 | `memelearner/cli.py` | the command line (`py -m memelearner`) |
 | `memelearner/surf.py` | the bot: find videos, read them, find the phrases people send on their own |
 | `memelearner/judging.py` | the judge: a model tells memes from names and explains them; compare |
+| `memelearner/explainers.py` | finds, reads and sums up the videos that explain memes |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |

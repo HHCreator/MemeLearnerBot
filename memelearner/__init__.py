@@ -10,6 +10,7 @@ apps learn them from it. Other apps only need what is in this file.
     memelearner.candidates()                # what the last run found, not looked at yet
     memelearner.learn(games=["lol"])        # read Bilibili now (takes minutes)
     memelearner.judge()                     # a model tells memes from names (minutes)
+    memelearner.explain()                   # read videos that explain those memes (minutes)
     memelearner.watching()                  # what the model wasn't sure of yet
     memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
     memelearner.reject("下路")              # not a meme: never list it again
@@ -35,15 +36,15 @@ changes when a field changes meaning or goes away; a new field doesn't change it
 import contextlib
 import io
 
-from . import judging, store, surf
+from . import explainers, judging, store, surf
 from .judging import ModelUnavailable, watching
 from .store import find, forget, lookup, memes, reject
 
 __version__ = "0.3.0"
 API_VERSION = 2  # 2: a candidate is a phrase people send on their own, new or not
 
-__all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "watching", "accept",
-           "reject", "forget", "ModelUnavailable", "API_VERSION"]
+__all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "explain", "watching",
+           "accept", "reject", "forget", "ModelUnavailable", "API_VERSION"]
 
 
 def candidates(game=None):
@@ -93,6 +94,28 @@ def judge(games=None, model=None, again=False, quiet=False):
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
         return judging.judge(games, model or judging.MODEL, again)
+
+
+def explain(phrases=None, games=None, videos=explainers.VIDEOS, top=explainers.TOP, links=None,
+            model=None, again=False, hearing=True, judge=True, quiet=False):
+    """Find and read the Bilibili videos that explain memes (阿一古是什么梗？), have the model
+    sum up what each says, and judge those memes again with it (see explainers.py). It reads
+    as a visitor, 5 to 7 seconds between requests, so it takes minutes: about half a minute
+    to a minute per video. Returns {"game:phrase": [summary, ...]} for the videos read now;
+    a summary is {"bvid", "url", "title", "author", "about", "meaning", "origin",
+    "english", "quote", "heard", "model", "summarized"}.
+
+    phrases: only these (default: the memes the judge found, the ones whose meaning is
+    least sure first); games: only these games' phrases; videos: read per phrase; top:
+    phrases looked up; links: {phrase: [video link, ...]} to read instead of looking;
+    model: as for judge(); again: also phrases looked up before; hearing=False: don't hear
+    videos even with Whisper installed (py -m pip install faster-whisper); judge=False:
+    don't judge them again. Raises ModelUnavailable when the model can't be asked; what was
+    read until then is kept. quiet: print nothing.
+    """
+    with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
+        return explainers.explain(phrases, games, links, model or judging.MODEL, videos, top,
+                                  again, hearing, judge)
 
 
 def accept(phrase, meaning="", english="", game=None):

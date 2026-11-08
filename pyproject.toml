@@ -11,6 +11,10 @@ license = { file = "LICENSE" }
 requires-python = ">=3.8"
 dependencies = []
 
+[project.optional-dependencies]
+# Hearing the videos that explain memes (explainers.py), with Whisper on this computer
+hear = ["faster-whisper>=1.1"]
+
 [project.urls]
 Homepage = "https://github.com/HHCreator/MemeLearnerBot"
 

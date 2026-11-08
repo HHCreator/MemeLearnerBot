@@ -2,6 +2,7 @@
 
     py -m memelearner learn                    read Bilibili, then list the phrases people send
     py -m memelearner judge                    a model tells memes from names
+    py -m memelearner explain                  read videos that explain the memes it found
     py -m memelearner compare qwen3:14b deepseek/deepseek-flash   several models side by side
     py -m memelearner candidates               what the last run found, to look through
     py -m memelearner watching                 what the model wasn't sure of yet
@@ -13,7 +14,8 @@
     py -m memelearner find "这下真的绷不住了"     the learned memes in a text
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
-learn --judge also judges what it found. candidates, watching, memes, lookup and find take
+learn --judge also judges what it found (learn --explain then also reads videos that explain
+the memes, and judges them again). candidates, watching, memes, lookup and find take
 --json to print JSON for another program (UTF-8) instead of lines for people, in the shapes
 __init__.py describes; lookup exits with 1 when the phrase isn't a learned meme.
 """
@@ -23,8 +25,8 @@ import json
 import os
 import sys
 
-from . import (ModelUnavailable, accept, candidates, find, forget, judging, lookup, memes,
-               reject, store, surf, watching)
+from . import (ModelUnavailable, accept, candidates, explainers, find, forget, judging, lookup,
+               memes, reject, store, surf, watching)
 
 
 def _print_json(value):
@@ -69,6 +71,19 @@ def _judge(games, model=None, again=False):
     return True
 
 
+def _explain(games, phrases=None, links=(), model=judging.MODEL, top=explainers.TOP,
+             videos=explainers.VIDEOS, again=False, hearing=True, judge=True):
+    """Read videos that explain memes and judge those memes again; False when the model
+    couldn't be asked."""
+    try:
+        explainers.explain(phrases, games, {phrases[0]: links} if links else None, model,
+                           videos, top, again, hearing, judge)
+    except ModelUnavailable as error:
+        print(f"Couldn't ask the model: {error}. What was read so far is kept.")
+        return False
+    return True
+
+
 def _learn(args):
     missing = [path for path in args.known if not os.path.exists(path)]
     if missing:
@@ -91,10 +106,14 @@ def _learn(args):
     for c in found:
         _show_candidate(c)
     print(f"\nSaved them with example lines to {surf.CANDIDATES_FILE}")
-    if args.judge and found:
+    if (args.judge or args.explain) and found:
         print()
         if not _judge(args.games):
             sys.exit("The candidates are saved: judge them later with py -m memelearner judge")
+        if args.explain:
+            print()
+            if not _explain(args.games):
+                sys.exit(1)
         return
     print('Learn one with: py -m memelearner accept PHRASE --meaning "..."; '
           "turn one down with: py -m memelearner reject PHRASE")
@@ -102,6 +121,15 @@ def _learn(args):
 
 def _judge_command(args):
     if not _judge(args.games, args.model, args.again):
+        sys.exit(1)
+
+
+def _explain_command(args):
+    if args.video and len(args.phrases) != 1:
+        sys.exit("--video: give the one phrase the video explains, like: "
+                 "py -m memelearner explain 阿一古 --video https://b23.tv/...")
+    if not _explain(args.games, args.phrases or None, args.video, args.model, args.top,
+                    args.videos, args.again, not args.no_audio, not args.no_judge):
         sys.exit(1)
 
 
@@ -210,6 +238,9 @@ def parser():
                        "word tables (.json or .txt; also MEMELEARNER_KNOWN)")
     learn.add_argument("--judge", action="store_true",
                        help="then have the model judge what was found (see judge)")
+    learn.add_argument("--explain", action="store_true",
+                       help="then judge, read videos that explain the memes found, and judge "
+                       "those again (see explain)")
     learn.set_defaults(run=_learn)
 
     judge = sub.add_parser("judge", help="have a model tell memes from names, game words and "
@@ -222,6 +253,30 @@ def parser():
                        f"{judging.LOCAL_MODEL} judges instead")
     judge.add_argument("--again", action="store_true", help="judge again what was judged before")
     judge.set_defaults(run=_judge_command)
+
+    explain = sub.add_parser("explain", help="find and read videos that explain the memes the "
+                             "judge found (阿一古是什么梗), sum them up, and judge those again")
+    explain.add_argument("phrases", nargs="*", metavar="PHRASE",
+                         help="only these phrases (default: the memes the judge found, the "
+                         "ones whose meaning is least sure first)")
+    explain.add_argument("--video", action="append", default=[], metavar="LINK",
+                         help="a video that explains the one phrase given, read instead of "
+                         "looking for one (can be given more than once)")
+    explain.add_argument("--games", nargs="+", metavar="GAME", help="only these games' phrases")
+    explain.add_argument("--top", type=int, default=explainers.TOP, metavar="N",
+                         help="phrases looked up in one run (default %(default)s)")
+    explain.add_argument("--videos", type=int, default=explainers.VIDEOS, metavar="N",
+                         help="videos read for each phrase (default %(default)s)")
+    explain.add_argument("--model", default=judging.MODEL,
+                         help="the model that sums the videos up and judges (default "
+                         "%(default)s; also MEMELEARNER_MODEL)")
+    explain.add_argument("--again", action="store_true",
+                         help="also phrases looked up before, and sum their videos up again")
+    explain.add_argument("--no-audio", action="store_true",
+                         help="don't hear the videos, even with Whisper installed")
+    explain.add_argument("--no-judge", action="store_true",
+                         help="don't judge the phrases again afterwards")
+    explain.set_defaults(run=_explain_command)
 
     side = sub.add_parser("compare", help="judge the same phrases with several models, side by "
                           "side, to pick one (the verdicts judge keeps don't change)")
