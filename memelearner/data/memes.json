@@ -162,6 +162,22 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "卑鄙": {
+   "meaning": "和“卑鄙的外乡人”意思一样，只是简称。有时不仅是游戏里使用，这个词可以作为“好贱”的平替词使用",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "卑鄙，给我采访啊",
+    "卑鄙拉扯",
+    "geng给一把云露吧，别太卑鄙"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "发狂了": {
    "meaning": "指选手或队伍打法上头、冲动、失去理智地乱打。",
    "english": "going berserk / playing recklessly on tilt",
@@ -339,7 +355,7 @@
    ]
   },
   "我的麦很炸吗": {
-   "meaning": "",
+   "meaning": "起源于麦克风不好的人会经常问这句话，但是由于他麦克风不好所以他在问这句话的时候其他人听到的音频质量可能会非常差，所以在音频质量差的时候就会刷频这句话表示当前音频质量很差",
    "english": "",
    "games": [
     "lol"
