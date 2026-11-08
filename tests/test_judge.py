@@ -272,6 +272,62 @@ class JudgeTest(unittest.TestCase):
         memelearner.reject("怎么翻", "an everyday phrase")
         self.assertEqual([v["phrase"] for v in memelearner.watching()], ["神中神"])
 
+    # -- what you taught it before ---------------------------------------------------------
+
+    SAME_AS = (["大超同意了兄弟们", "大超同意了"], ["大超同意了！", "这波大超同意了吧"])
+    CHEER = (["blg加油", "blg加油blg加油"], ["blg加油！", "冲啊blg加油"])
+
+    def test_the_model_sees_the_learned_memes_and_turned_down_phrases_that_look_alike(self):
+        store.accept("超威同意了", meaning="调侃超威点头认可", note="chovy就是超威")
+        store.reject("ig加油", "给队伍加油的口号")
+        store.reject("下路", "an everyday word")  # like none of them
+        self.write_run(more={"大超同意了": self.SAME_AS, "blg加油": self.CHEER})
+        verdicts = self.judge()
+        asked = self.model.explained
+        learned = [{"phrase": "超威同意了", "meaning": "调侃超威点头认可", "notes": ["chovy就是超威"]}]
+        self.assertEqual((asked["大超同意了"]["learned"], asked["大超同意了"]["turned_down"]),
+                         (learned, []))
+        self.assertEqual((asked["blg加油"]["learned"], asked["blg加油"]["turned_down"]),
+                         ([], [{"phrase": "ig加油", "reason": "给队伍加油的口号"}]))
+        self.assertEqual((asked["阿一古"]["learned"], asked["阿一古"]["turned_down"]), ([], []))
+        self.assertNotIn("learned", self.model.tested["阿一古"])  # the blind test doesn't see them
+        self.assertEqual(verdicts["大超同意了"]["learned"], learned)  # what it went by
+        # compare shows every model the same
+        self.model.asked.clear()
+        with contextlib.redirect_stdout(io.StringIO()):
+            judging.compare(["deepseek-r1:14b"])
+        shown = {phrase: q for _, kind, phrase, q in self.model.asked if kind == "explain"}
+        self.assertEqual(shown["大超同意了"]["learned"], learned)
+        self.assertEqual(shown["blg加油"]["turned_down"], asked["blg加油"]["turned_down"])
+
+    def test_a_phrase_is_judged_again_once_a_meme_like_it_is_learned_or_your_note_changes(self):
+        self.write_run(more={"大超同意了": self.SAME_AS})
+        self.judge()
+        calls = self.model.calls
+        # Verdicts from before the judge was shown them stand while nothing looks like them
+        data = judging.history()
+        for verdict in data["judged"].values():
+            del verdict["learned"], verdict["turned_down"]
+        surf._save_json(judging.judge_file(), data)
+        self.judge()
+        self.assertEqual(self.model.calls, calls)
+        store.accept("超威同意了", meaning="调侃超威点头认可")
+        self.judge()
+        self.assertEqual(self.model.calls, calls + 1)  # 大超同意了 only (its answer isn't JSON)
+        self.assertEqual(self.model.explained["大超同意了"]["learned"][0]["notes"], [])
+        self.judge()
+        self.assertEqual(self.model.calls, calls + 1)  # nothing changed: not asked again
+        store.accept("超威同意了", note="chovy就是超威")
+        self.judge()
+        self.assertEqual(self.model.calls, calls + 2)
+        self.assertEqual(self.model.explained["大超同意了"]["learned"][0]["notes"],
+                         ["chovy就是超威"])
+        store.reject("同意了", "an everyday phrase")
+        self.judge()
+        self.assertEqual(self.model.calls, calls + 3)
+        self.assertEqual(self.model.explained["大超同意了"]["turned_down"],
+                         [{"phrase": "同意了", "reason": "an everyday phrase"}])
+
     def test_lines_that_explain_a_phrase_are_told_apart_from_questions_and_opinions(self):
         for line in ["芝士雪豹是这是雪豹的谐音", "阿一古的意思是韩语的哎呦", "出自去年的世界赛",
                      "yyds=永远的神", "阿一古是什么意思？韩语哎呦的意思"]:

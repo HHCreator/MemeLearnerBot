@@ -308,6 +308,15 @@ faster than that, so the judge never goes by what the model remembers:
   few short ones, how many people send it on its own, its variants and the titles of its
   videos. It says what kind of phrase it is and, for a meme, writes what it means there,
   only from what it got, or no meaning when it can't tell.
+- It also gets what you taught the bot before: up to 5 learned memes that look like the
+  phrase, with their meanings and your notes, and up to 3 phrases you turned down that look
+  like it, with your reasons. Two phrases look alike when a pattern in your notes fits the
+  phrase (your note on wei出 has "X出", which kanavi出 fits), or when they share a piece
+  (同意了, 加油), the longest first (`related()` in meanings.py). So a variant of a learned
+  meme is explained the way your notes say, and a cheer like the ones you turned down
+  (blg加油, after ig加油) is likely no meme either: you don't correct the same mistake
+  twice. When that changes (a meme like it learned, a meaning or note of yours changed, a
+  phrase like it turned down), the next `judge` judges the phrase again.
 - Then a blind test: a second question, which never saw those lines, gets the other longer
   lines and two meanings, the model's and the literal one, and says which one each line
   means. The meaning passes when at least 2 lines, and three quarters of the lines that
