@@ -4,12 +4,16 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memelearner"
-version = "0.2.0"
+version = "0.3.0"
 description = "A bot that reads Bilibili for the newest gaming memes, and gives other apps the memes it learned"
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.8"
 dependencies = []
+
+[project.optional-dependencies]
+# Hearing the videos that explain memes (explainers.py), with Whisper on this computer
+hear = ["faster-whisper>=1.1"]
 
 [project.urls]
 Homepage = "https://github.com/HHCreator/MemeLearnerBot"
