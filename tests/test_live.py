@@ -3,6 +3,7 @@ a made-up socket that sends packets in the shapes Bilibili's danmu feed sends. W
 feed still answers a visitor that way is only shown by a real run of
 py -m memelearner live."""
 
+import contextlib
 import io
 import json
 import os
@@ -12,7 +13,7 @@ import unittest
 import zlib
 from unittest import mock
 
-from memelearner import bilibili, live, surf
+from memelearner import bilibili, cli, live, surf
 
 from .test_surf import VISITOR, FakeBilibili
 
@@ -361,6 +362,29 @@ class FindTest(unittest.TestCase):
         self.assertNotIn("汽车人", status)  # another game's
         self.assertEqual((compared["parts"], compared["danmu"], compared["senders"],
                           compared["before"]), (2, 90, 90, 3040))
+
+    def test_live_phrases_saves_what_it_lists_new_first(self):
+        def phrase(name, status, rise=None):
+            return {"game": "lol", "phrase": name, "status": status, "rise": rise,
+                    "people": 9, "alone": 0.9, "videos": 2, "variants": [],
+                    "examples": [{"text": name, "bvid": "live:6-20261103-1905#1"}]}
+
+        # Best first, as find() returns them: a rising phrase can come before the new ones
+        found = [phrase("涨了", "rising", 9.0), phrase("新的", "new"),
+                 phrase("又涨了", "rising", 4.0), phrase("新的二", "new"),
+                 phrase("少见", "first look"), phrase("老的", "steady")]
+        compared = {"start": self.start, "recordings": ["6-20261103-1905.jsonl"], "danmu": 90,
+                    "senders": 90, "parts": 2, "before": 3040}
+        saved = []
+        printed = io.StringIO()
+        with mock.patch.object(live, "find", lambda *a, **k: (found, {}, compared)), \
+                mock.patch.object(surf, "save", lambda keep, *a, **k: saved.extend(keep)), \
+                contextlib.redirect_stdout(printed):
+            cli.main(["live-phrases", "--top", "1"])
+        self.assertEqual([c["phrase"] for c in saved], ["新的", "涨了", "少见", "老的"])
+        for c in saved:
+            self.assertIn(c["phrase"], printed.getvalue())
+        self.assertNotIn("又涨了", printed.getvalue())
 
     def test_the_recording_is_part_of_what_the_judge_reads(self):
         videos = {video for game, video, _ in surf.load_messages() if video.startswith("live")}

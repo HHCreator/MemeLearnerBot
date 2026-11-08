@@ -214,20 +214,20 @@ def _live_phrases(args):
     groups = (("new", "New: nobody sent these in what was read before"),
               ("rising", "Rising: sent before, but much more now"),
               ("first look", "First look (too little to compare with)"))
-    shown = 0
+    keep = []  # what's listed, in the same order (new first), is what judge and compare get
     for status, title in groups:
         some = [c for c in found if c["status"] == status][:args.top]
         if some:
             print(f"\n{title}:")
             for c in some:
                 _show_candidate(c)
-            shown += len(some)
+            keep += some
     others = [c for c in found if c["status"] in ("steady", "older")][:args.known_top]
     if others:
         print(f"\nAlso sent a lot, but not new (the {len(others)} most sent):")
         for c in others:
             _show_candidate(c)
-    keep = [c for c in found if c["status"] not in ("steady", "older")][:args.top] + others
+    keep += others
     surf.save(keep, summary, 0, live=compared)
     print(f"\nSaved {len(keep)} phrases with example lines to {surf.CANDIDATES_FILE}, as the "
           "candidates: py -m memelearner judge (or compare) works on them now; "
