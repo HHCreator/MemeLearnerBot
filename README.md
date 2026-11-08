@@ -88,9 +88,9 @@ said it is, its `meaning`, `english` and `literal` meaning, whether that meaning
 `guess`, the `explanations` it was shown, what the `videos` explaining it said, `why`, the
 blind `test`, and the `model` that judged it; see `judge()` in `memelearner/judging.py`.
 When the online model can't be reached, qwen3:14b on this computer judges instead (see
-Which model below); `judge()` raises `memelearner.ModelUnavailable` only when no model can
-be asked (Ollama isn't running or doesn't have it either), and `explain()` raises it when
-its model can't be asked.
+Which model below), and sums up the videos for `explain()`; both raise
+`memelearner.ModelUnavailable` only when no model can be asked (Ollama isn't running or
+doesn't have it either).
 
 **Any language: the command line.** `memes`, `lookup`, `find`, `candidates` and `watching`
 take `--json` and print what the Python functions return, in UTF-8. `lookup` exits with 1 when
@@ -206,7 +206,9 @@ model is free and works offline, but it knows far less slang. The `MEMELEARNER_M
 environment variable changes the default.
 
 The judge sends DeepSeek the lines and video titles it shows the model, never who sent
-them, and asks without DeepSeek's "thinking", which is slower and costs more. Judging the
+them, and asks without DeepSeek's "thinking", which is slower and costs more. `explain`
+sends it what it read of each explainer video: the title, description, tags, subtitles or
+what Whisper heard, and some hot comments and danmu, again never who wrote them. Judging the
 60 phrases of a run takes about 100 answers and 60,000 tokens: about 1.3 US cents with
 Flash and 5 with Pro at full price (2026-11-02). The prices are on DeepSeek's site, and they
 halve outside 9:00-12:00 and 14:00-18:00 Beijing time on weekdays. The judge says how many
@@ -261,8 +263,9 @@ faster than that, so the judge never goes by what the model remembers:
   real run, tests on 2 or 3 lines threw out more right meanings than wrong ones.
 - Many memes are only ever sent on their own, so few lines show what they mean. When fewer
   than 8 lines say more than the phrase (so fewer than 4 would be left to test on), its
-  meaning isn't tested: the verdict is "untested". If some lines explain it, the meaning
-  comes from them, and `candidates` shows one of them. If none does, the meaning is only the
+  meaning isn't tested: the verdict is "untested". If some lines explain it, or a video
+  does (see Videos that explain memes), the meaning comes from them, and `candidates`
+  shows one of them. If none does, the meaning is only the
   model's guess: it is shown as one, and `accept` doesn't take it, so give the meaning
   yourself with `--meaning`.
 - What the model can't tell, or a meaning that doesn't pass, goes on the watching list.
@@ -308,9 +311,10 @@ For each phrase it:
    the smallest audio stream (about half a megabyte a minute, only for videos up to 10
    minutes), a Whisper model on this computer writes down what is said, and the audio is
    deleted. Nothing is uploaded anywhere.
-4. **Sums up** each video with the judge's model: does it explain the phrase, what does it
-   say the phrase means and where it comes from, and a line quoted from it (a quote that
-   isn't in the video is dropped). The model is told to write only what the video says.
+4. **Sums up** each video with the judge's model (qwen3:14b when DeepSeek can't be
+   reached, as for the judge): does it explain the phrase, what does it say the phrase
+   means and where it comes from, and a line quoted from it (a quote that isn't in the
+   video is dropped). The model is told to write only what the video says.
 5. **Judges again** the phrases a video explains: the model gets the videos' summaries
    beside the danmu, and a meaning a video backs isn't only a guess any more, so `accept`
    takes it. `candidates` shows which video it came from.

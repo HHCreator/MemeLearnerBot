@@ -25,7 +25,8 @@ TOP a run):
                   MAX_SECONDS long), has a Whisper model on this computer write down what is
                   said, and deletes the audio. Nothing is uploaded anywhere.
     3. Sum up     The judge's model gets what the video says (judging.py's model, local or
-                  online) and writes down only that: whether the video explains the phrase,
+                  online; when an online one can't be reached, LOCAL_MODEL, as for the
+                  judge) and writes down only that: whether the video explains the phrase,
                   what it says the phrase means, where it comes from, and a line quoted from
                   the video. A quote the video doesn't contain is dropped.
     4. Judge      The phrases with new summaries are judged again, the model getting what
@@ -509,15 +510,31 @@ def show(summary, phrase):
     print(f"    {summary['bvid']}  {title} [{how}]: {summary['meaning']}{origin}")
 
 
+def _stand_in(error, rest=False):
+    """judging.LOCAL_MODEL, which sums the videos up (the rest of them when rest is True)
+    instead of an online model that can't be reached (error), as it judges instead in
+    judging.judge(). Raises judging.ModelUnavailable when it can't be asked either."""
+    try:
+        judging.check_model(judging.LOCAL_MODEL)
+    except judging.ModelUnavailable as local:
+        raise judging.ModelUnavailable(f"{error}; and {judging.LOCAL_MODEL}, which stands in "
+                                       f"for it, can't be asked either: {local}") from local
+    print(f"{error}.\nSo {judging.LOCAL_MODEL}, the model on this computer, sums "
+          f"{'the rest of ' if rest else ''}the videos up instead.")
+    return judging.LOCAL_MODEL
+
+
 def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top=TOP,
             again=False, hearing=True, judge=True):
     """Steps 1 to 4: find and read the videos that explain some phrases (by default the
     memes the judge found that need it most, up to top), sum each up, and judge the phrases
     again. links: {phrase: [video link, ...]} to read instead of looking (a phrase with links
     isn't searched for). hearing=False never hears videos, even with Whisper installed.
-    Returns {"game:phrase": [new summary, ...]}. Raises judging.ModelUnavailable when the
-    model can't be asked; what was read and summed up until then is kept."""
-    model = model or judging.MODEL
+    model: as for judging.judge() (default: judging.MODEL); when it is an online model that
+    can't be reached, judging.LOCAL_MODEL sums the videos up instead from then on. Returns
+    {"game:phrase": [new summary, ...]}. Raises judging.ModelUnavailable when no model can
+    be asked; what was read and summed up until then is kept."""
+    asked_for = model = model or judging.MODEL
     games = None if games is None else {game.lower() for game in games}
     links = {store.normal(phrase): list(found) for phrase, found in (links or {}).items()}
     data = load()
@@ -527,7 +544,10 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
         print("Nothing to look up: run py -m memelearner learn and judge first, or every meme "
               "the judge found is explained already or was looked up lately (--again).")
         return {}
-    judging.check_model(model)
+    try:
+        judging.check_model(model)
+    except judging._Unreachable as error:  # an online model: no key, no balance, no answer
+        model = _stand_in(error)
     hearing = hearing and can_hear()
     print(f"Looking for videos that explain {len(wanted)} phrases (read only, a request every "
           f"5 to 7 seconds) ...")
@@ -564,7 +584,11 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
                     print(f"    skipped {video['bvid']} (Bilibili answered in an unexpected "
                           f"way: {error!r})")
                     continue
-                summary = summarize(phrase, game, material, model)
+                try:
+                    summary = summarize(phrase, game, material, model)
+                except judging._Unreachable as error:  # the online model stopped answering
+                    model = _stand_in(error, rest=True)
+                    summary = summarize(phrase, game, material, model)
                 entry["videos"] = [v for v in entry.get("videos") or []
                                    if v["bvid"] != summary["bvid"]] + [summary]
                 new.setdefault(key, []).append(summary)
@@ -585,5 +609,7 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
     again = {c["phrase"] for c in wanted if c["phrase"] in told and not c.get("made_up")}
     if judge and again:
         print()
-        judging.judge(games, model, phrases=again)
+        # With the model asked for: judge() has LOCAL_MODEL stand in by itself, and the
+        # online model judges those phrases again once it can be reached
+        judging.judge(games, asked_for, phrases=again)
     return new
