@@ -379,6 +379,7 @@ class ExplainTest(Folder):
         super().setUp()
         self.model = FakeModel()
         for patcher in (mock.patch.object(judging, "_ask", self.model),
+                        mock.patch.object(judging, "MODEL", "deepseek-r1:14b"),
                         mock.patch.object(judging, "_get_json",
                                           lambda path: {"models": [{"name": "deepseek-r1:14b"}]}),
                         mock.patch.object(explainers, "can_hear", return_value=False)):

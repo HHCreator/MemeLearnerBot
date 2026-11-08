@@ -9,7 +9,7 @@ apps learn them from it. Other apps only need what is in this file.
     memelearner.find("这下真的绷不住了")       # the learned memes in a text, in order
     memelearner.candidates()                # what the last run found, not looked at yet
     memelearner.learn(games=["lol"])        # read Bilibili now (takes minutes)
-    memelearner.judge()                     # a local model tells memes from names (minutes)
+    memelearner.judge()                     # a model tells memes from names (minutes)
     memelearner.explain()                   # read videos that explain those memes (minutes)
     memelearner.watching()                  # what the model wasn't sure of yet
     memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
@@ -27,7 +27,7 @@ A meme is a dict:
 
 A candidate is a short danmu that many people send on their own, with how new it is, its
 numbers, its variants and example lines (see surf.find_candidates()), and once judged, the
-local model's verdict and meaning ("judge", see judging.judge()). Apps that aren't written
+model's verdict and meaning ("judge", see judging.judge()). Apps that aren't written
 in Python get the same through the command line with --json (cli.py), or read
 data/memes.json, which holds the learned memes (its format is in store.py). API_VERSION
 changes when a field changes meaning or goes away; a new field doesn't change it.
@@ -66,8 +66,8 @@ def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.M
     days: how recent "new" is; people: different people who must send a phrase on its own
     (in at least two videos); fetch=False
     finds phrases again in what was read before, without visiting Bilibili; known: phrases
-    your app knows already, left out like the learned ones; judge: then have the local
-    model judge them, as judge() does (raises ModelUnavailable when it can't be asked; the
+    your app knows already, left out like the learned ones; judge: then have the model
+    judge them, as judge() does (raises ModelUnavailable when it can't be asked; the
     candidates are saved all the same); quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
@@ -78,16 +78,19 @@ def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.M
 
 
 def judge(games=None, model=None, again=False, quiet=False):
-    """Have a local model (through Ollama) judge the last run's candidates: is each a meme,
-    a name, a game word or an everyday word, and what does a meme mean? Returns the
-    candidates, each with its verdict as "judge" (also saved for candidates()); see
-    judging.py for how it works and what a verdict holds. It takes a few seconds per
-    candidate.
+    """Have a model judge the last run's candidates: is each a meme, a name, a game word or
+    an everyday word, and what does a meme mean? Returns the candidates, each with its
+    verdict as "judge" (also saved for candidates()); see judging.py for how it works and
+    what a verdict holds. It takes a few seconds per candidate.
 
-    games: only these games' candidates; model: an Ollama model (MEMELEARNER_MODEL, or
-    deepseek-r1:14b); again=True judges again what was judged before. Raises
-    ModelUnavailable when Ollama isn't running or doesn't have the model; the verdicts given
-    until then are kept. quiet: print nothing.
+    games: only these games' candidates; model: an online model named PROVIDER/MODEL, which
+    reads your key from an environment variable (DEEPSEEK_API_KEY), or an Ollama model on
+    this computer like qwen3:14b (default: MEMELEARNER_MODEL, or deepseek/deepseek-flash);
+    again=True judges again what was judged before. When an online model can't be reached
+    (no internet, no key, a key it refuses or no balance left), qwen3:14b on this computer
+    judges instead (judging.LOCAL_MODEL), and each verdict's "model" says which one judged.
+    Raises ModelUnavailable when no model can be asked (Ollama isn't running or doesn't
+    have it, either); the verdicts given until then are kept. quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
         return judging.judge(games, model or judging.MODEL, again)
