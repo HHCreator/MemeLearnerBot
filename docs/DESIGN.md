@@ -16,11 +16,12 @@ MemeLearnerBot/
 └── memelearner/       真正的代码（一个 Python 包）
     ├── __init__.py    门面：memes()、lookup()、find()、candidates()、learn()、judge()、explain()、watching()、accept()、reject()，别的程序只调用它
     ├── __main__.py    py -m memelearner
-    ├── cli.py         命令行：learn、judge、explain、candidates、watching、accept、reject、forget、memes、lookup、find
+    ├── cli.py         命令行：learn、judge、explain、compare、candidates、watching、accept、reject、forget、memes、lookup、find、live、live-phrases、report、live-report
     ├── surf.py        梗机器人：找 B 站上很多人单独发的说法
     ├── judging.py     模型（本地的或在线的）判断候选：是梗、名字、游戏术语还是普通的话，梗是什么意思；比较几个模型（第 3 节）
     ├── explainers.py  找、看、总结 B 站上讲梗的视频（「XX是什么梗」），给模型判断用（第 3.5 节）
     ├── meanings.py    把 Hao 的补充和模型的解释合成一句完整的含义（第 4 节）
+    ├── review.py      浏览器里的报告：标记、决定，点「完成」就学（第 3.6 节）
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评、视频页、字幕和音频（只读）
     ├── store.py       学到的梗和不要的说法，存在 data/memes.json
     ├── data/          梗、每个游戏的起点视频、日常说法、英文常用词
@@ -104,6 +105,15 @@ flowchart TD
 - **重新判断**。有视频讲了的说法，再判断一次（`judge(phrases=...)`）：模型同时拿到视频说的意思（`videos`），没法盲测的梗（untested）只要有视频讲过，意思就不算猜的，accept 会用；`candidates` 会写出是哪个视频说的。结论里的 `videos` 存着视频的链接、标题和它说的意思。判过的说法有了新视频讲才再判（`_still_good()`）。
 - **不用 BiliNote 和 SummifyAI**。两个都是 MIT 协议，都是把你给的一个视频变成笔记的完整应用，都不会帮一个说法找视频。BiliNote 有网页、数据库和桌面客户端，读 B 站字幕要登录用户的 cookie（SESSDATA），下载用 yt-dlp 和 ffmpeg；SummifyAI 要 PyTorch（固定的 2.6 版还不支持 RTX 50 系显卡）和在线模型。机器人借了它们听音频的做法（BiliNote 也用 faster-whisper），自己写了 `explainers.py` 和 `bilibili.py` 里读视频页、字幕和音频的几个函数，不装 Whisper 的时候还是只用 Python 自带的库。
 
+## 3.6 报告（`review.py`）
+
+2026-11-08 Hao 选的办法：bot 自己出一个浏览器里的网页，跟 Claude Docs 里的梗报告一样是一张能直接操作的表，点「完成」bot 自己学。`py -m memelearner report` 打开上一次运行（learn 或 live-phrases）的报告；`py -m memelearner live-report` 一条命令跑完直播录制的 live-phrases、judge、explain（每次最多 `--explain-top` 个梗），再打开报告。
+
+- **表**（`rows()`）。每个还没学、没拒的候选一行：说法、单独发它的人数、两句用到它的句子（judge 看到的句子里比说法长的先，不要分享视频的标题）、模型的回答（种类和意思，猜的、没通过盲测的标出来；不是默认模型判的写上是谁判的），后面是 Mark、Decision、My meaning，都空着等人填，不替人选。顺序（`_group()`）：盲测通过的梗，有句子或视频解释的梗，别的梗（猜的、没有意思、没通过盲测），看不出来的，名字、游戏术语和普通的话，还没判的；同一组里人多的在前。
+- **每次点选都存**（`choose()`）。网页每改一处就发给 bot，存进 `.cache/surf/review.json`（先写临时文件再换掉，不会存一半）。关了网页或窗口也不丢，再运行 `report` 就照原样打开。Mark 跟着它标的那个回答（模型、结论、种类、意思的哈希，`_answer()`）：重判以后模型说的不一样了，Mark 就空了；Decision 和 My meaning 跟着说法，一直留着。
+- **完成**（`finish()`）。先把 Add 里写了 My meaning 的一起合并（`meanings.merge_all()`，补充之间说「和 X 是同一个梗」也能用上）：模型的意思标了 Wrong 的不用，猜的意思只有标了 Correct 或 Half correct 才用；合并要问模型，问不了就什么都不学、选择都留着，等会儿再点。然后 Add 的 `store.accept()`（例句和来源用表里的句子和它们的视频），Not a meme 的 `store.reject()`，理由是 My meaning（没写就是日期）：下次判断相近的说法时模型会看到这个理由（第 3 节 `learned_like()`）。Not sure yet 和没选的留到下次。最后按第一次评分的分数算模型的分（Correct 1，Half correct 0.5，Correct, no meaning 0.5，No point 0，Wrong −1，I don't know 不算），同一个回答只算一次（`scored`）；结果显示在网页上和窗口里，`review.json` 的 `done` 里也留一份。然后 bot 停下。
+- **只给这台电脑用**（`Report`）。只听 127.0.0.1（不会弹防火墙），端口默认随便挑一个空的；链接里带一个随机的 token，网页每次存都带上它（`X-Token` 头），Host 也要是 127.0.0.1：别的网页（哪怕在同一个浏览器里）改不了你的选择。网页里的弹幕和意思都当文字放（`textContent`），不当 HTML；数据放在 JSON 里，`<` 写成 `\u003c`，一句弹幕也结束不了 `<script>`。只用 Python 自带的 `http.server`，不用装别的。
+
 ## 4. 学到的梗（`store.py`、`data/memes.json`）
 
 ```
@@ -151,7 +161,7 @@ flowchart TD
 | `data/surf_sources.json` | 每个游戏的标题词（words）和起点视频（seeds） | 你写，surf.py 读 |
 | `data/surf_common.txt` | 永远不列的日常说法（哈哈哈、加油、比赛） | 你写，surf.py 读 |
 | `data/words/common_english.txt` | 1 万个常用英文单词，用来分开英文单词（nice）和字母梗（yyds） | surf.py 读 |
-| `.cache/surf/` | 读到的弹幕和评论（每个视频一个 `.jsonl`，发送者是短哈希）、`videos.json`、`candidates.json`；`judge.json`：模型的结论；`explainers.json`：见过的讲梗视频和每个说法的视频总结，`explainers/`：看过的讲梗视频（每个一个 `.json`） | surf.py、judging.py 和 explainers.py 读写，不进 git；环境变量 `MEMELEARNER_HOME` 可以换地方，exe 里放在 `%LOCALAPPDATA%\MemeLearnerBot` |
+| `.cache/surf/` | 读到的弹幕和评论（每个视频一个 `.jsonl`，发送者是短哈希）、`videos.json`、`candidates.json`；`judge.json`：模型的结论；`explainers.json`：见过的讲梗视频和每个说法的视频总结，`explainers/`：看过的讲梗视频（每个一个 `.json`）；`review.json`：报告里的选择、算过分的回答和每次「完成」的结果 | surf.py、judging.py、explainers.py 和 review.py 读写，不进 git；环境变量 `MEMELEARNER_HOME` 可以换地方，exe 里放在 `%LOCALAPPDATA%\MemeLearnerBot` |
 | `.cache/whisper/` | Whisper 模型（装了 faster-whisper、第一次听视频的时候下载） | explainers.py 读，不进 git |
 
 ## 7. 为什么这样设计

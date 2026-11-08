@@ -15,6 +15,8 @@
     py -m memelearner find "这下真的绷不住了"     the learned memes in a text
     py -m memelearner live https://live.bilibili.com/6 --until 22:55   record a live room's danmu
     py -m memelearner live-phrases             the phrases in the last recording, and which are new
+    py -m memelearner report                   the report in your browser: mark, decide, then 完成
+    py -m memelearner live-report              live-phrases, judge and explain, then the report
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
 learn --judge also judges what it found (learn --explain then also reads videos that explain
@@ -60,15 +62,17 @@ def _show_candidate(c):
           f"{c['videos']} videos{also})  e.g. {example[:40]}{said}")
 
 
-def _judge(games, model=None, again=False):
-    """Judge the last run's candidates and say what to do next; False when the model
-    couldn't be asked."""
+def _judge(games, model=None, again=False, hint=True):
+    """Judge the last run's candidates and (with hint) say what to do next; False when the
+    model couldn't be asked."""
     try:
         with judging.awake():  # a run can take a while: Windows mustn't sleep meanwhile
             judging.judge(games, model, again)
     except ModelUnavailable as error:
         print(f"Couldn't ask the model: {error}.")
         return False
+    if not hint:
+        return True
     print('Learn one with: py -m memelearner accept PHRASE (it takes the judge\'s meaning '
           'unless it is only a guess, or give your own with --meaning); turn one down with: '
           'py -m memelearner reject PHRASE')
@@ -285,6 +289,65 @@ def _live_phrases(args):
           "py -m memelearner learn --no-fetch lists the usual ones again.")
 
 
+def _report(args):
+    from . import review
+    rows = review.rows()
+    if not rows:
+        print("Nothing to report: run py -m memelearner learn or live-phrases, and judge, "
+              "first; or every phrase found is learned or turned down.")
+        return
+    try:
+        report = review.Report(rows, args.model, args.port, review.about())
+    except OSError as error:
+        sys.exit(f"Couldn't open the report on port {args.port}: {error}")
+    result = report.run(not args.no_browser)
+    if result:
+        print("\n".join(review.summary(result)))
+
+
+def _live_report(args):
+    """live-phrases, judge and explain, then the report: a live recording in one command."""
+    _live_phrases(args)
+    print()
+    if not _judge(None, args.model, hint=False):
+        sys.exit("The phrases are saved: judge them later with py -m memelearner judge, then "
+                 "open the report with py -m memelearner report")
+    if not args.no_explain:
+        print()
+        if not _explain(None, model=args.model, top=args.explain_top,
+                        hearing=not args.no_audio):
+            print("So the report shows what the judge said before that.")
+    print()
+    _report(args)
+
+
+def _recording_options(command):
+    """The options of live-phrases, which live-report has too."""
+    command.add_argument("recordings", nargs="*", metavar="RECORDING",
+                         help="recordings (files in surf/live/, like 6-20261103-1905); by "
+                         "default the last day's (all of it, when the recorder was restarted)")
+    command.add_argument("--all", action="store_true", help="every recording together")
+    command.add_argument("--slice", type=int, default=60, metavar="MINUTES",
+                         help="minutes of a recording that count as one video (default "
+                         "%(default)s): a phrase must be sent in two")
+    command.add_argument("--people", type=int, default=5, metavar="N",
+                         help="different people who must send a phrase on its own (default "
+                         "%(default)s)")
+    command.add_argument("--top", type=int, default=40, metavar="N",
+                         help="new phrases listed (default %(default)s)")
+    command.add_argument("--known-top", type=int, default=10, metavar="N",
+                         help="phrases listed that aren't new (default %(default)s)")
+
+
+def _report_options(command, model_help):
+    command.add_argument("--model", default=judging.MODEL, help=model_help)
+    command.add_argument("--port", type=int, default=0, metavar="N",
+                         help="the port the page is served on, on this computer only "
+                         "(default: a free one)")
+    command.add_argument("--no-browser", action="store_true",
+                         help="don't open the browser: open the link it prints yourself")
+
+
 def parser():
     commands = argparse.ArgumentParser(
         prog="memelearner", description="The meme bot: finds the newest gaming memes on "
@@ -419,21 +482,28 @@ def parser():
 
     heard = sub.add_parser("live-phrases", help="the phrases people send on their own in a "
                            "recording, and which are new next to what was read before")
-    heard.add_argument("recordings", nargs="*", metavar="RECORDING",
-                       help="recordings (files in surf/live/, like 6-20261103-1905); by "
-                       "default the last day's (all of it, when the recorder was restarted)")
-    heard.add_argument("--all", action="store_true", help="every recording together")
-    heard.add_argument("--slice", type=int, default=60, metavar="MINUTES",
-                       help="minutes of a recording that count as one video (default "
-                       "%(default)s): a phrase must be sent in two")
-    heard.add_argument("--people", type=int, default=5, metavar="N",
-                       help="different people who must send a phrase on its own (default "
-                       "%(default)s)")
-    heard.add_argument("--top", type=int, default=40, metavar="N",
-                       help="new phrases listed (default %(default)s)")
-    heard.add_argument("--known-top", type=int, default=10, metavar="N",
-                       help="phrases listed that aren't new (default %(default)s)")
+    _recording_options(heard)
     heard.set_defaults(run=_live_phrases)
+
+    page = sub.add_parser("report", help="the last run's phrases and the judge's answers as a "
+                          "page in your browser: mark them, decide, and 完成 learns them")
+    _report_options(page, "the model that merges your My meaning with the judge's meaning "
+                    f"(default %(default)s; {judging.LOCAL_MODEL} when it can't be reached)")
+    page.set_defaults(run=_report)
+
+    whole = sub.add_parser("live-report", help="live-phrases, judge and explain for the last "
+                           "live recording, then open the report")
+    _recording_options(whole)
+    _report_options(whole, "the model that judges, sums up the videos and merges your notes "
+                    f"(default %(default)s; {judging.LOCAL_MODEL} when it can't be reached)")
+    whole.add_argument("--no-explain", action="store_true",
+                       help="don't look for videos that explain the memes (that reads Bilibili "
+                       "for some minutes)")
+    whole.add_argument("--explain-top", type=int, default=explainers.TOP, metavar="N",
+                       help="memes whose explaining videos are read (default %(default)s)")
+    whole.add_argument("--no-audio", action="store_true",
+                       help="don't hear the videos, even with Whisper installed")
+    whole.set_defaults(run=_live_report)
 
     scan = sub.add_parser("find", help="the learned memes in a text")
     scan.add_argument("text")
