@@ -12,6 +12,8 @@
     py -m memelearner memes                    the memes learned so far
     py -m memelearner lookup 绷不住了            one learned meme
     py -m memelearner find "这下真的绷不住了"     the learned memes in a text
+    py -m memelearner live https://live.bilibili.com/6 --until 22:55   record a live room's danmu
+    py -m memelearner live-phrases             the phrases in the last recording, and which are new
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
 learn --judge also judges what it found (learn --explain then also reads videos that explain
@@ -24,6 +26,7 @@ import argparse
 import json
 import os
 import sys
+import time
 
 from . import (ModelUnavailable, accept, candidates, explainers, find, forget, judging, lookup,
                memes, reject, store, surf, watching)
@@ -215,6 +218,64 @@ def _find(args):
         _show_meme(meme)
 
 
+def _live(args):
+    from . import bilibili, live
+    try:
+        until = live.end_time(args.until, args.hours)
+        live.record(args.room, until, game=args.game.lower())
+    except ValueError as error:
+        sys.exit(str(error))
+    except live.NeedBrotli as error:
+        sys.exit(str(error))
+    except (bilibili.Error, bilibili.Blocked, OSError, KeyError, TypeError) as error:
+        sys.exit(f"Couldn't open the live room: {error!r}")
+
+
+def _live_phrases(args):
+    from . import live
+    paths = []
+    for path in args.recordings:
+        if not os.path.exists(path):
+            path = os.path.join(live.live_dir(), path if path.endswith(".jsonl")
+                                else path + ".jsonl")
+        if not os.path.exists(path):
+            sys.exit(f"There's no recording {path}")
+        paths.append(path)
+    if args.all:
+        paths = live.recordings()
+    try:
+        found, summary, compared = live.find(paths, args.slice, args.people)
+    except ValueError as error:
+        sys.exit(str(error))
+    start = time.strftime("%Y-%m-%d %H:%M", time.localtime(compared["start"]))
+    print(f"{', '.join(compared['recordings'])}: {compared['danmu']} danmu from "
+          f"{compared['senders']} senders since {start}, in {compared['parts']} parts of "
+          f"{args.slice} minutes (each counts as a video)")
+    print(f"Compared with {compared['before']} lines read before it (replays, earlier "
+          "recordings)")
+    groups = (("new", "New: nobody sent these in what was read before"),
+              ("rising", "Rising: sent before, but much more now"),
+              ("first look", "First look (too little to compare with)"))
+    keep = []  # what's listed, in the same order (new first), is what judge and compare get
+    for status, title in groups:
+        some = [c for c in found if c["status"] == status][:args.top]
+        if some:
+            print(f"\n{title}:")
+            for c in some:
+                _show_candidate(c)
+            keep += some
+    others = [c for c in found if c["status"] in ("steady", "older")][:args.known_top]
+    if others:
+        print(f"\nAlso sent a lot, but not new (the {len(others)} most sent):")
+        for c in others:
+            _show_candidate(c)
+    keep += others
+    surf.save(keep, summary, 0, live=compared)
+    print(f"\nSaved {len(keep)} phrases with example lines to {surf.CANDIDATES_FILE}, as the "
+          "candidates: py -m memelearner judge (or compare) works on them now; "
+          "py -m memelearner learn --no-fetch lists the usual ones again.")
+
+
 def parser():
     commands = argparse.ArgumentParser(
         prog="memelearner", description="The meme bot: finds the newest gaming memes on "
@@ -327,6 +388,35 @@ def parser():
     one.add_argument("phrase")
     one.add_argument("--json", action="store_true", help="print JSON (null when there's none)")
     one.set_defaults(run=_lookup)
+
+    watch = sub.add_parser("live", help="record a live room's danmu as a visitor (no login, "
+                           "sends nothing), to find phrases in later")
+    watch.add_argument("room", help="the room's link or number, like "
+                       "https://live.bilibili.com/6")
+    watch.add_argument("--until", metavar="HH:MM",
+                       help="stop at this time on this computer's clock, like 22:55")
+    watch.add_argument("--hours", type=float, metavar="N", help="stop after N hours")
+    watch.add_argument("--game", default="lol",
+                       help="the game the room shows, for finding phrases (default lol)")
+    watch.set_defaults(run=_live)
+
+    heard = sub.add_parser("live-phrases", help="the phrases people send on their own in a "
+                           "recording, and which are new next to what was read before")
+    heard.add_argument("recordings", nargs="*", metavar="RECORDING",
+                       help="recordings (files in surf/live/, like 6-20261103-1905); by "
+                       "default the last day's (all of it, when the recorder was restarted)")
+    heard.add_argument("--all", action="store_true", help="every recording together")
+    heard.add_argument("--slice", type=int, default=60, metavar="MINUTES",
+                       help="minutes of a recording that count as one video (default "
+                       "%(default)s): a phrase must be sent in two")
+    heard.add_argument("--people", type=int, default=5, metavar="N",
+                       help="different people who must send a phrase on its own (default "
+                       "%(default)s)")
+    heard.add_argument("--top", type=int, default=40, metavar="N",
+                       help="new phrases listed (default %(default)s)")
+    heard.add_argument("--known-top", type=int, default=10, metavar="N",
+                       help="phrases listed that aren't new (default %(default)s)")
+    heard.set_defaults(run=_live_phrases)
 
     scan = sub.add_parser("find", help="the learned memes in a text")
     scan.add_argument("text")

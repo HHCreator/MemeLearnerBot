@@ -30,6 +30,8 @@ MemeLearnerBot/
 
 目标是自己去 B 站找最新的梗，列出来给人看。机器人找的是「很多人单独发出来」的短弹幕（候选），再标上新不新，由人决定哪些是梗：`accept` 学下来，`reject` 以后不再列。
 
+直播间的弹幕另外录：`py -m memelearner live` 像没登录的观众一样录一个直播间，`live-phrases` 在录下来的弹幕里找新说法。见 [LIVE.md](LIVE.md)（`live.py`）。
+
 ```mermaid
 flowchart TD
     A["data/surf_sources.json：每个游戏的标题词和起点视频"] --> B["1 找视频：顺着相关推荐找，最近 7 天发布、弹幕最多"]
