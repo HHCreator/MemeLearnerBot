@@ -534,6 +534,48 @@ class ExplainTest(Folder):
                 self.quietly(memelearner.explain, ["正义必胜"])
         self.assertEqual(self.read, [])
 
+    def test_the_local_model_sums_up_when_deepseek_cant_be_reached(self):
+        self.write_run()
+        online, local = "deepseek/deepseek-flash", judging.LOCAL_MODEL
+        with mock.patch.dict(os.environ, {"DEEPSEEK_API_KEY": ""}):  # no key
+            with self.assertRaisesRegex(memelearner.ModelUnavailable,
+                                        f"DEEPSEEK_API_KEY.*ollama pull {local}"):
+                self.quietly(memelearner.explain, ["正义必胜"], model=online)
+            self.assertEqual(self.read, [])  # nothing is read that no model could sum up
+            with mock.patch.object(judging, "_get_json",
+                                   lambda path: {"models": [{"name": local}]}):
+                found, printed = self.quietly(memelearner.explain, ["正义必胜"], model=online)
+        self.assertIn(f"So {local}, the model on this computer, sums the videos up instead.",
+                      printed)
+        self.assertEqual({summary["model"] for summary in found["lol:正义必胜"]}, {local})
+        chant = {c["phrase"]: c for c in memelearner.candidates()}["正义必胜"]["judge"]
+        self.assertEqual((chant["model"], chant["meaning"]), (local, FROM_VIDEO))
+
+    def test_the_local_model_sums_up_the_rest_when_deepseek_stops_answering(self):
+        self.write_run()
+        online, local = "deepseek/deepseek-flash", judging.LOCAL_MODEL
+        answered = []
+
+        def ask(messages, model):
+            if judging.online(model):
+                if answered:  # the balance ran out after one answer
+                    raise judging._Unreachable(f"{model}: the balance has run out")
+                answered.append(model)
+            return self.model(messages, model)
+
+        with mock.patch.object(judging, "_ask", ask), \
+                mock.patch.object(judging, "_call_online",
+                                  return_value={"data": [{"id": "deepseek-flash"}]}), \
+                mock.patch.object(judging, "_get_json",
+                                  lambda path: {"models": [{"name": local}]}):
+            found, printed = self.quietly(memelearner.explain, ["正义必胜"], model=online)
+        self.assertEqual([summary["model"] for summary in found["lol:正义必胜"]],
+                         [online, local])
+        self.assertIn(f"So {local}, the model on this computer, sums the rest of the videos up "
+                      "instead.", printed)
+        chant = {c["phrase"]: c for c in memelearner.candidates()}["正义必胜"]["judge"]
+        self.assertEqual(chant["model"], local)  # the judge has it stand in too
+
     def run_cli(self, *args):
         printed = io.StringIO()
         code = 0
@@ -553,10 +595,13 @@ class ExplainTest(Folder):
         code, printed = self.run_cli("explain", "正义必胜", "fpx", "--video", "BV1linked001")
         self.assertIn("give the one phrase", str(code))
         self.run_cli("judge")  # fpx is a name now, which no video explains
-        code, printed = self.run_cli("explain", "--top", "1")
+        awake = []
+        with mock.patch.object(judging, "_execution_state", awake.append):
+            code, printed = self.run_cli("explain", "--top", "1")
         self.assertEqual(code, 0)
         self.assertIn("1 of 1 phrases are explained by a video now.", printed)
         self.assertIn("from 1 video explaining it", printed)  # judged again
+        self.assertEqual(awake, [judging.STAY_AWAKE, judging.MAY_SLEEP])  # Windows stayed up
         with mock.patch.object(judging, "_get_json", lambda path: {"models": []}):
             code, printed = self.run_cli("explain", "fpx")
         self.assertEqual(code, 1)

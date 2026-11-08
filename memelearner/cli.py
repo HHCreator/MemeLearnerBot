@@ -71,13 +71,14 @@ def _judge(games, model=None, again=False):
     return True
 
 
-def _explain(games, phrases=None, links=(), model=judging.MODEL, top=explainers.TOP,
+def _explain(games, phrases=None, links=(), model=None, top=explainers.TOP,
              videos=explainers.VIDEOS, again=False, hearing=True, judge=True):
-    """Read videos that explain memes and judge those memes again; False when the model
-    couldn't be asked."""
+    """Read videos that explain memes and judge those memes again; False when no model
+    could be asked."""
     try:
-        explainers.explain(phrases, games, {phrases[0]: links} if links else None, model,
-                           videos, top, again, hearing, judge)
+        with judging.awake():  # hearing and summing up take a while too
+            explainers.explain(phrases, games, {phrases[0]: links} if links else None, model,
+                               videos, top, again, hearing, judge)
     except ModelUnavailable as error:
         print(f"Couldn't ask the model: {error}. What was read so far is kept.")
         return False
@@ -268,8 +269,9 @@ def parser():
     explain.add_argument("--videos", type=int, default=explainers.VIDEOS, metavar="N",
                          help="videos read for each phrase (default %(default)s)")
     explain.add_argument("--model", default=judging.MODEL,
-                         help="the model that sums the videos up and judges (default "
-                         "%(default)s; also MEMELEARNER_MODEL)")
+                         help="the model that sums the videos up and judges, as for judge "
+                         "(default %(default)s; also MEMELEARNER_MODEL). When an online model "
+                         f"can't be reached, {judging.LOCAL_MODEL} does instead")
     explain.add_argument("--again", action="store_true",
                          help="also phrases looked up before, and sum their videos up again")
     explain.add_argument("--no-audio", action="store_true",

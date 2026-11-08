@@ -108,10 +108,11 @@ def explain(phrases=None, games=None, videos=explainers.VIDEOS, top=explainers.T
     phrases: only these (default: the memes the judge found, the ones whose meaning is
     least sure first); games: only these games' phrases; videos: read per phrase; top:
     phrases looked up; links: {phrase: [video link, ...]} to read instead of looking;
-    model: as for judge(); again: also phrases looked up before; hearing=False: don't hear
-    videos even with Whisper installed (py -m pip install faster-whisper); judge=False:
-    don't judge them again. Raises ModelUnavailable when the model can't be asked; what was
-    read until then is kept. quiet: print nothing.
+    model: as for judge(), and qwen3:14b sums the videos up too when an online model can't
+    be reached; again: also phrases looked up before; hearing=False: don't hear videos even
+    with Whisper installed (py -m pip install faster-whisper); judge=False: don't judge them
+    again. Raises ModelUnavailable when no model can be asked; what was read until then is
+    kept. quiet: print nothing.
     """
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
         return explainers.explain(phrases, games, links, model or judging.MODEL, videos, top,

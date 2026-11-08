@@ -624,7 +624,7 @@ def judge(games=None, model=None, again=False, phrases=None):
          "meaning", "english", "literal": what the model wrote ("" when it isn't a meme, or
                                             the model couldn't tell what the meme means),
          "guess": True when that meaning is only the model's guess: untested, and no line
-                  explains it (accept doesn't take it),
+                  or video explains it (accept doesn't take it),
          "explanations": the lines explaining the phrase that the model was shown,
          "videos": [{"url", "title", "says"}]: what the videos explaining it said, shown
                    to the model too (see explainers.py),
