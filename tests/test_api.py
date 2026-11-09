@@ -98,6 +98,8 @@ class EntryPointTest(unittest.TestCase):
         self.assertEqual(saved["version"], store.VERSION)
         self.assertEqual(saved["memes"], {})
         self.assertEqual(saved["rejected"]["yyds"]["reason"], "too old to be news")
+        with open(store.MEMES_FILE, "rb") as f:
+            self.assertNotIn(b"\r\n", f.read())  # the same lines on Windows as on GitHub
         with self.assertRaises(ValueError):
             memelearner.accept("!!!")  # nothing left of it
 

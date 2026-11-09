@@ -29,9 +29,11 @@ py -m memelearner explain                           # read videos that explain t
 py -m memelearner candidates                        # what the last run found, with verdicts
 py -m memelearner accept 阿一古                       # learn it as a meme, with the judge's meaning
 py -m memelearner accept 阿一古 --meaning "..."      # ... or with your own
+py -m memelearner accept 下雨了 --note "..."         # ... or merged with your own note
 py -m memelearner reject 笑死 --reason "everyday"    # not a meme: never list it again
 py -m memelearner forget 笑死                        # undo accept or reject
 py -m memelearner memes                             # the memes learned so far
+py -m memelearner report                            # or mark, decide and learn in your browser
 ```
 
 `accept` takes the games, a few example lines and their videos from the last run, and the
@@ -39,6 +41,17 @@ judge's meaning and English gloss when it found the phrase a meme, unless that m
 only the model's guess; `--meaning` and `--english` give your own instead. The learned memes are kept in
 `memelearner/data/memes.json`, which is committed: push it, and every app that uses the bot
 gets them.
+
+`--note` is for what you'd add to a meaning rather than a whole one: "这个梗一般只用在theshy
+选手的比赛", or "chovy就是超威，和超威同意了是同一个梗". The model merges it with the meaning
+(yours, the one learned before, or the judge's) into one whole meaning that someone who
+doesn't know the meme understands, and where they disagree, your note wins. When your note
+says the phrase is the same meme as a learned one (和X是同一个梗, 来源同"X"), or a variant of a
+pattern of them ("XX同意了"的变体), their meaning is what it means. Every name and quoted word
+of your note must be in the merged meaning: the model is asked again when one isn't, and
+`accept` says what it still leaves out. With nothing to merge it with, your note is the
+meaning, word for word. Your notes are kept as you wrote them, as `notes` in `memes.json`;
+the merging is in `memelearner/meanings.py`.
 
 ## Using it from another app
 
@@ -177,6 +190,7 @@ py -m memelearner live https://live.bilibili.com/6 --until 22:55   # record unti
 py -m memelearner live 6 --hours 3                                 # ... or for 3 hours
 py -m memelearner live-phrases                 # the phrases in the last day's recording, new first
 py -m memelearner live-phrases --all           # every recording together
+py -m memelearner live-report                  # live-phrases, judge, explain, then the report
 ```
 
 `live` never logs in and never sends anything. It joins the room's danmu feed like the
@@ -206,6 +220,10 @@ rising and first-look phrases (at least 5 people each, `--people`), then the 10 
 ones, and saves them as the candidates, so `judge` and `compare` work on them; `learn
 --no-fetch` lists the usual ones again. The recordings are part of what the bot has read
 from then on, so the judge sees their lines too, and `learn` counts them with the last 7 days.
+
+`live-report` does the rest of a recording in one go: `live-phrases` (with the same
+options), `judge`, `explain` for the memes that need it most, and then the report in your
+browser (see [The report](#the-report)).
 
 ## The judge
 
@@ -296,6 +314,15 @@ faster than that, so the judge never goes by what the model remembers:
   few short ones, how many people send it on its own, its variants and the titles of its
   videos. It says what kind of phrase it is and, for a meme, writes what it means there,
   only from what it got, or no meaning when it can't tell.
+- It also gets what you taught the bot before: up to 5 learned memes that look like the
+  phrase, with their meanings and your notes, and up to 3 phrases you turned down that look
+  like it, with your reasons. Two phrases look alike when a pattern in your notes fits the
+  phrase (your note on wei出 has "X出", which kanavi出 fits), or when they share a piece
+  (同意了, 加油), the longest first (`related()` in meanings.py). So a variant of a learned
+  meme is explained the way your notes say, and a cheer like the ones you turned down
+  (blg加油, after ig加油) is likely no meme either: you don't correct the same mistake
+  twice. When that changes (a meme like it learned, a meaning or note of yours changed, a
+  phrase like it turned down), the next `judge` judges the phrase again.
 - Then a blind test: a second question, which never saw those lines, gets the other longer
   lines and two meanings, the model's and the literal one, and says which one each line
   means. The meaning passes when at least 2 lines, and three quarters of the lines that
@@ -382,6 +409,53 @@ downloads with yt-dlp and ffmpeg; SummifyAI needs PyTorch and an online model. T
 what they do for audio, with the same Whisper engine as BiliNote, and stays free of extra
 packages unless you want it to hear.
 
+## The report
+
+`report` shows the last run's phrases and the judge's answers as one table in your browser,
+like the meme reports in Claude Docs, and learns what you decide there:
+
+```
+py -m memelearner report          # the last run's phrases (learn or live-phrases), judged
+py -m memelearner live-report     # the last live recording: live-phrases, judge, explain, report
+```
+
+One row per phrase, the likeliest memes first (a meaning that passed its blind test, then
+one that lines or videos explain, the other memes, what the model couldn't tell, and last
+names, game words and everyday words): the phrase, how many people sent it on its own, two
+lines that use it, and the model's answer (its kind and meaning, marked when it is only a
+guess or failed its test). You fill in:
+
+- **Mark**: how right the answer is: Correct, Half correct, Correct, no meaning, No point,
+  Wrong, or I don't know.
+- **Decision**: Add (learn it), Not a meme (never list it again) or Not sure yet (next time).
+- **My meaning**: what the model's meaning leaves out or gets wrong, a whole meaning, or
+  that it is the same meme as a learned one (和超威同意了是同一个梗).
+
+Every choice is saved as you make it, in `memelearner/.cache/surf/review.json`: close the
+page or the window, and `report` opens it again as you left it. A Mark goes with the answer
+it is on: when the phrase is judged again and the model says something else, its Mark is
+empty again. Click **完成** when you're done. The bot then:
+
+- learns the phrases marked Add, with the judge's meaning; with My meaning, the model merges
+  the two into one whole meaning in which yours wins, as `accept --note` does. A meaning you
+  marked Wrong isn't used, nor a guess unless you marked it Correct or Half correct.
+- turns down the ones marked Not a meme, with My meaning as the reason. The judge is shown
+  it for phrases that look alike, so a cheer like ig加油 isn't taken for a meme again.
+- leaves Not sure yet and the rest for the next report.
+- scores the model from your Marks, as on the first scorecard: Correct 1, Half correct and
+  Correct, no meaning ½, No point 0, Wrong −1, I don't know not counted; an answer counts
+  once. It shows what it learned and the score on the page and in the window, and stops.
+
+When no model can merge your notes (no internet and no Ollama), it learns nothing and says
+so; your choices stay saved, so click 完成 again later. The page is served by the bot on this
+computer only (127.0.0.1), through a link with a random token, so no other web page can
+change your choices; `--port` picks the port, and `--no-browser` only prints the link.
+
+`live-report` runs `live-phrases` (with its options), `judge`, `explain` for the 10 memes
+that need it most (`--explain-top`, `--no-explain`, `--no-audio`) and then `report`; `--model`
+is the model for all of it (deepseek-flash, with qwen3:14b standing in when it can't be
+reached).
+
 ## Files
 
 | File | What it is |
@@ -391,6 +465,8 @@ packages unless you want it to hear.
 | `memelearner/surf.py` | the bot: find videos, read them, find the phrases people send on their own |
 | `memelearner/judging.py` | the judge: a model tells memes from names and explains them; compare |
 | `memelearner/explainers.py` | finds, reads and sums up the videos that explain memes |
+| `memelearner/meanings.py` | merges your notes with the model's meanings |
+| `memelearner/review.py` | the report in your browser: your marks and decisions, and what 完成 learns |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |

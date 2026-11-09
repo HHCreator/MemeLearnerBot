@@ -12,7 +12,9 @@ too. It looks like this:
      "rejected": {"下路": {"reason": "an everyday word", "date": "2026-11-01"}}}
 
 "memes" are the learned memes, by phrase; "rejected" are the phrases you turned down (names,
-everyday words), so the bot doesn't list them again. Every phrase is written the way the bot
+everyday words), so the bot doesn't list them again. A meme you wrote notes on has them too,
+word for word, as "notes": ["chovy就是超威，和超威同意了是同一个梗"]; its meaning is then the one
+the model merged from them and its own (see meanings.py). Every phrase is written the way the bot
 finds it (normal()): lowercase, half-width, only letters, digits and Chinese characters.
 "version" changes when a field changes meaning or goes away; a new field doesn't change it.
 """
@@ -62,7 +64,8 @@ def save(data):
                "rejected": dict(sorted(data["rejected"].items()))}
     os.makedirs(os.path.dirname(MEMES_FILE), exist_ok=True)
     temporary = MEMES_FILE + ".tmp"
-    with open(temporary, "w", encoding="utf-8") as f:
+    # newline="\n": the same line ends on Windows, so git shows only the lines that changed
+    with open(temporary, "w", encoding="utf-8", newline="\n") as f:
         json.dump(content, f, ensure_ascii=False, indent=1)
         f.write("\n")
     os.replace(temporary, MEMES_FILE)  # all at once, so a reader never sees half a file
@@ -147,9 +150,11 @@ def _merge(old, new):
     return merged
 
 
-def accept(phrase, meaning="", english="", games=(), examples=(), sources=()):
+def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), note=""):
     """Learn a phrase as a meme; returns it. Accepting it again updates it: a meaning or an
-    English gloss given replaces the old one, and games, examples and sources are added."""
+    English gloss given replaces the old one, and games, examples and sources are added.
+    note: your own note on it, kept word for word in its "notes" (meanings.py merges it
+    with the meaning; the meaning given here is the merged one)."""
     key = _key(phrase)
     data = load()
     entry = data["memes"].get(key, {})
@@ -159,6 +164,8 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=()):
                  added=entry.get("added") or time.strftime("%Y-%m-%d"),
                  examples=_merge(entry.get("examples"), examples)[:EXAMPLES],
                  sources=_merge(entry.get("sources"), sources)[:EXAMPLES])
+    if note.strip():
+        entry["notes"] = _merge(entry.get("notes"), [" ".join(note.split())])
     data["memes"][key] = entry
     data["rejected"].pop(key, None)
     save(data)

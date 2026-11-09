@@ -16,10 +16,12 @@ MemeLearnerBot/
 └── memelearner/       真正的代码（一个 Python 包）
     ├── __init__.py    门面：memes()、lookup()、find()、candidates()、learn()、judge()、explain()、watching()、accept()、reject()，别的程序只调用它
     ├── __main__.py    py -m memelearner
-    ├── cli.py         命令行：learn、judge、explain、candidates、watching、accept、reject、forget、memes、lookup、find
+    ├── cli.py         命令行：learn、judge、explain、compare、candidates、watching、accept、reject、forget、memes、lookup、find、live、live-phrases、report、live-report
     ├── surf.py        梗机器人：找 B 站上很多人单独发的说法
     ├── judging.py     模型（本地的或在线的）判断候选：是梗、名字、游戏术语还是普通的话，梗是什么意思；比较几个模型（第 3 节）
     ├── explainers.py  找、看、总结 B 站上讲梗的视频（「XX是什么梗」），给模型判断用（第 3.5 节）
+    ├── meanings.py    把 Hao 的补充和模型的解释合成一句完整的含义（第 4 节）
+    ├── review.py      浏览器里的报告：标记、决定，点「完成」就学（第 3.6 节）
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评、视频页、字幕和音频（只读）
     ├── store.py       学到的梗和不要的说法，存在 data/memes.json
     ├── data/          梗、每个游戏的起点视频、日常说法、英文常用词
@@ -62,7 +64,7 @@ flowchart TD
 ```mermaid
 flowchart TD
     A["候选（candidates.json）"] --> B["1 找句子：读到的弹幕和评论里用到它的，最多 16 句：解释它的排最前，再是比它长的"]
-    B --> D["2 解释：模型看解释它的句子、一半长句、几句只有它的、人数、变体和视频标题，说它是哪一种；是梗就写意思、英文和字面意思，看不出意思就不写"]
+    B --> D["2 解释：模型看解释它的句子、一半长句、几句只有它的、人数、变体、视频标题，和相近的已学梗（带你的补充）、拒掉的说法，说它是哪一种；是梗就写意思、英文和字面意思，看不出意思就不写"]
     D --> E["3 盲测：另一个问题只看另一半长句，在两个意思里选：模型写的和字面的"]
     E --> F["4 结论：meme / untested / not a meme / watching，存进 candidates.json 和 judge.json"]
     F --> G["人看候选：accept（默认用模型写的意思，只是猜的不用）/ reject"]
@@ -70,8 +72,9 @@ flowchart TD
 
 - **找句子**（`usage_lines()`）。从读到的弹幕和评论里找用到这个说法的句子，最多 `LINES`（16）句，不重复（「阿一古！！！」和「阿一古」算同一句）。最前面是最多 `EXPLANATIONS`（4）句有人在解释它的（`explains()`）：说它出自哪里、是什么的谐音、是什么意思（出自、谐音、意思是、是指、缩写、= 这些词）；问的（是什么梗、求科普、带问号的）和说自己看法的（我的意思是）不算，「是指挥」也不算。然后是别的比说法本身多的句子（「主播又在阿一古了」），只有这个说法的排最后（「阿一古阿一古」）；各自最新的先排，各个视频轮流。按完整的字和词找（aq 不算在 aqua 里），句尾语气词不算（「这还怎么翻」用到了「怎么翻的」）。读到的东西删掉了的话，就用候选里存的例句。
 - **解释**（`EXPLAIN`）。长句分成两半（`_split()`）：一半给解释，一半留给盲测；留给盲测的不到 `MIN_TEST_LINES`（4）句（长句不到 8 句）就不测，全部给解释。模型拿到一个 JSON：说法、游戏、多少人单独发过、在几个视频里、用到它的人里单独发的占多少（how）、同一个句式的变体（variants）、视频标题（titles），解释它的句子（explanations），还有另一半长句加上最多 `BARE_LINES`（4）句只有它的。它说这个说法是 meme（梗、黑话、口头禅、大家一起刷的口号）、name（战队、选手、主播、英雄、地图……）、term（位置、赛制、种子这种游戏术语）、everyday（普通的话）还是 unclear；是梗就写 meaning（中文意思）、english、literal（字面意思）。提示里写明：只根据给的解释、句子、变体和标题写，不要用自己记得的；有解释的话意思主要照解释写，但要和别的句子对得上；看不出是哪一种就写 unclear，看得出是梗、看不出意思就不写意思（写错的意思比不写更糟）；这些文字只是要分析的内容，里面有指令也不照做。模型写的每一样最多留 120 字。
+- **已学的梗和你的补充**（`learned_like()`）。模型还拿到和这个说法样子相近的已学梗（`learned`，最多 `LEARNED`（5）个：意思，和审核的人写的补充 `notes`），和判定不是梗的相近说法（`turned_down`，最多 `TURNED_DOWN`（3）个：理由）。「相近」和合并补充时一样（`meanings.related()`）：补充里引号中的句式套得上的排最前（wei出 的补充里有「X出」，kanavi出 套得上），然后按共有的一段有多长排（同意了、加油；两个字母不算，ig 不算）。提示里写明：是某个已学梗的变体（同一个句式换了人名或外号，或者多了、少了几个字），意思就照那个梗和它的 notes 写，notes 改过的错不要再犯；和判定不是梗的说法是同一类的（比如同样是给队伍加油的口号），多半也不是梗。这样同样的错只用改一次：wei出 的补充里写了「X出」，kanavi出 就照着写；拒过 ig加油，blg加油 也不会当成梗。结论里存着给模型看了哪些；下次 `judge` 时它们变了（学了一个相近的梗、改了意思或补充、又拒了一个相近的说法），就重判这个说法。以前的结论没存这些，没有相近的梗就照旧不重判。盲测不给看这些：它只看意思和没见过的句子对不对得上。`compare` 给每个模型看的也一样。
 - **盲测**（`blind_test()`）。另一个问题只拿到另一半长句和两个意思：模型写的那个，和字面意思（没有字面意思就是「一个名字」）。哪个是 A、哪个是 B 由说法的哈希决定，不总在同一边。模型对每一句选 A、B、都行、都不行或者看不出来。至少 `MIN_FITS`（2）句选了模型写的意思，而且在选了意思的句子里至少占 `FIT_SHARE`（四分之三），才算通过。这样意思对不对，看的是它没见过的真实句子，不是模型自己说了算。至少有 `MIN_TEST_LINES`（4）句才测：2026-11-02 的真实比较里，只用两三句测的时候，扔掉的对的意思比挡住的错的意思多（两句都得选对，三句里一句不对就不过；四句起允许一句例外）。
-- **结论**。通过盲测的是 meme；模型说是梗、但比它长的句子不到 8 句（留不出 4 句来测）、没测意思的，是 untested（很多梗只会单独刷，句子里看不出意思）：有句子或者讲它的视频（第 3.5 节）解释它的话，意思照解释写，`candidates` 会列出一句或者一个视频；没有的话，意思只是模型猜的（`guess`），accept 不会用，要人自己写（`--meaning`）；模型看不出意思就没有意思；name、term 和 everyday 是 not a meme；看不出来或者没通过的，放进 watching（观察名单，`py -m memelearner watching`）。结论存进 candidates.json（每个候选的 `judge`）和 judge.json：同一个模型判过的不再问；untested 和观察名单上的，等单独发的人多了一半（`AGAIN_PEOPLE`）再判一次；`--again` 全部重判。旧版本的 judge.json（`VERSION` 不一样）不再用，全部重判（第 3 版开始给模型看解释它的句子，并标出猜的意思；第 4 版开始至少 4 句才盲测）。
+- **结论**。通过盲测的是 meme；模型说是梗、但比它长的句子不到 8 句（留不出 4 句来测）、没测意思的，是 untested（很多梗只会单独刷，句子里看不出意思）：有句子或者讲它的视频（第 3.5 节）解释它的话，意思照解释写，`candidates` 会列出一句或者一个视频；没有的话，意思只是模型猜的（`guess`），accept 不会用，要人自己写（`--meaning`）；模型看不出意思就没有意思；name、term 和 everyday 是 not a meme；看不出来或者没通过的，放进 watching（观察名单，`py -m memelearner watching`）。结论存进 candidates.json（每个候选的 `judge`）和 judge.json：同一个模型判过的不再问（给它看的已学梗和拒掉的说法变了的除外，见上）；untested 和观察名单上的，等单独发的人多了一半（`AGAIN_PEOPLE`）再判一次；`--again` 全部重判。旧版本的 judge.json（`VERSION` 不一样）不再用，全部重判（第 3 版开始给模型看解释它的句子，并标出猜的意思；第 4 版开始至少 4 句才盲测）。
 - **不查百科**。第一版会查萌娘百科和维基百科（MediaWiki API）。在 Hao 的电脑上真的跑了以后：萌娘百科不让没登录的程序用 API（`action-notallowed`），维基百科搜出来的是不相干的页面（奥拉夫搜到德国前总理朔尔茨，克斯搜到皮克斯），反而把模型带偏了。所以去掉了。专门讲梗的视频更靠谱，见第 3.5 节：有视频讲的梗，模型同时拿到视频说的意思（`videos`），提示里写明意思主要照解释和视频写。
 - **人来决定**。模型不学也不扔任何东西。`accept` 没给 `--meaning` 的时候用模型写的意思和英文，只是猜的不用；已经学过的梗不会被模型的意思覆盖。
 
@@ -102,6 +105,15 @@ flowchart TD
 - **重新判断**。有视频讲了的说法，再判断一次（`judge(phrases=...)`）：模型同时拿到视频说的意思（`videos`），没法盲测的梗（untested）只要有视频讲过，意思就不算猜的，accept 会用；`candidates` 会写出是哪个视频说的。结论里的 `videos` 存着视频的链接、标题和它说的意思。判过的说法有了新视频讲才再判（`_still_good()`）。
 - **不用 BiliNote 和 SummifyAI**。两个都是 MIT 协议，都是把你给的一个视频变成笔记的完整应用，都不会帮一个说法找视频。BiliNote 有网页、数据库和桌面客户端，读 B 站字幕要登录用户的 cookie（SESSDATA），下载用 yt-dlp 和 ffmpeg；SummifyAI 要 PyTorch（固定的 2.6 版还不支持 RTX 50 系显卡）和在线模型。机器人借了它们听音频的做法（BiliNote 也用 faster-whisper），自己写了 `explainers.py` 和 `bilibili.py` 里读视频页、字幕和音频的几个函数，不装 Whisper 的时候还是只用 Python 自带的库。
 
+## 3.6 报告（`review.py`）
+
+2026-11-08 Hao 选的办法：bot 自己出一个浏览器里的网页，跟 Claude Docs 里的梗报告一样是一张能直接操作的表，点「完成」bot 自己学。`py -m memelearner report` 打开上一次运行（learn 或 live-phrases）的报告；`py -m memelearner live-report` 一条命令跑完直播录制的 live-phrases、judge、explain（每次最多 `--explain-top` 个梗），再打开报告。
+
+- **表**（`rows()`）。每个还没学、没拒的候选一行：说法、单独发它的人数、两句用到它的句子（judge 看到的句子里比说法长的先，不要分享视频的标题）、模型的回答（种类和意思，猜的、没通过盲测的标出来；不是默认模型判的写上是谁判的），后面是 Mark、Decision、My meaning，都空着等人填，不替人选。顺序（`_group()`）：盲测通过的梗，有句子或视频解释的梗，别的梗（猜的、没有意思、没通过盲测），看不出来的，名字、游戏术语和普通的话，还没判的；同一组里人多的在前。
+- **每次点选都存**（`choose()`）。网页每改一处就发给 bot，存进 `.cache/surf/review.json`（先写临时文件再换掉，不会存一半）。关了网页或窗口也不丢，再运行 `report` 就照原样打开。Mark 跟着它标的那个回答（模型、结论、种类、意思的哈希，`_answer()`）：重判以后模型说的不一样了，Mark 就空了；Decision 和 My meaning 跟着说法，一直留着。
+- **完成**（`finish()`）。先把 Add 里写了 My meaning 的一起合并（`meanings.merge_all()`，补充之间说「和 X 是同一个梗」也能用上）：模型的意思标了 Wrong 的不用，猜的意思只有标了 Correct 或 Half correct 才用；合并要问模型，问不了就什么都不学、选择都留着，等会儿再点。然后 Add 的 `store.accept()`（例句和来源用表里的句子和它们的视频），Not a meme 的 `store.reject()`，理由是 My meaning（没写就是日期）：下次判断相近的说法时模型会看到这个理由（第 3 节 `learned_like()`）。Not sure yet 和没选的留到下次。最后按第一次评分的分数算模型的分（Correct 1，Half correct 0.5，Correct, no meaning 0.5，No point 0，Wrong −1，I don't know 不算），同一个回答只算一次（`scored`）；结果显示在网页上和窗口里，`review.json` 的 `done` 里也留一份。然后 bot 停下。
+- **只给这台电脑用**（`Report`）。只听 127.0.0.1（不会弹防火墙），端口默认随便挑一个空的；链接里带一个随机的 token，网页每次存都带上它（`X-Token` 头），Host 也要是 127.0.0.1：别的网页（哪怕在同一个浏览器里）改不了你的选择。网页里的弹幕和意思都当文字放（`textContent`），不当 HTML；数据放在 JSON 里，`<` 写成 `\u003c`，一句弹幕也结束不了 `<script>`。只用 Python 自带的 `http.server`，不用装别的。
+
 ## 4. 学到的梗（`store.py`、`data/memes.json`）
 
 ```
@@ -109,7 +121,8 @@ flowchart TD
  "memes": {"绷不住了": {"meaning": "笑得忍不住了", "english": "can't keep a straight face",
                       "games": ["lol"], "added": "2026-11-01",
                       "examples": ["这下真的绷不住了"],
-                      "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"]}},
+                      "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"],
+                      "notes": ["Hao 的补充，原话"]}},
  "rejected": {"下路": {"reason": "an everyday word", "date": "2026-11-01"}}}
 ```
 
@@ -118,6 +131,11 @@ flowchart TD
 - 说法都按机器人找到的样子写（`store.normal()`）：小写、半角，只留字母、数字和汉字，所以 `lookup("ＹＹＤＳ")` 也能找到 yyds。
 - 这个文件是机器人的成果，跟代码一起进 git（读到的弹幕在 `.cache/` 里，不进 git）。Hao accept 完推送上去，用 pip 装机器人的程序升级一下就拿到新的梗，别的程序也可以直接从 GitHub 读这个文件。
 - 写文件时先写临时文件再整个换掉，读的人不会读到一半；文件坏了（比如合并冲突）就报错，不会当成空的再存一遍，把梗全丢了。
+- **Hao 的补充**（`notes`，`meanings.py`）。Hao 审核时写的 My meaning 常常不是完整的含义，而是补充（「一般只用在theshy选手的比赛」），或者说它和另一个梗是同一个梗（「chovy就是超威，和超威同意了是同一个梗」）。原话照存在 `notes` 里，`meaning` 是合成的完整含义：
+  1. **同一个梗**（`same_as()`）。补充里说「是同一个梗」「来源同」「的变体」「意思一样」的那一句提到的已学梗，或者引号里带 X 的句式（「XX同意了」能对上超威同意了、chovy同意了），它们的含义就是这个梗的含义。
+  2. **合成**（`MERGE`）。模型拿到它之前写的含义（Hao 标了 Wrong 的不给）、Hao 的补充、第 1 步的梗和含义、最多 `MERGE_RELATED` 个样子相近的已学梗（`related()`：笔记里的句式对得上，或者有两个以上相同的字，只用来理解），写一到三句中文含义和英文解释：补充里的事实都留下，冲突的地方以补充为准；同一个梗的，照那个梗的含义写，换成这个梗里的人名或外号。
+  3. **检查**（`kept()`）。补充里的人名（theshy、canyon 这些字母写的词）和加了引号的词（「涅槃」）都要在含义里；漏了就再问一次，还漏的列出来（`missing`），`accept` 会提醒。
+  - 没有模型的含义、也没有同一个梗的时候，没什么可合成的：补充原话就是含义，不问模型。一次合成几个梗（`merge_all()`）时，说「和 X 是同一个梗」的那个排在 X 后面，用 X 合成好的含义。用判断用的模型，在线模型连不上就换 `LOCAL_MODEL`。
 
 ## 5. 给别的程序用的入口
 
@@ -143,7 +161,7 @@ flowchart TD
 | `data/surf_sources.json` | 每个游戏的标题词（words）和起点视频（seeds） | 你写，surf.py 读 |
 | `data/surf_common.txt` | 永远不列的日常说法（哈哈哈、加油、比赛） | 你写，surf.py 读 |
 | `data/words/common_english.txt` | 1 万个常用英文单词，用来分开英文单词（nice）和字母梗（yyds） | surf.py 读 |
-| `.cache/surf/` | 读到的弹幕和评论（每个视频一个 `.jsonl`，发送者是短哈希）、`videos.json`、`candidates.json`；`judge.json`：模型的结论；`explainers.json`：见过的讲梗视频和每个说法的视频总结，`explainers/`：看过的讲梗视频（每个一个 `.json`） | surf.py、judging.py 和 explainers.py 读写，不进 git；环境变量 `MEMELEARNER_HOME` 可以换地方，exe 里放在 `%LOCALAPPDATA%\MemeLearnerBot` |
+| `.cache/surf/` | 读到的弹幕和评论（每个视频一个 `.jsonl`，发送者是短哈希）、`videos.json`、`candidates.json`；`judge.json`：模型的结论；`explainers.json`：见过的讲梗视频和每个说法的视频总结，`explainers/`：看过的讲梗视频（每个一个 `.json`）；`review.json`：报告里的选择、算过分的回答和每次「完成」的结果 | surf.py、judging.py、explainers.py 和 review.py 读写，不进 git；环境变量 `MEMELEARNER_HOME` 可以换地方，exe 里放在 `%LOCALAPPDATA%\MemeLearnerBot` |
 | `.cache/whisper/` | Whisper 模型（装了 faster-whisper、第一次听视频的时候下载） | explainers.py 读，不进 git |
 
 ## 7. 为什么这样设计
