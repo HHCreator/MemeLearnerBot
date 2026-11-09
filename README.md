@@ -87,14 +87,18 @@ A meme is a dict:
  "games": ["lol"],
  "added": "2026-11-01",
  "examples": ["这下真的绷不住了"],
- "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"]}
+ "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"],
+ "variants": []}
 ```
 
 `phrase` is lowercase and half-width, the way the bot finds it; `meaning` (Chinese) and
-`english` are "" until someone fills them in. A candidate has the phrase, its game, how new
+`english` are "" until someone fills them in. `variants` are the other ways the same meme
+is written (超威同意了 has chovy同意了, 大超同意了 and 三叔不同意: see Variants of one meme
+below); `lookup()` and `find()` find a meme by any of them. A candidate has the phrase, its game, how new
 it is (`new`, `rising`, `steady`, `older`, or a `first look` when there's too little to
 compare with yet), how many `people` send it on its own and in how many `videos`, the share of the
-people using it who send it on its own (`alone`), its `variants` and example lines (see
+people using it who send it on its own (`alone`), its `variants` with how many send each,
+its `pattern` (`XX同意了`), the `names` in it and who they are, and example lines (see
 `find_candidates()` in `memelearner/surf.py`). Once judged it also has `judge`: the
 `verdict` (`meme`, `untested`, `not a meme` or `watching`), what `kind` of phrase the model
 said it is, its `meaning`, `english` and `literal` meaning, whether that meaning is only a
@@ -191,14 +195,23 @@ once these differences are taken away:
   someone, XX. So is a Chinese name of two or three characters that isn't in the table
   (兰子同意了), where at least two other names go in the same place.
 - **left out**: one or two parts of one are left out (真不一样了 is 超威今年真不一样了
-  without 超威今年), keeping at least 2 characters that aren't names, and half of the other's.
+  without 超威今年), keeping at least 2 characters that aren't names and leaving out at
+  most 2 others besides names (感谢多兰 isn't 千言万语感谢多兰). Two characters alone need
+  a name with them for that: wei发狂了 is 发狂了, but 退役 isn't 感谢退役.
 - **turned around**: 不 or 没 added (三叔不同意).
 - **written longer**: a character written more than once in a row (同意意意了, chooooovy),
   and mood words at the end.
 
 Anything else keeps them apart: 我们是冠军 and 我们是路边, or 目前不知道怎么赢 and
 目前不知道怎么输, mean different things. Each group is named by its most sent phrase that has
-a name, with the name as XX.
+a name, with the name as XX, when at least half as many send it as the most sent one
+(「XX今年真不一样了」); else by the most sent one (让二追三).
+
+The bot finds, judges and learns a meme as one group: the candidate is its most sent
+phrase, with the others as its `variants`; the judge sees them all, with who the names in
+them are; the report shows it as one row, so you decide once; and `memes.json` keeps it as
+one entry with its `variants`. A new variant of a learned meme (ruler同意了, once
+超威同意了 is learned) says so in the report, and Add puts it into that meme.
 
 **Finding videos.** Bilibili asks a visitor's search for a captcha more often than not,
 and the bot never solves captchas, so it finds videos the way a viewer does: in the related
@@ -345,18 +358,21 @@ faster than that, so the judge never goes by what the model remembers:
   opinions like 我的意思是 don't count), then the others that say more than the phrase
   (主播又在阿一古了), then a few that are just the phrase. The model gets the explaining
   lines, half of the other longer lines (all of them when there are too few to test on), a
-  few short ones, how many people send it on its own, its variants and the titles of its
-  videos. It says what kind of phrase it is and, for a meme, writes what it means there,
-  only from what it got, or no meaning when it can't tell.
+  few short ones, how many people send it on its own, its variants with how many send each,
+  its pattern (XX同意了), the names in it with who they are by the nickname table (三叔 =
+  Canyon), and the titles of its videos. It says what kind of phrase it is and, for a meme,
+  writes what it means there, only from what it got, or no meaning when it can't tell; for
+  a meme with variants, what the meme means, not one player's version of it.
 - It also gets what you taught the bot before: up to 5 learned memes that look like the
   phrase, with their meanings and your notes, and up to 3 phrases you turned down that look
   like it, with your reasons. Two phrases look alike when a pattern in your notes fits the
   phrase (your note on wei出 has "X出", which kanavi出 fits), or when they share a piece
-  (同意了, 加油), the longest first (`related()` in meanings.py). So a variant of a learned
-  meme is explained the way your notes say, and a cheer like the ones you turned down
-  (blg加油, after ig加油) is likely no meme either: you don't correct the same mistake
-  twice. When that changes (a meme like it learned, a meaning or note of yours changed, a
-  phrase like it turned down), the next `judge` judges the phrase again.
+  (同意了, 加油), the longest first (`related()` in meanings.py); a learned meme it is a
+  variant of comes first, marked `same`. So a variant of a learned meme is explained the
+  way your notes say, and a cheer like the ones you turned down (blg加油, after ig加油) is
+  likely no meme either: you don't correct the same mistake twice. When that changes (a
+  meme like it learned, a meaning or note of yours changed, a phrase like it turned down,
+  or a nickname in it added to the table), the next `judge` judges the phrase again.
 - Then a blind test: a second question, which never saw those lines, gets the other longer
   lines and two meanings, the model's and the literal one, and says which one each line
   means. The meaning passes when at least 2 lines, and three quarters of the lines that
@@ -453,11 +469,15 @@ py -m memelearner report          # the last run's phrases (learn or live-phrase
 py -m memelearner live-report     # the last live recording: live-phrases, judge, explain, report
 ```
 
-One row per phrase, the likeliest memes first (a meaning that passed its blind test, then
+One row per meme, the likeliest memes first (a meaning that passed its blind test, then
 one that lines or videos explain, the other memes, what the model couldn't tell, and last
-names, game words and everyday words): the phrase, how many people sent it on its own, two
-lines that use it, and the model's answer (its kind and meaning, marked when it is only a
-guess or failed its test). You fill in:
+names, game words and everyday words): its pattern and the way most people write it
+(「XX同意了」, 超威同意了), how many people sent that on its own, two lines that use it, and
+the model's answer (its kind and meaning, marked when it is only a guess or failed its
+test). Under it are its variants, with how many people sent each, and who the names in
+them are (Chovy = 超威、chovy、大超); click a variant that isn't this meme to keep it out
+of it (click again to take that back). A row that is a new variant of a learned meme says
+which one. You fill in, once for the whole meme:
 
 - **Mark**: how right the answer is: Correct, Half correct, Correct, no meaning, No point,
   Wrong, or I don't know.
@@ -470,11 +490,15 @@ page or the window, and `report` opens it again as you left it. A Mark goes with
 it is on: when the phrase is judged again and the model says something else, its Mark is
 empty again. Click **完成** when you're done. The bot then:
 
-- learns the phrases marked Add, with the judge's meaning; with My meaning, the model merges
-  the two into one whole meaning in which yours wins, as `accept --note` does. A meaning you
-  marked Wrong isn't used, nor a guess unless you marked it Correct or Half correct.
-- turns down the ones marked Not a meme, with My meaning as the reason. The judge is shown
-  it for phrases that look alike, so a cheer like ig加油 isn't taken for a meme again.
+- learns the memes marked Add, each as one entry with its variants (not the ones you
+  clicked out: those are kept as `apart`, so they aren't taken for it again), with the
+  judge's meaning; with My meaning, the model merges the two into one whole meaning in
+  which yours wins, as `accept --note` does. A meaning you marked Wrong isn't used, nor a
+  guess unless you marked it Correct or Half correct. A new variant of a learned meme goes
+  into that meme, which keeps its meaning (merged with My meaning, if you wrote one).
+- turns down the ones marked Not a meme, with their variants, and My meaning as the reason.
+  The judge is shown it for phrases that look alike, so a cheer like ig加油 isn't taken for
+  a meme again.
 - leaves Not sure yet and the rest for the next report.
 - scores the model from your Marks, as on the first scorecard: Correct 1, Half correct and
   Correct, no meaning ½, No point 0, Wrong −1, I don't know not counted; an answer counts

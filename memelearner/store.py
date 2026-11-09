@@ -4,7 +4,7 @@ The file is what the bot makes, so it is committed with the code (unlike what th
 which stays in the cache folder, see surf.py), and an app can read it straight from GitHub
 too. It looks like this:
 
-    {"version": 1,
+    {"version": 2,
      "memes": {"绷不住了": {"meaning": "笑得忍不住了", "english": "can't keep a straight face",
                           "games": ["lol"], "added": "2026-11-01",
                           "examples": ["这下真的绷不住了"],
@@ -32,7 +32,7 @@ import unicodedata
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 MEMES_FILE = os.path.join(HERE, "data", "memes.json")
-VERSION = 1
+VERSION = 2  # 2: a meme written in more than one way is one entry, the others in "variants"
 EXAMPLES = 3  # example lines (and the videos they're from) kept for each meme
 NOTE = ("Memes learned by MemeLearnerBot (https://github.com/HHCreator/MemeLearnerBot). "
         "Change them with py -m memelearner accept, reject or forget; the format is in "

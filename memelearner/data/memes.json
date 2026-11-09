@@ -1,6 +1,6 @@
 {
  "_comment": "Memes learned by MemeLearnerBot (https://github.com/HHCreator/MemeLearnerBot). Change them with py -m memelearner accept, reject or forget; the format is in memelearner/store.py and the README.",
- "version": 1,
+ "version": 2,
  "memes": {
   "bin神": {
    "meaning": "对英雄联盟选手 Bin 的称呼，带夸张吹捧或调侃意味，用来夸他表现神勇。",

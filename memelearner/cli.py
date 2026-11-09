@@ -42,7 +42,9 @@ def _print_json(value):
 def _show_meme(meme):
     games = ", ".join(meme["games"]) or "-"
     meaning = " / ".join(part for part in (meme["meaning"], meme["english"]) if part)
-    print(f"  {meme['phrase']}  [{games}]  {meaning or '(no meaning yet)'}")
+    written = meme.get("variants") or []
+    also = f"  (also {', '.join(written[:3])}{' ...' if len(written) > 3 else ''})" if written else ""
+    print(f"  {meme['phrase']}  [{games}]  {meaning or '(no meaning yet)'}{also}")
 
 
 def _show_candidate(c):
@@ -58,7 +60,8 @@ def _show_candidate(c):
         said = "  -> a meme, " + judging.untested(verdict)
     if said and verdict.get("model") and verdict["model"] != judging.MODEL:
         said += f"  (judged by {verdict['model']})"  # like the offline model, standing in
-    print(f"  {c['game']:<9} {how:<12} {c['phrase']}  ({c['people']} people{alone}, "
+    pattern = f" 「{c['pattern']}」" if c.get("pattern") not in (None, c["phrase"]) else ""
+    print(f"  {c['game']:<9} {how:<12} {c['phrase']}{pattern}  ({c['people']} people{alone}, "
           f"{c['videos']} videos{also})  e.g. {example[:40]}{said}")
 
 
