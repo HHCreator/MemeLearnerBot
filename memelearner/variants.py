@@ -20,13 +20,17 @@ Two phrases are the same meme when they are the same once these differences are 
                    千言万语感谢多兰. Two characters alone need a name with them to leave
                    other characters out: wei发狂了 is 发狂了, but 退役 isn't 感谢退役.
     Turned around  不 or 没 added: 三叔不同意 is 三叔同意了 turned around.
-    Written longer A character written more than once in a row (同意意意了, chooooovy), and
-                   mood words at the end (了 呢 吧 啊 ...), as the finder counts them.
+    Written longer A character written more than once in a row (同意意意了, chooooovy, ggg
+                   and gg), and mood words at the end (了 呢 吧 啊 ...), as the finder counts
+                   them. 啊 anywhere else is 阿: 啊一占 is 阿一占.
 
 Phrases that differ in anything else stay apart, however much they look alike: 我们是冠军
-and 我们是路边, or 目前不知道怎么赢 and 目前不知道怎么输, mean different things. groups()
-puts the variants among some phrases together, each group named by a pattern in which a
-name is XX (「XX同意了」), with the names in it and who they are.
+and 我们是路边, or 目前不知道怎么赢 and 目前不知道怎么输, mean different things. A phrase
+that is only a name, or only a word in letters (ggg), is no meme's words: it is nobody's
+variant. groups() puts the variants among some phrases together, each group named by a
+pattern in which a name is XX (「XX同意了」), with the names in it and who they are. One
+phrase can't make two memes one: 阿一古加油 is 阿一古 with 加油, and ig加油 with 阿一古 for
+ig, but 阿一古 and ig加油 have nothing in common, so they stay apart (kin()).
 """
 
 import functools
@@ -44,11 +48,16 @@ ALONE_KEPT = 3  # ... and that it must keep for that without a name (退役 isn'
 NAME_CHARS = (2, 3)  # characters of a Chinese name that isn't in the table (兰子): one
 #                      alone is too often a word (还在洗, 还在送 aren't names)
 SHOWN_NAMES = 2  # different names that must go where XX is before an unknown one counts
+UNKNOWN_MORE = 3  # times as many people as the most sent one with a name it may have: 正义必胜
+#                   (2206 people) isn't ig必胜 (60) with 正义 for ig, but a meme of its own
 NOT_NAMES = {"大家", "今年", "今天", "现在", "终于", "一定", "应该", "已经", "果然", "居然",
-             "竟然", "必须", "就是", "还是", "也是", "真的", "确实"}  # words, not names
+             "竟然", "必须", "就是", "还是", "也是", "真的", "确实", "开始", "继续", "马上",
+             "直接", "赶紧", "一直", "突然", "只能", "肯定", "绝对"}  # words, not names
 NOT_NAME_START = "我你他她它咱您这那谁都也还就又再才别快真太很要会能可已"  # 我们, 这个, 又 ...
 LETTERS = re.compile(r"[0-9a-z]*[a-z][0-9a-z]*")  # a word in letters (with digits: t1, s7)
 RUNS = re.compile(r"(.)\1+")
+SAME_CHARS = str.maketrans({"啊": "阿"})  # one character written two ways (but 啊 at the end
+#                                          is a mood word: ig冲啊 is ig冲)
 
 
 def names(phrase):
@@ -82,12 +91,19 @@ def _with(text, found, name):
 def shape(phrase):
     """What is left of a phrase once names are someone (X), each character is written once
     and the mood words at its end are left out: 超威同意了 -> X同意, 三叔不同意 -> X不同意,
-    chooooovy同意意意了 -> X同意, 真不一样了 -> 真不一样."""
+    chooooovy同意意意了 -> X同意, 真不一样了 -> 真不一样, 啊一占 -> 阿一占."""
     text = store.normal(phrase)
     shape = RUNS.sub(r"\1", _with(text, _names(text), SLOT))
     while shape and shape[-1] in surf.PARTICLES:
         shape = shape[:-1]
-    return shape
+    return RUNS.sub(r"\1", shape.translate(SAME_CHARS))
+
+
+def only_names(phrase):
+    """Whether a phrase is only names, or only a word in letters (chooovy, ggg): no meme's
+    words are in it."""
+    found = shape(phrase)
+    return SLOT in found and not _kept(found)
 
 
 def pattern(phrase):
@@ -152,8 +168,34 @@ def _same_shapes(a, b):
 
 def same_meme(a, b):
     """Whether two phrases are the same meme (see the top of this file). An unknown name in
-    Chinese only counts in groups(), which sees where other names go."""
+    Chinese only counts in groups(), which sees where other names go. Two that are only a
+    word in letters are the same when one is the other written longer (ggg and gg)."""
+    if only_names(a) and only_names(b):
+        return RUNS.sub(r"\1", store.normal(a)) == RUNS.sub(r"\1", store.normal(b))
     return _same_shapes(shape(a), shape(b))
+
+
+def _common(a, b):
+    """How many characters two shapes have in common in the same order, names, 不 and 没
+    left out."""
+    a, b = (_turned(s).replace(SLOT, "") for s in (a, b))
+    row = [0] * (len(b) + 1)
+    for char in a:
+        before = 0  # row[j - 1] as it was for the character before
+        for j in range(1, len(b) + 1):
+            was = row[j]
+            row[j] = before + 1 if char == b[j - 1] else max(row[j], row[j - 1])
+            before = was
+    return row[-1]
+
+
+def kin(a, b):
+    """Whether two shapes may be in one group: they have in common, in the same order, the
+    characters that aren't names of the one with fewer, up to MIN_KEPT of them. A phrase
+    that has two memes in it doesn't put them together: 阿一古 and ig加油 (阿一古加油), or
+    恭喜gen and gen要夺冠了 (恭喜gen夺冠) have nothing in common."""
+    need = min(MIN_KEPT, _kept(_turned(a)), _kept(_turned(b)))
+    return need > 0 and _common(a, b) >= need
 
 
 def _fill(slotted, other):
@@ -182,13 +224,15 @@ def groups(phrases):
     as the first one (「XX今年真不一样了」: 107 people, next to 153 for 真不一样了), else the
     first one (让二追三, not XX加油让二追三). The group with the most sent phrase comes
     first. names: the names in its phrases, each once, player "" for one that isn't in the
-    table (ruler, and 兰子 where others show a name goes there)."""
+    table (ruler, and 兰子 where others show a name goes there). Every phrase in a group is
+    kin() to its first one."""
     people = dict(phrases) if isinstance(phrases, dict) else {p: 0 for p in phrases}
     order = sorted(people, key=lambda p: -people[p])  # stable: a list keeps its order
     rank = {phrase: i for i, phrase in enumerate(order)}
     shapes = {phrase: shape(phrase) for phrase in order}
     found = {phrase: _names(store.normal(phrase)) for phrase in order}
     leader = {phrase: phrase for phrase in order}
+    members = {phrase: [phrase] for phrase in order}  # each group's, under the one leading it
 
     def lead(phrase):
         while leader[phrase] != phrase:
@@ -197,10 +241,17 @@ def groups(phrases):
         return phrase
 
     def join(a, b):
+        """Put the groups of a and b together, the one sent more leading, unless a phrase of
+        the other one isn't kin() to it. Returns whether they are one group now."""
         a, b = lead(a), lead(b)
-        if a != b:  # the one sent more leads
-            first, second = sorted((a, b), key=rank.get)
-            leader[second] = first
+        if a == b:
+            return True
+        first, second = sorted((a, b), key=rank.get)
+        if not all(kin(shapes[first], shapes[phrase]) for phrase in members[second]):
+            return False
+        leader[second] = first
+        members[first] += members.pop(second)
+        return True
 
     # What two phrases must have for _same_shapes() to be worth asking: about as many
     # characters, and one's characters all among the other's (without names, 不 and 没)
@@ -228,11 +279,12 @@ def groups(phrases):
     for slotted, names_there in who.items():
         if len(names_there) < SHOWN_NAMES:
             continue
+        named = [p for p in order if _turned(shapes[p]) == slotted]  # the most sent first
         for phrase in order:
             name = _fill(slotted, shapes[phrase])
-            if name:
+            if name and people[phrase] <= UNKNOWN_MORE * people[named[0]] and \
+                    join(phrase, named[0]):
                 unknown[phrase] = name
-                join(phrase, next(p for p in order if _turned(shapes[p]) == slotted))
 
     together = {}
     for phrase in order:
@@ -244,21 +296,22 @@ def groups(phrases):
                                                      text.index(name) + len(name), "")])
 
     result = []
-    for members in together.values():
-        named = [p for p in members if found[p] and 2 * people[p] >= people[members[0]]]
+    for phrases_there in together.values():
+        worded = [p for p in phrases_there if _kept(shapes[p])]  # not ggg, which is no name
+        named = [p for p in worded if found[p] and 2 * people[p] >= people[phrases_there[0]]]
         if named:
             head = store.normal(named[0])
             name = _with(head, found[named[0]], PATTERN_NAME)
         else:
-            name = members[0]
+            name = phrases_there[0]
         listed, seen = [], set()
-        for phrase in members:
+        for phrase in worded:
             text = store.normal(phrase)
             for start, end, player in found[phrase]:
                 if nicknames.key(text[start:end]) not in seen:
                     seen.add(nicknames.key(text[start:end]))
                     listed.append({"name": text[start:end], "player": player})
-        result.append({"pattern": name, "phrases": members, "names": listed})
+        result.append({"pattern": name, "phrases": phrases_there, "names": listed})
     return result
 
 

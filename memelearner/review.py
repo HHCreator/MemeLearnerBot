@@ -24,10 +24,13 @@ empty again.
 
 - Add learns the meme (store.accept()), as one entry with its variants, with the judge's
   meaning and where it comes from (a source the model only guessed only when you marked
-  its answer Correct or Half correct; none when you marked it Wrong). With My meaning, the model merges the two into one whole meaning in which yours
-  wins (meanings.py). A meaning you marked Wrong isn't used, nor one that is only a guess
-  unless you marked it Correct or Half correct. A new variant of a learned meme joins that
-  meme instead, which keeps its meaning (merged with My meaning, if you wrote one).
+  its answer Correct or Half correct; none when you marked it Wrong). With My meaning, the
+  model merges the two into one whole meaning in which yours wins (meanings.py). A meaning
+  you marked Wrong isn't used, nor one that is only a guess unless you marked it Correct or
+  Half correct. When My meaning says where the meme comes from (”阿一古“的变体), that is
+  its source, found in your note. Two memes don't come from each other: of two guesses
+  that would, neither is kept. A new variant of a learned meme joins that meme instead,
+  which keeps its meaning (merged with My meaning, if you wrote one).
 - Not a meme turns it down with its variants (store.reject()): the bot doesn't list them
   again, and My meaning is kept as the reason, which the judge is shown for phrases like
   it (judging.learned_like()).
@@ -269,6 +272,40 @@ def _source(row, mark):
     return source
 
 
+def _note_source(row, note, known):
+    """Where your note on a row says its meme comes from (”阿一古“的变体): {"phrase", "how":
+    "note"}, or None (meanings.source_in(); known: the learned memes and the other rows)."""
+    own = [_meme_of(row)] + _variants(row)
+    found = meanings.source_in(row["phrase"], note, known, own)
+    return {"phrase": found, "how": "note"} if found else None
+
+
+def _untangle(rows, sources, memes):
+    """Take out the sources that go round: when two memes would each come from the other
+    (把光借给ig and 把力量借给ig, each the model's guess for the other), a guess gives way
+    to one found, and two guesses both go; so does a guess that a learned meme comes from
+    this one. sources: {row key: source or None} of the rows learned, changed in place."""
+    owner = store.owners(memes)
+    ways = {row["key"]: {store.normal(p) for p in [row["phrase"], _meme_of(row)] +
+                         _variants(row)} for row in rows}
+    row_of = {phrase: key for key, phrases in ways.items() for phrase in phrases}
+    dropped = set()
+    for key, mine in sources.items():
+        if not mine:
+            continue
+        other = row_of.get(store.normal(mine["phrase"]))
+        theirs = sources.get(other) if other not in (None, key) else \
+            (memes.get(owner.get(store.normal(mine["phrase"]), "")) or {}).get("source")
+        if not theirs or store.normal(theirs.get("phrase")) not in ways[key]:
+            continue
+        if mine["how"] == "guess":
+            dropped.add(key)
+        if other not in (None, key) and theirs["how"] == "guess":
+            dropped.add(other)
+    for key in dropped:
+        sources[key] = None
+
+
 def _meme_of(row):
     """The meme a row is learned as: the learned meme it is a new variant of, or itself."""
     return row["learned"]["phrase"] if row.get("learned") else row["phrase"]
@@ -299,6 +336,11 @@ def finish(rows, model=None):
              for row in adds if note(row)]
     merged = {result["phrase"]: result for result in meanings.merge_all(items, model)} \
         if items else {}  # first, so nothing is learned when no model can merge
+    memes = store.load()["memes"]
+    known = list(dict.fromkeys(list(store.owners(memes)) + [row["phrase"] for row in rows]))
+    sources = {row["key"]: _note_source(row, note(row), known) or
+               _source(row, picked[row["key"]]["mark"]) for row in adds}
+    _untangle(adds, sources, memes)
     added = []
     for row in adds:
         meaning, english = base(row)
@@ -309,7 +351,7 @@ def finish(rows, model=None):
         meme = store.accept(_meme_of(row), meaning, english, games=[row["game"]],
                             examples=row["examples"], sources=row["sources"], note=note(row),
                             variants=joining, apart=picked[row["key"]]["apart"],
-                            source=_source(row, picked[row["key"]]["mark"]))
+                            source=sources[row["key"]])
         added.append({"phrase": meme["phrase"], "meaning": meaning,
                       "from": ("merged" if result["model"] else "note") if result else
                       (("learned" if row.get("learned") else "judge") if meaning else ""),
@@ -598,7 +640,8 @@ const DATA = JSON.parse(document.getElementById("data").textContent);
 const KINDS = {meme: "meme", name: "a name", term: "a game word", everyday: "everyday words",
                unclear: "unclear"};
 const HOW = {video: "查到的：视频里说的", explanation: "查到的：弹幕里有人说",
-             learned: "查到的：已学的梗里写着", guess: "猜的"};  // how the model knows the source
+             learned: "查到的：已学的梗里写着", note: "查到的：你的补充里写着",
+             guess: "猜的"};  // how the source is known
 const WHOSE = {merged: "和你的补充合成的", note: "你的原话", judge: "模型的意思",
                learned: "原来学的意思",
                "": "还没有意思：之后用 py -m memelearner accept 它 --note \"...\" 补上"};

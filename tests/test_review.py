@@ -262,6 +262,38 @@ class ReviewTest(unittest.TestCase):
         self.assertIsNone(review._source(dict(row, source={"phrase": "x", "how": "video"}),
                                          "Wrong"))
 
+    def test_your_note_says_where_a_meme_comes_from(self):
+        self.choose(review.rows(), [
+            ("lol:正义必胜", "Correct", "Add", "来源于“正义永不缺席”，常常在比赛前刷"),
+            ("lol:阿一古", "Correct", "Add", "“啊一古”的变体，啊和阿基本是同一个字"),
+            ("lol:怎么翻", "Wrong", "Add", "“XX翻了”的变体，嘲笑落后太多")])
+        result = review.finish(review.rows())
+        self.assertEqual(store.lookup("正义必胜")["source"], {"phrase": "正义永不缺席", "how": "note"})
+        self.assertIn("    comes from 正义永不缺席 (note)", review.summary(result))
+        # Another way of writing it, or a pattern, is no source
+        self.assertIsNone(store.lookup("阿一古")["source"])
+        self.assertIsNone(store.lookup("怎么翻")["source"])
+
+    def test_two_memes_dont_come_from_each_other(self):
+        rows = [{"key": "lol:把光借给ig", "phrase": "把光借给ig", "variants": [{"phrase": "把光借给blg"}]},
+                {"key": "lol:把力量借给ig", "phrase": "把力量借给ig", "variants": []},
+                {"key": "lol:豹一豹", "phrase": "豹一豹", "variants": []}]
+        guess = lambda phrase: {"phrase": phrase, "how": "guess"}
+        # The model guessed each of them comes from the other: neither is kept
+        sources = {"lol:把光借给ig": guess("把力量借给ig"), "lol:把力量借给ig": guess("把光借给blg"),
+                   "lol:豹一豹": guess("豹一把")}
+        review._untangle(rows, sources, {})
+        self.assertEqual(sources, {"lol:把光借给ig": None, "lol:把力量借给ig": None,
+                                   "lol:豹一豹": guess("豹一把")})
+        # A guess gives way to a source found, here or in a learned meme
+        found = {"phrase": "把光借给ig", "how": "note"}
+        sources = {"lol:把光借给ig": guess("把力量借给ig"), "lol:把力量借给ig": found}
+        review._untangle(rows[:2], sources, {})
+        self.assertEqual(sources, {"lol:把光借给ig": None, "lol:把力量借给ig": found})
+        sources = {"lol:把光借给ig": guess("把力量借给ig")}
+        review._untangle(rows[:1], sources, {"把力量借给ig": {"source": found}})
+        self.assertEqual(sources, {"lol:把光借给ig": None})
+
     def test_the_page_holds_the_rows_and_no_line_can_end_its_script(self):
         rows = review.rows()
         line = "</script><script>alert(1)</script>"

@@ -96,7 +96,8 @@ A meme is a dict:
 is written (超威同意了 has chovy同意了, 大超同意了 and 三叔不同意: see Variants of one meme
 below); `lookup()` and `find()` find a meme by any of them. A meme made from another one
 also has a `source`: `{"phrase": "我们是冠军", "how": "learned"}`, where it comes from and
-how the judge knows (`video`, `explanation`, `learned`, or `guess`; see The judge). A candidate has the phrase, its game, how new
+how it is known (`video`, `explanation`, `learned`, or `guess`, see The judge; `note`
+when your note in the report says so). A candidate has the phrase, its game, how new
 it is (`new`, `rising`, `steady`, `older`, or a `first look` when there's too little to
 compare with yet), how many `people` send it on its own and in how many `videos`, the share of the
 people using it who send it on its own (`alone`), its `variants` with how many send each,
@@ -195,18 +196,22 @@ once these differences are taken away:
 
 - **who**: a name from the nickname table, or any word in letters (ruler, kiin), is just
   someone, XX. So is a Chinese name of two or three characters that isn't in the table
-  (兰子同意了), where at least two other names go in the same place.
+  (兰子同意了), where at least two other names go in the same place, unless far more
+  people send it than any of those (正义必胜 is a meme of its own, not ig必胜 with 正义).
 - **left out**: one or two parts of one are left out (真不一样了 is 超威今年真不一样了
   without 超威今年), keeping at least 2 characters that aren't names and leaving out at
   most 2 others besides names (感谢多兰 isn't 千言万语感谢多兰). Two characters alone need
   a name with them for that: wei发狂了 is 发狂了, but 退役 isn't 感谢退役.
 - **turned around**: 不 or 没 added (三叔不同意).
-- **written longer**: a character written more than once in a row (同意意意了, chooooovy),
-  and mood words at the end.
+- **written longer**: a character written more than once in a row (同意意意了, chooooovy,
+  ggg and gg), and mood words at the end. 啊 anywhere else is 阿 (啊一占 is 阿一占).
 
 Anything else keeps them apart: 我们是冠军 and 我们是路边, or 目前不知道怎么赢 and
-目前不知道怎么输, mean different things. Each group is named by its most sent phrase that has
-a name, with the name as XX, when at least half as many send it as the most sent one
+目前不知道怎么输, mean different things. A phrase that is only a name or a word in letters
+(ggg) is nobody's variant. Every phrase in a group shares at least 2 characters that
+aren't names with its most sent one: a phrase with two memes in it (阿一古加油, ig加油必胜)
+doesn't make them one. Each group is named by its most sent phrase that has a name, with
+the name as XX, when at least half as many send it as the most sent one
 (「XX今年真不一样了」); else by the most sent one (让二追三).
 
 The bot finds, judges and learns a meme as one group: the candidate is its most sent
@@ -382,7 +387,7 @@ faster than that, so the judge never goes by what the model remembers:
   source. It also says how it knows, and the bot checks that: `video`, `explanation` or
   `learned` only when a video, a line, or a learned meme's meaning or your notes name that
   source (your note on 我们是冠军 saying 我们是路边 comes from it counts too); else it is a
-  `guess`.
+  `guess`. When you write in the report where it comes from, that is its source (`note`).
 - Then a blind test: a second question, which never saw those lines, gets the other longer
   lines and two meanings, the model's and the literal one, and says which one each line
   means. The meaning passes when at least 2 lines, and three quarters of the lines that
@@ -498,8 +503,9 @@ the whole meme:
 - **Mark**: how right the answer is: Correct, Half correct, Correct, no meaning, No point,
   Wrong, or I don't know.
 - **Decision**: Add (learn it), Not a meme (never list it again) or Not sure yet (next time).
-- **My meaning**: what the model's meaning leaves out or gets wrong, a whole meaning, or
-  that it is the same meme as a learned one (和超威同意了是同一个梗).
+- **My meaning**: what the model's meaning leaves out or gets wrong, a whole meaning,
+  that it is the same meme as a learned one (和超威同意了是同一个梗), or where it comes from
+  (”阿一古“的变体).
 
 Every choice is saved as you make it, in `memelearner/.cache/surf/review.json`: close the
 page or the window, and `report` opens it again as you left it. A Mark goes with the answer
@@ -511,9 +517,12 @@ empty again. Click **完成** when you're done. The bot then:
   judge's meaning; with My meaning, the model merges the two into one whole meaning in
   which yours wins, as `accept --note` does. A meaning you marked Wrong isn't used, nor a
   guess unless you marked it Correct or Half correct. Where it comes from is kept as its
-  `source`: one that was found, unless you marked the answer Wrong; a guessed one only when
-  you marked it Correct or Half correct. A new variant of a learned meme goes into that
-  meme, which keeps its meaning (merged with My meaning, if you wrote one).
+  `source`: the one My meaning names (”阿一古“的变体, 来源于“搏至无憾”; not a pattern like
+  “XX翻了”, nor another way of writing the meme), else one that was found, unless you
+  marked the answer Wrong, or a guessed one when you marked it Correct or Half correct.
+  Two memes never come from each other: of two guesses that would, neither is kept. A new
+  variant of a learned meme goes into that meme, which keeps its meaning (merged with My
+  meaning, if you wrote one).
 - turns down the ones marked Not a meme, with their variants, and My meaning as the reason.
   The judge is shown it for phrases that look alike, so a cheer like ig加油 isn't taken for
   a meme again.

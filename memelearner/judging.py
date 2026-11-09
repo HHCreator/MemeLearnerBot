@@ -588,10 +588,11 @@ def names_in(candidate):
     """The names in a candidate and its variants, each once, with who they are by the
     nickname table as it is now: [{"name", "player"}]. First the ones the finder saw
     (variants.groups(): 兰子 too, where other names go), then any it didn't: a nickname you
-    added to the table since."""
+    added to the table since. Not a word in letters alone (ggg): it's no name."""
     phrases = [candidate["phrase"]] + [v["phrase"] for v in candidate.get("variants") or []]
     found = [name["name"] for name in candidate.get("names") or []]
-    found += [name for phrase in phrases for name, _ in variants.names(phrase)]
+    found += [name for phrase in phrases if not variants.only_names(phrase)
+              for name, _ in variants.names(phrase)]
     names, seen = [], set()
     for name in found:
         if nicknames.key(name) not in seen:

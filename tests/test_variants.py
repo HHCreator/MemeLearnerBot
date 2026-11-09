@@ -113,6 +113,52 @@ class VariantTest(unittest.TestCase):
         self.assertEqual(variants.twists("ruler同意了", ["超威同意了", "超威会同意的"]), [])
         self.assertEqual(variants.twists("怎么翻", ["怎么回事"]), [])
 
+    def test_a_phrase_with_two_memes_in_it_doesnt_make_them_one(self):
+        # IG vs GEN: 阿一古加油 is 阿一古 with 加油 and ig加油 with 阿一古 for ig, ig加油必胜 is
+        # ig加油 and ig必胜, and 正义必胜 looked like ig必胜 with 正义 for ig: so 阿一古 and
+        # 正义必胜 were turned down with ig加油
+        found = variants.groups({
+            "ig加油": 7718, "阿一古": 3400, "正义必胜": 2206, "blg加油": 450, "t1加油": 102,
+            "ig必胜": 60, "人类必胜": 56, "lpl必胜": 20, "阿一古加油": 30, "正义加油": 12,
+            "ig加油必胜": 10, "恭喜gen": 180, "恭喜geng": 50, "恭喜geng夺冠": 9,
+            "geng要夺冠了": 40, "超威要夺冠了": 30, "超威同意了": 274, "兰子同意了": 20,
+            "ruler同意了": 15})
+        group = {phrase: g["pattern"] for g in found for phrase in g["phrases"]}
+        self.assertEqual(group["blg加油"], "XX加油")
+        for phrase in ("阿一古", "正义必胜", "ig必胜", "人类必胜"):
+            self.assertNotEqual(group[phrase], "XX加油", phrase)
+        self.assertEqual(group["正义必胜"], "正义必胜")  # sent far more than ig必胜: no name in it
+        self.assertEqual(group["ig必胜"], group["lpl必胜"])
+        self.assertEqual(group["阿一古加油"], "阿一古")
+        self.assertEqual(group["恭喜geng夺冠"], "恭喜XX")
+        self.assertEqual(group["超威要夺冠了"], "XX要夺冠了")
+        self.assertEqual(group["兰子同意了"], "XX同意了")
+        # Everyone in a group has something in common with its first phrase
+        for g in found:
+            for phrase in g["phrases"]:
+                self.assertTrue(variants.kin(variants.shape(g["phrases"][0]),
+                                             variants.shape(phrase)), phrase)
+
+    def test_a_word_in_letters_alone_is_no_name(self):
+        self.assertTrue(variants.only_names("ggg"))
+        self.assertTrue(variants.only_names("chooovy"))
+        self.assertFalse(variants.only_names("啊啊啊"))
+        self.assertTrue(variants.same_meme("ggg", "GG"))  # written longer
+        self.assertFalse(variants.same_meme("ggg", "ig"))
+        self.assertFalse(variants.same_meme("ggg", "gg加油"))
+        self.assertEqual(variants.groups({"ggg": 148, "ig": 90}),
+                         [{"pattern": "ggg", "phrases": ["ggg"], "names": []},
+                          {"pattern": "ig", "phrases": ["ig"], "names": []}])
+
+    def test_one_character_written_two_ways(self):
+        self.assertTrue(variants.same_meme("啊一占", "阿一占"))  # 你说「啊和阿基本是同一个字」
+        self.assertTrue(variants.same_meme("ig冲啊", "ig冲"))  # 啊 at the end is a mood word
+        self.assertEqual(variants.shape("ig冲啊"), "X冲")
+        # 开始 is a word, not a name, wherever names go
+        found = variants.groups(["超威同意了", "chovy同意了", "ruler同意了", "开始同意"])
+        self.assertEqual([g["phrases"] for g in found],
+                         [["超威同意了", "chovy同意了", "ruler同意了"], ["开始同意"]])
+
     def test_an_edited_table_counts_at_once(self):
         with open(self.table, "w", encoding="utf-8") as f:
             f.write("Chovy = 超威\n")
