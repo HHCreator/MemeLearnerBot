@@ -32,7 +32,7 @@ import sys
 import time
 
 from . import (ModelUnavailable, accept, candidates, explainers, find, forget, judging, lookup,
-               meanings, memes, reject, store, surf, watching)
+               meanings, memes, nicknames, reject, store, surf, watching)
 
 
 def _print_json(value):
@@ -516,4 +516,7 @@ def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # Chinese in the Windows console and in --json
     args = parser().parse_args(argv)
-    args.run(args)
+    try:
+        args.run(args)
+    except nicknames.TableError as error:  # a line of data/nicknames.txt it can't read
+        sys.exit(str(error))

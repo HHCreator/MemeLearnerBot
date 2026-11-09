@@ -24,7 +24,8 @@ MemeLearnerBot/
     ├── review.py      浏览器里的报告：标记、决定，点「完成」就学（第 3.6 节）
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评、视频页、字幕和音频（只读）
     ├── store.py       学到的梗和不要的说法，存在 data/memes.json
-    ├── data/          梗、每个游戏的起点视频、日常说法、英文常用词
+    ├── nicknames.py   选手外号表 data/nicknames.txt：哪个外号是哪个选手（超威、大超 = Chovy）
+    ├── data/          梗、选手外号表、每个游戏的起点视频、日常说法、英文常用词
     └── .cache/        surf/：读到的弹幕和评论、candidates.json、judge.json、explainers.json；whisper/：Whisper 模型（都不进 git）
 ```
 
@@ -160,6 +161,7 @@ flowchart TD
 | `data/memes.json` | 学到的梗和不要的说法（第 4 节） | store.py 读写，进 git |
 | `data/surf_sources.json` | 每个游戏的标题词（words）和起点视频（seeds） | 你写，surf.py 读 |
 | `data/surf_common.txt` | 永远不列的日常说法（哈哈哈、加油、比赛） | 你写，surf.py 读 |
+| `data/nicknames.txt` | 选手外号表：一行一个选手，`Chovy = 超威, 大超, chooovy`；大小写、全角半角、重复的字母（chooooovy）都不算不同 | 你写，nicknames.py 读，进 git |
 | `data/words/common_english.txt` | 1 万个常用英文单词，用来分开英文单词（nice）和字母梗（yyds） | surf.py 读 |
 | `.cache/surf/` | 读到的弹幕和评论（每个视频一个 `.jsonl`，发送者是短哈希）、`videos.json`、`candidates.json`；`judge.json`：模型的结论；`explainers.json`：见过的讲梗视频和每个说法的视频总结，`explainers/`：看过的讲梗视频（每个一个 `.json`）；`review.json`：报告里的选择、算过分的回答和每次「完成」的结果 | surf.py、judging.py、explainers.py 和 review.py 读写，不进 git；环境变量 `MEMELEARNER_HOME` 可以换地方，exe 里放在 `%LOCALAPPDATA%\MemeLearnerBot` |
 | `.cache/whisper/` | Whisper 模型（装了 faster-whisper、第一次听视频的时候下载） | explainers.py 读，不进 git |
@@ -181,6 +183,7 @@ flowchart TD
 |---|---|
 | 让机器人看别的视频或别的游戏 | `data/surf_sources.json` 加标题词、起点视频链接或游戏 |
 | 某个普通说法老被列出来 | 加进 `data/surf_common.txt`，或者 `py -m memelearner reject 它` |
+| 机器人不认识某个选手的外号 | 加进 `data/nicknames.txt`（`Chovy = 超威, 大超`）；只是一个外号的说法就不再列出来 |
 | 机器人更敏感或更保守 | `surf.py` 开头的 `MIN_PEOPLE`、`MIN_VIDEOS`、`MIN_ALONE`、`MAX_SHORT`、`RISE`、`SURE` |
 | 不要列别的程序已经知道的词 | `--known 词表文件或文件夹`，或环境变量 `MEMELEARNER_KNOWN` |
 | 每个梗多存几句例句 | `store.py` 的 `EXAMPLES` |

@@ -164,7 +164,23 @@ send yet), or `older` when it was more common before (most of a game's danmu are
 with, so it also reads as many older videos (posted 30 to 90 days ago) to learn what
 people were already saying; after that, each run's lines become the next runs' "before".
 Phrases already learned or turned down, everyday ones in
-`memelearner/data/surf_common.txt`, and your app's words (`--known`) are left out.
+`memelearner/data/surf_common.txt`, your app's words (`--known`) and players' nicknames on
+their own (chooovy, see below) are left out.
+
+**Players' nicknames.** Danmu call players by nicknames the model often doesn't know:
+Chovy is 超威, 大超 or chooovy, Canyon is 三叔. `memelearner/data/nicknames.txt` says who
+each one is, and you can edit it in Notepad, one player a line:
+
+```
+Chovy = 超威, 大超, chooovy
+Canyon = 三叔, 三姆斯
+```
+
+The player is on the left of `=`, the nicknames on the right, apart by commas (`,` `，` `、`
+or spaces); the player's own ID counts as one, and `#` starts a note. Case and width don't
+matter, nor how many times a letter is written (chooooovy is chovy). A team works the same
+way (`IG = 埃及`). A line the bot can't read, or a nickname given to two players, stops it
+with the line's number.
 
 **Finding videos.** Bilibili asks a visitor's search for a captcha more often than not,
 and the bot never solves captchas, so it finds videos the way a viewer does: in the related
@@ -471,6 +487,7 @@ reached).
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
 | `memelearner/data/surf_common.txt` | everyday phrases the bot never lists |
+| `memelearner/data/nicknames.txt` | players' nicknames, which you edit (`nicknames.py` reads it) |
 | `surf.py` | `py surf.py`, short for `py -m memelearner learn` |
 
 The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs/DESIGN.md).

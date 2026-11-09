@@ -39,7 +39,8 @@ How it works:
                        together, under the one most people send (_group()). Known phrases
                        are left out (known_phrases()): the memes already learned or turned
                        down, everyday ones in data/surf_common.txt, and another app's words
-                       if you say where.
+                       if you say where; so are players' nicknames on their own (chooovy),
+                       from data/nicknames.txt (nicknames.py).
     4. How new         Each phrase's share of the people writing in the last DAYS days is
                        compared with its share before that: nobody sent it before = new, at
                        least RISE times as common = rising, RISE times rarer = older, else
@@ -62,7 +63,7 @@ import time
 import unicodedata
 import urllib.error
 
-from . import bilibili, store
+from . import bilibili, nicknames, store
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SOURCES_FILE = os.path.join(HERE, "data", "surf_sources.json")
@@ -583,7 +584,8 @@ def _game_candidates(game, lines, min_people, min_videos, min_before, known, top
         if len(senders) < min_people:
             continue
         popular.add(key)
-        if key not in known and not any(form in known for form in entry["forms"]):
+        if key not in known and not any(form in known for form in entry["forms"]) and \
+                not nicknames.is_name(key):  # chooovy alone is a name
             wanted[key] = (entry, senders)
 
     # ... and who writes them inside a longer line, which is how names and game words are
