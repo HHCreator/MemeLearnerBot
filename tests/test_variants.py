@@ -1,11 +1,10 @@
 """Offline tests for telling the variants of one meme (variants.py)."""
 
-import os
 import tempfile
 import unittest
-from unittest import mock
 
-from memelearner import nicknames, variants
+from memelearner import variants
+from tests.test_surf import use_table
 
 # Hao's examples from the IG vs GEN report (2026-11-07), with how many people sent each
 EXAMPLES = {"超威同意了": 272, "真不一样了": 153, "超威今年真不一样了": 107, "chovy同意了": 107,
@@ -26,6 +25,11 @@ def summary(groups):
 
 
 class VariantTest(unittest.TestCase):
+    def setUp(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        self.table = use_table(self, folder.name)  # Chovy = 超威, 大超, chooovy; Canyon = 三叔
+
     def test_haos_examples_are_two_memes(self):
         groups = variants.groups(EXAMPLES)
         self.assertEqual(summary(groups), [
@@ -100,16 +104,12 @@ class VariantTest(unittest.TestCase):
                          [("XX同意了", ["超威同意了", "chovy同意了"])])  # a list: in its order
 
     def test_an_edited_table_counts_at_once(self):
-        folder = tempfile.TemporaryDirectory()
-        self.addCleanup(folder.cleanup)
-        path = os.path.join(folder.name, "nicknames.txt")
-        with open(path, "w", encoding="utf-8") as f:
+        with open(self.table, "w", encoding="utf-8") as f:
             f.write("Chovy = 超威\n")
-        with mock.patch.object(nicknames, "NICKNAMES_FILE", path):
-            self.assertFalse(variants.same_meme("超威同意了", "三叔不同意"))
-            with open(path, "w", encoding="utf-8") as f:
-                f.write("Chovy = 超威\nCanyon = 三叔\n")
-            self.assertTrue(variants.same_meme("超威同意了", "三叔不同意"))
+        self.assertFalse(variants.same_meme("超威同意了", "三叔不同意"))
+        with open(self.table, "w", encoding="utf-8") as f:
+            f.write("Chovy = 超威\nCanyon = 三叔\n")
+        self.assertTrue(variants.same_meme("超威同意了", "三叔不同意"))
 
 
 if __name__ == "__main__":

@@ -35,8 +35,10 @@ How it works:
                        that at least MIN_ALONE of the people who use it send on its own. A
                        danmu that repeats itself counts once (正义必胜正义必胜 is 正义必胜), and
                        mood words at its end don't count (怎么翻的 is 怎么翻): phrase_of().
-                       Variants of one pattern (千言万语感谢现役, 千言万语赶紧退役) are listed
-                       together, under the one most people send (_group()). Known phrases
+                       Variants of one meme (超威同意了, chovy同意了, 三叔不同意: see
+                       variants.py) are listed together, under the one most people send
+                       (_group()); twists that mean something else (千言万语赶紧退役 next to
+                       千言万语感谢现役) are listed on their own. Known phrases
                        are left out (known_phrases()): the memes already learned or turned
                        down, everyday ones in data/surf_common.txt, and another app's words
                        if you say where; so are players' nicknames on their own (chooovy),
@@ -111,7 +113,7 @@ MIN_EXPECTED = 5  # a phrase is only steady when, had it been as common all alon
 TOP = 30  # phrases kept for each game
 EXAMPLES = 8  # example lines kept for each phrase
 ALONE_EXAMPLES = 2  # ... of them the phrase on its own, after the longer lines that use it
-VARIANTS = 6  # variants kept with a phrase (千言万语赶紧退役 with 千言万语感谢现役)
+VARIANTS = 30  # variants kept with a phrase (chovy同意了 and 三叔不同意 with 超威同意了)
 DAY = 86400
 
 EMOTE = re.compile(r"\[[^\[\]\s]{1,12}\]")  # [doge] [笑哭]: emotes in comments
@@ -522,7 +524,9 @@ def find_candidates(messages, days=DAYS, now=None, min_people=MIN_PEOPLE,
          "videos": 5,             videos it was sent in on its own
          "rise": 9.1,             how many times as common as before (None for a first look)
          "score": 172.7,          what they are sorted by: people * (1 + log2(videos))
-         "variants": [{"phrase": "阿古", "people": 4}],   other phrases of the same pattern
+         "variants": [{"phrase": "阿古", "people": 4}],   other ways to write the same meme
+         "pattern": "阿一古",      the meme's pattern, a name in it as XX (XX同意了)
+         "names": [{"name", "player"}],   the names in it and its variants (variants.py)
          "examples": [{"text", "video", "kind", "sent"}]}  lines that use it
     """
     now = time.time() if now is None else now
@@ -619,7 +623,7 @@ def _game_candidates(game, lines, min_people, min_videos, min_before, known, top
             found[key] = (entry, senders, share)
     score = {key: len(senders) * (1 + math.log2(len(entry["videos"])))
              for key, (entry, senders, _) in found.items()}
-    heads, variants = _group(found, score, min_videos)
+    heads, variants, about = _group(found, score, min_videos)
 
     # How new each one is: a change only counts when luck would explain it less than once
     # in 10^SURE times
@@ -663,6 +667,7 @@ def _game_candidates(game, lines, min_people, min_videos, min_before, known, top
             "variants": [{"phrase": _written(found[other][0]), "people": len(found[other][1])}
                          for other in sorted(variants[key], key=lambda k: -len(found[k][1]))
                          ][:VARIANTS],
+            "pattern": about[key]["pattern"], "names": about[key]["names"],
             "examples": _pick_examples(entry["examples"], inside_examples[key]),
         })
     candidates.sort(key=lambda c: -c["score"])
@@ -676,40 +681,22 @@ def _written(entry):
 
 
 def _group(found, score, min_videos):
-    """Put the variants of a pattern together: (heads, {head: [variant, ...]}). Best first,
-    each phrase joins the best one before it that it is a variant of (variant()), the one it
-    shares the most with; the others lead a group of their own. A phrase sent in fewer than
-    min_videos videos (one video's catchphrase) can only be another one's variant."""
-    heads, variants = [], {}
-    by_end = collections.defaultdict(list)  # the heads, by their first and by their last unit
-
-    def best_head(parts):
-        best, most = None, 0
-        for head in dict.fromkeys(by_end["<", parts[0]] + by_end[">", parts[-1]]):
-            other = found[head][0]["parts"]
-            if variant(parts, other) and shared(parts, other) > most:
-                best, most = head, shared(parts, other)
-        return best
-
-    later = []
-    for key in sorted(found, key=lambda key: (-score[key], key)):
-        parts = found[key][0]["parts"]
-        if len(found[key][0]["videos"]) < min_videos:
-            later.append(key)
-            continue
-        head = best_head(parts)
-        if head is None:
-            heads.append(key)
-            variants[key] = []
-            by_end["<", parts[0]].append(key)
-            by_end[">", parts[-1]].append(key)
-        else:
-            variants[head].append(key)
-    for key in later:
-        head = best_head(found[key][0]["parts"])
-        if head is not None:
-            variants[head].append(key)
-    return heads, variants
+    """Put the variants of one meme together (variants.groups()): (heads, {head: [variant,
+    ...]}, {head: {"pattern", "names"}}). The one with the best score leads its group, unless
+    it was sent in fewer than min_videos videos (one video's catchphrase): such a phrase can
+    only be another one's variant, and a group of only those isn't listed."""
+    from . import variants  # here: variants.py uses this module
+    written = {key: _written(found[key][0]) for key in found}
+    key_of = {text: key for key, text in written.items()}
+    heads, members, about = [], {}, {}
+    for group in variants.groups({written[key]: score[key] for key in found}):
+        keys = [key_of[phrase] for phrase in group["phrases"]]
+        leaders = [key for key in keys if len(found[key][0]["videos"]) >= min_videos]
+        if leaders:
+            heads.append(leaders[0])
+            members[leaders[0]] = [key for key in keys if key != leaders[0]]
+            about[leaders[0]] = {"pattern": group["pattern"], "names": group["names"]}
+    return heads, members, about
 
 
 def _pick_examples(alone, inside):

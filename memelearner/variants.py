@@ -202,8 +202,18 @@ def groups(phrases):
             first, second = sorted((a, b), key=rank.get)
             leader[second] = first
 
+    # What two phrases must have for _same_shapes() to be worth asking: about as many
+    # characters, and one's characters all among the other's (without names, 不 and 没)
+    quick = {}
+    for phrase in order:
+        turned = _turned(shapes[phrase])
+        quick[phrase] = (_kept(turned), frozenset(turned) - {SLOT})
     for i, a in enumerate(order):
+        kept_a, chars_a = quick[a]
         for b in order[i + 1:]:
+            kept_b, chars_b = quick[b]
+            if abs(kept_a - kept_b) > MAX_ADDED or not (chars_a <= chars_b or chars_b <= chars_a):
+                continue
             if _same_shapes(shapes[a], shapes[b]):
                 join(a, b)
 
@@ -250,3 +260,29 @@ def groups(phrases):
                     listed.append({"name": text[start:end], "player": player})
         result.append({"pattern": name, "phrases": members, "names": listed})
     return result
+
+
+def learned_of(groups_of, memes):
+    """Which learned memes some groups of phrases are (a candidate: its phrase and its
+    variants): {name: [learned phrase, ...]} for groups_of {name: [phrase, ...]}, the learned
+    memes (memes: memes.json's {phrase: entry}) in groups() order, and only for the groups
+    that are one. Not a meme whose "apart" holds the group's first phrase: you said it isn't
+    that one."""
+    owner = store.owners(memes)
+    asked = [phrase for phrases in groups_of.values() for phrase in phrases]
+    together = groups(list(dict.fromkeys(list(owner) + asked)))
+    group_of = {phrase: i for i, group in enumerate(together) for phrase in group["phrases"]}
+    found = {}
+    for name, phrases in groups_of.items():
+        if not phrases:
+            continue
+        hits = []
+        for phrase in phrases:
+            for other in together[group_of[phrase]]["phrases"] if phrase in group_of else ():
+                meme = owner.get(other)
+                if meme and meme not in hits and \
+                        store.normal(phrases[0]) not in (memes[meme].get("apart") or []):
+                    hits.append(meme)
+        if hits:
+            found[name] = hits
+    return found
