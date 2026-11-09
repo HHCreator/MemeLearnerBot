@@ -115,10 +115,16 @@ def find(text, path=None):
     (chooooovy). Where two could start, the longer one wins (大超 rather than 超, were both
     in the table), and one of letters or digits only counts as a whole word: chovy is in
     "chovy同意了", not in "chovyx"."""
+    text = store.normal(text)
+    return [(text[start:end], player) for start, end, player in spans(text, path)]
+
+
+def spans(text, path=None):
+    """Where the nicknames are in a text that store.normal() wrote, as find() finds them:
+    [(start, end, player)]."""
     keys = _read(path)["keys"]
     if not keys:
         return []
-    text = store.normal(text)
     # The text with each letter written once, and where each of its characters came from
     squeezed, starts, ends = [], [], []
     for i, char in enumerate(text):
@@ -135,7 +141,7 @@ def find(text, path=None):
         for length in range(min(longest, len(squeezed) - at), 0, -1):
             piece = squeezed[at:at + length]
             if piece in keys and _whole(squeezed, at, at + length):
-                found.append((text[starts[at]:ends[at + length - 1]], keys[piece]))
+                found.append((starts[at], ends[at + length - 1], keys[piece]))
                 at += length
                 break
         else:

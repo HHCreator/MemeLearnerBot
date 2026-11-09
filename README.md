@@ -182,6 +182,24 @@ matter, nor how many times a letter is written (chooooovy is chovy). A team work
 way (`IG = 埃及`). A line the bot can't read, or a nickname given to two players, stops it
 with the line's number.
 
+**Variants of one meme.** 超威同意了, chovy同意了, 大超同意了 and 三叔不同意 are one meme,
+「XX同意了」, and 超威今年真不一样了 and 真不一样了 another, 「XX今年真不一样了」.
+`memelearner/variants.py` tells them: two phrases are the same meme when they are the same
+once these differences are taken away:
+
+- **who**: a name from the nickname table, or any word in letters (ruler, kiin), is just
+  someone, XX. So is a Chinese name of two or three characters that isn't in the table
+  (兰子同意了), where at least two other names go in the same place.
+- **left out**: one or two parts of one are left out (真不一样了 is 超威今年真不一样了
+  without 超威今年), keeping at least 2 characters that aren't names, and half of the other's.
+- **turned around**: 不 or 没 added (三叔不同意).
+- **written longer**: a character written more than once in a row (同意意意了, chooooovy),
+  and mood words at the end.
+
+Anything else keeps them apart: 我们是冠军 and 我们是路边, or 目前不知道怎么赢 and
+目前不知道怎么输, mean different things. Each group is named by its most sent phrase that has
+a name, with the name as XX.
+
 **Finding videos.** Bilibili asks a visitor's search for a captcha more often than not,
 and the bot never solves captchas, so it finds videos the way a viewer does: in the related
 videos shown beside a video. For each game it starts from a few seed videos, follows the
@@ -488,6 +506,7 @@ reached).
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
 | `memelearner/data/surf_common.txt` | everyday phrases the bot never lists |
 | `memelearner/data/nicknames.txt` | players' nicknames, which you edit (`nicknames.py` reads it) |
+| `memelearner/variants.py` | tells the variants of one meme (XX同意了) |
 | `surf.py` | `py surf.py`, short for `py -m memelearner learn` |
 
 The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs/DESIGN.md).

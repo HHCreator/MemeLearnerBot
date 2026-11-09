@@ -25,6 +25,7 @@ MemeLearnerBot/
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评、视频页、字幕和音频（只读）
     ├── store.py       学到的梗和不要的说法，存在 data/memes.json
     ├── nicknames.py   选手外号表 data/nicknames.txt：哪个外号是哪个选手（超威、大超 = Chovy）
+    ├── variants.py    认出同一个梗的变体：换了人名或外号、加了「不」、省略一部分、拉长的写法（超威同意了、三叔不同意 = 「XX同意了」）
     ├── data/          梗、选手外号表、每个游戏的起点视频、日常说法、英文常用词
     └── .cache/        surf/：读到的弹幕和评论、candidates.json、judge.json、explainers.json；whisper/：Whisper 模型（都不进 git）
 ```
@@ -184,6 +185,7 @@ flowchart TD
 | 让机器人看别的视频或别的游戏 | `data/surf_sources.json` 加标题词、起点视频链接或游戏 |
 | 某个普通说法老被列出来 | 加进 `data/surf_common.txt`，或者 `py -m memelearner reject 它` |
 | 机器人不认识某个选手的外号 | 加进 `data/nicknames.txt`（`Chovy = 超威, 大超`）；只是一个外号的说法就不再列出来 |
+| 变体归组更严或更松 | `variants.py` 开头的 `MAX_LEFT_OUT`（最多省略几段）、`MIN_KEPT`（至少留几个字）、`NAME_CHARS`（不在外号表里的中文名字几个字）、`SHOWN_NAMES`（同一个位置至少出现过几个不同的名字，才把不认识的中文当名字） |
 | 机器人更敏感或更保守 | `surf.py` 开头的 `MIN_PEOPLE`、`MIN_VIDEOS`、`MIN_ALONE`、`MAX_SHORT`、`RISE`、`SURE` |
 | 不要列别的程序已经知道的词 | `--known 词表文件或文件夹`，或环境变量 `MEMELEARNER_KNOWN` |
 | 每个梗多存几句例句 | `store.py` 的 `EXAMPLES` |

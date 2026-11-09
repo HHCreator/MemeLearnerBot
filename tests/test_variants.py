@@ -1,0 +1,112 @@
+"""Offline tests for telling the variants of one meme (variants.py)."""
+
+import os
+import tempfile
+import unittest
+from unittest import mock
+
+from memelearner import nicknames, variants
+
+# Hao's examples from the IG vs GEN report (2026-11-07), with how many people sent each
+EXAMPLES = {"超威同意了": 272, "真不一样了": 153, "超威今年真不一样了": 107, "chovy同意了": 107,
+            "三叔不同意": 54, "大超同意了": 42}
+
+# What the finder listed with them in that run, as their variants
+AGREED = ["超威不同意", "超威今年不同意了", "超威同意一下", "超威会同意的", "超威快同意啊",
+          "超威又同意了", "chovy不同意", "chovy会同意的", "chovy同意一下", "chovy快同意",
+          "rookie同意了", "ruler同意了", "今年不同意了", "三叔同意了", "kiin不同意", "ts不同意",
+          "大超不同意", "大超同意一下", "大超快同意", "大超又同意了"]
+DIFFERENT = ["超威真不一样了", "今年真不一样了", "超威今年真的不一样了", "超威不一样了",
+             "chovy今年真不一样了", "超威真的不一样了", "chovy真不一样了", "今年不一样了",
+             "大超真不一样了", "大超不一样了", "今年chovy真不一样了"]
+
+
+def summary(groups):
+    return [(group["pattern"], group["phrases"]) for group in groups]
+
+
+class VariantTest(unittest.TestCase):
+    def test_haos_examples_are_two_memes(self):
+        groups = variants.groups(EXAMPLES)
+        self.assertEqual(summary(groups), [
+            ("XX同意了", ["超威同意了", "chovy同意了", "三叔不同意", "大超同意了"]),
+            ("XX今年真不一样了", ["真不一样了", "超威今年真不一样了"])])
+        self.assertEqual(groups[0]["names"], [
+            {"name": "超威", "player": "Chovy"}, {"name": "chovy", "player": "Chovy"},
+            {"name": "三叔", "player": "Canyon"}, {"name": "大超", "player": "Chovy"}])
+        self.assertEqual(groups[1]["names"], [{"name": "超威", "player": "Chovy"}])
+
+    def test_the_variants_the_finder_saw_with_them_join_them(self):
+        others = ["我不同意", "我们是冠军", "我们是路边", "让二追三"]
+        phrases = dict(EXAMPLES, **{p: 1 for p in AGREED + DIFFERENT + others})
+        groups = summary(variants.groups(phrases))
+        self.assertEqual(groups[0], ("XX同意了", ["超威同意了", "chovy同意了", "三叔不同意",
+                                                 "大超同意了"] + AGREED))
+        self.assertEqual(groups[1], ("XX今年真不一样了", ["真不一样了", "超威今年真不一样了"] +
+                                     DIFFERENT))
+        # 我不同意 is everyday talk (我 is no name), and the others are memes of their own
+        self.assertEqual(groups[2:], [(p, [p]) for p in others])
+        names = [n["name"] for n in variants.groups(phrases)[0]["names"]]
+        self.assertEqual(names, ["超威", "chovy", "三叔", "大超", "rookie", "ruler", "kiin", "ts"])
+
+    def test_what_counts_as_the_same_meme(self):
+        for a, b in [("超威同意了", "ruler同意了"),          # another player
+                     ("三叔不同意", "三叔同意了"),            # turned around
+                     ("超威同意了", "超威会同意的"),          # a word left out
+                     ("真不一样了", "超威今年真不一样了"),    # the start left out
+                     ("chooooovy同意了", "chovy同意了"),     # written longer
+                     ("超威同意意意了", "超威同意了"),
+                     ("超威不同意", "超威同意一下")]:          # turned around and a word added
+            self.assertTrue(variants.same_meme(a, b), (a, b))
+        for a, b in [("我们是冠军", "我们是路边"),            # another meaning
+                     ("目前不知道怎么赢", "目前不知道怎么输"),
+                     ("同意", "超威同意一下兄弟们"),           # too little left
+                     ("chooovy", "超威"),                    # two names, no meme
+                     ("还在洗", "还在ig"),
+                     ("我不同意", "超威同意了")]:
+            self.assertFalse(variants.same_meme(a, b), (a, b))
+
+    def test_shapes_patterns_and_names(self):
+        for phrase, shape in [("超威同意了", "X同意"), ("三叔不同意", "X不同意"),
+                              ("ＣＨＯＯＯＯＶＹ同意意意了！", "X同意"),
+                              ("真不一样了", "真不一样"), ("超威chovy同意了", "X同意")]:
+            self.assertEqual(variants.shape(phrase), shape, phrase)
+        self.assertEqual(variants.pattern("超威同意了"), "XX同意了")
+        self.assertEqual(variants.pattern("超威chovy同意了"), "XX同意了")
+        self.assertEqual(variants.pattern("真不一样了"), "真不一样了")
+        self.assertEqual(variants.names("chooooovy同意了，kiin不同意"),
+                         [("chooooovy", "Chovy"), ("kiin", "")])
+
+    def test_a_chinese_name_not_in_the_table_counts_where_names_go(self):
+        phrases = {"超威同意了": 10, "ruler同意了": 5, "兰子同意了": 3, "还在ig": 4,
+                   "还在we": 2, "还在洗": 4}
+        groups = variants.groups(phrases)
+        self.assertEqual(summary(groups), [("XX同意了", ["超威同意了", "ruler同意了", "兰子同意了"]),
+                                           ("还在XX", ["还在ig", "还在we"]),
+                                           ("还在洗", ["还在洗"])])  # one character: a word
+        self.assertIn({"name": "兰子", "player": ""}, groups[0]["names"])
+        # Where only one name has gone yet, a word there may be no name
+        self.assertEqual(summary(variants.groups({"超威同意了": 10, "兰子同意了": 3})),
+                         [("XX同意了", ["超威同意了"]), ("兰子同意了", ["兰子同意了"])])
+
+    def test_the_pattern_comes_from_a_phrase_sent_about_as_much(self):
+        self.assertEqual(summary(variants.groups({"让二追三": 786, "ig加油让二追三": 20})),
+                         [("让二追三", ["让二追三", "ig加油让二追三"])])
+        self.assertEqual(summary(variants.groups(["超威同意了", "chovy同意了"])),
+                         [("XX同意了", ["超威同意了", "chovy同意了"])])  # a list: in its order
+
+    def test_an_edited_table_counts_at_once(self):
+        folder = tempfile.TemporaryDirectory()
+        self.addCleanup(folder.cleanup)
+        path = os.path.join(folder.name, "nicknames.txt")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("Chovy = 超威\n")
+        with mock.patch.object(nicknames, "NICKNAMES_FILE", path):
+            self.assertFalse(variants.same_meme("超威同意了", "三叔不同意"))
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("Chovy = 超威\nCanyon = 三叔\n")
+            self.assertTrue(variants.same_meme("超威同意了", "三叔不同意"))
+
+
+if __name__ == "__main__":
+    unittest.main()
