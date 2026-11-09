@@ -423,9 +423,10 @@ def shared(a, b):
 
 
 def variant(a, b):
-    """Whether two phrases are variants of one pattern: they share at least two units at
-    their start and end, and more than half of the longer one (我们是冠军 and 我们是路边; not
-    怎么翻 and 怎么回事)."""
+    """Whether two phrases are on one template: they share at least two units at their start
+    and end, and more than half of the longer one (我们是冠军 and 我们是路边; not 怎么翻 and
+    怎么回事). Such a pair is often a meme and another made from it (variants.twists()); the
+    variants of one meme are told by variants.py."""
     both = shared(a, b)
     return both >= 2 and 2 * both > max(len(a), len(b))
 

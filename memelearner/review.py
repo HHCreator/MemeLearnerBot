@@ -13,7 +13,9 @@ test) with a Mark, then a Decision and My meaning, all empty until you fill them
 it, its variants (chovy同意了, 三叔不同意: variants.py) with how many sent each, and who the
 names in them are (超威 = Chovy, by data/nicknames.txt); click a variant that isn't this
 meme to keep it out. A meme that is a new variant of a learned one (ruler同意了, once
-超威同意了 is learned) says which. Every change is saved at once, in surf/review.json, so
+超威同意了 is learned) says which, and one made from another meme says where it comes from
+(我们是路边: 我们是冠军), and whether a video, a line or a learned meme says so or the model
+only guessed. Every change is saved at once, in surf/review.json, so
 closing the page loses nothing: report opens it again as you left it. A Mark goes with the
 answer it is on: when the model answers something else for the phrase later, its Mark is
 empty again.
@@ -21,7 +23,8 @@ empty again.
 完成 then:
 
 - Add learns the meme (store.accept()), as one entry with its variants, with the judge's
-  meaning. With My meaning, the model merges the two into one whole meaning in which yours
+  meaning and where it comes from (a source the model only guessed only when you marked
+  its answer Correct or Half correct; none when you marked it Wrong). With My meaning, the model merges the two into one whole meaning in which yours
   wins (meanings.py). A meaning you marked Wrong isn't used, nor one that is only a guess
   unless you marked it Correct or Half correct. A new variant of a learned meme joins that
   meme instead, which keeps its meaning (merged with My meaning, if you wrote one).
@@ -118,9 +121,10 @@ def rows():
     the names in them and who they are by the nickname table (judging.names_in()),
     "learned": {"phrase", "meaning", "english"} of the learned meme it is a new variant of,
     or None, "examples": up to store.EXAMPLES lines that use it, "sources": the links of
-    their videos, "verdict", "kind", "meaning", "english", "why", "guess": the judge's
-    (judging.judge()), "test": the blind test it failed, or None, "model": which model
-    judged it ("" when none did yet), "answer": which answer a Mark is on, "group"}."""
+    their videos, "verdict", "kind", "meaning", "english", "why", "guess", "source" (where
+    it comes from: {"phrase", "how"} or None): the judge's (judging.judge()), "test": the
+    blind test it failed, or None, "model": which model judged it ("" when none did yet),
+    "answer": which answer a Mark is on, "group"}."""
     last = surf._load_json(surf.CANDIDATES_FILE, {})
     done = store.phrases()
     found = [c for c in last.get("candidates") or [] if store.normal(c["phrase"]) not in done]
@@ -154,6 +158,7 @@ def rows():
             "names": judging.names_in(c),
             "learned": {"phrase": learned, "meaning": memes[learned].get("meaning", ""),
                         "english": memes[learned].get("english", "")} if learned else None,
+            "source": verdict.get("source"),
             "examples": [line for line, _ in examples],
             "sources": sources, "verdict": verdict.get("verdict", ""),
             "kind": verdict.get("kind", ""), "meaning": verdict.get("meaning", ""),
@@ -252,6 +257,18 @@ def _base(row, mark):
     return row["meaning"], row["english"]
 
 
+def _source(row, mark):
+    """Where a row's meme comes from, as far as your Mark lets the bot keep it: one a video,
+    a line or a learned meme names, unless you marked the answer Wrong; one the model only
+    guessed, when you marked it Correct or Half correct. None for a new variant of a learned
+    meme, which keeps its own."""
+    source = row.get("source")
+    if not source or row.get("learned") or mark == "Wrong" or \
+            source.get("how") == "guess" and mark not in TAKE_GUESS:
+        return None
+    return source
+
+
 def _meme_of(row):
     """The meme a row is learned as: the learned meme it is a new variant of, or itself."""
     return row["learned"]["phrase"] if row.get("learned") else row["phrase"]
@@ -266,7 +283,7 @@ def finish(rows, model=None):
     "judge" (the judge's meaning), "learned" (the meaning it was learned with before) or ""
     (no meaning), "model": the model that merged, "missing": names and quoted words of your
     note the meaning leaves out, "variants": the variants it got, "learned": whether it was
-    learned before}], "rejected": [{"phrase", "reason", "variants": turned down with it}],
+    learned before, "source": where it comes from, as kept (_source())}], "rejected": [{"phrase", "reason", "variants": turned down with it}],
     "left": [{"phrase", "decision"}], "score": {model: {"points", "answers": the answers
     counted, "marks": {mark: how many}}}}. Raises judging.ModelUnavailable, learning
     nothing, when your notes need a model to merge them and none can be asked."""
@@ -291,13 +308,15 @@ def finish(rows, model=None):
         joining = ([row["phrase"]] if row.get("learned") else []) + kept(row)
         meme = store.accept(_meme_of(row), meaning, english, games=[row["game"]],
                             examples=row["examples"], sources=row["sources"], note=note(row),
-                            variants=joining, apart=picked[row["key"]]["apart"])
+                            variants=joining, apart=picked[row["key"]]["apart"],
+                            source=_source(row, picked[row["key"]]["mark"]))
         added.append({"phrase": meme["phrase"], "meaning": meaning,
                       "from": ("merged" if result["model"] else "note") if result else
                       (("learned" if row.get("learned") else "judge") if meaning else ""),
                       "model": result["model"] if result else "",
                       "missing": result["missing"] if result else [],
-                      "variants": joining, "learned": bool(row.get("learned"))})
+                      "variants": joining, "learned": bool(row.get("learned")),
+                      "source": meme["source"]})
     rejected = []
     for row in turned:
         reason = note(row) or f"not a meme (report {time.strftime('%Y-%m-%d')})"
@@ -343,6 +362,8 @@ def summary(result):
         if a.get("variants"):
             lines.append(f"    {'new variants' if a.get('learned') else 'variants'}: "
                          f"{', '.join(a['variants'])}")
+        if a.get("source"):
+            lines.append(f"    comes from {a['source']['phrase']} ({a['source']['how']})")
         if a["missing"]:
             lines.append(f"    check it: it leaves out {', '.join(a['missing'])} of your note")
     for r in rejected:
@@ -372,7 +393,8 @@ def page(rows, picked, token, line=""):
             "picked": picked,
             "rows": [{k: row.get(k) for k in ("key", "phrase", "pattern", "people", "variants",
                                               "names", "learned", "examples", "kind",
-                                              "meaning", "why", "guess", "test", "model")}
+                                              "meaning", "why", "guess", "source", "test",
+                                              "model")}
                      for row in rows]}
     text = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")  # never ends the tag
     return PAGE.replace("__DATA__", text)
@@ -522,6 +544,7 @@ button.variant { font: inherit; font-weight: 400; color: var(--text); background
 button.variant .n { color: var(--muted); margin-left: 5px; font-variant-numeric: tabular-nums; }
 button.variant[aria-pressed="true"] { color: var(--no); border-color: var(--no); text-decoration: line-through; }
 tr.variants .names { margin-top: 3px; }
+td.answer .source { margin-top: 4px; }
 td.people { text-align: right; font-variant-numeric: tabular-nums; }
 td.lines { color: var(--muted); min-width: 13em; }
 td.lines div + div { margin-top: 4px; }
@@ -574,6 +597,8 @@ button:disabled { opacity: .5; cursor: default; }
 const DATA = JSON.parse(document.getElementById("data").textContent);
 const KINDS = {meme: "meme", name: "a name", term: "a game word", everyday: "everyday words",
                unclear: "unclear"};
+const HOW = {video: "查到的：视频里说的", explanation: "查到的：弹幕里有人说",
+             learned: "查到的：已学的梗里写着", guess: "猜的"};  // how the model knows the source
 const WHOSE = {merged: "和你的补充合成的", note: "你的原话", judge: "模型的意思",
                learned: "原来学的意思",
                "": "还没有意思：之后用 py -m memelearner accept 它 --note \"...\" 补上"};
@@ -639,6 +664,10 @@ function said(row) {
     text.append(": " + row.why);
   }
   if (row.model !== DATA.model) text.append(" · ", el("span", {class: "flag"}, "judged by " + row.model));
+  if (row.kind === "meme" && row.source) {
+    text.append(el("div", {class: "source"}, "来源：「" + row.source.phrase + "」",
+                   el("span", {class: "flag"}, "（" + (HOW[row.source.how] || HOW.guess) + "）")));
+  }
   return text;
 }
 
@@ -753,6 +782,7 @@ function results(result) {
   list(`学会了 ${result.added.length} 个梗`, result.added.map(a => [
     el("b", {}, a.phrase), "：" + (a.meaning || "—") + "（" + WHOSE[a.from] + "）" +
     (a.variants.length ? (a.learned ? " 加了变体 " : " 变体 ") + a.variants.join("、") : "") +
+    (a.source ? ` 来源「${a.source.phrase}」（${HOW[a.source.how] || HOW.guess}）` : "") +
     (a.missing.length ? " 请检查：没写进你补充里的 " + a.missing.join("、") : "")]));
   list(`不再列出 ${result.rejected.length} 个`, result.rejected.map(r => [el("b", {}, r.phrase), "：" + r.reason +
     (r.variants.length ? "（还有变体 " + r.variants.join("、") + "）" : "")]));

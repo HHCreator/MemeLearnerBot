@@ -236,6 +236,32 @@ class ReviewTest(unittest.TestCase):
         self.assertEqual((meme["meaning"], meme["notes"], meme["variants"][-1]),
                          ("调侃超威点头认可；谁都可以同意", ["谁都可以同意"], "faker同意了"))
 
+    def test_where_a_meme_comes_from_is_shown_and_kept_as_far_as_your_mark_lets_it(self):
+        store.accept("我们是冠军", meaning="庆祝夺冠的口号", note="我们是路边是从它变来的")
+        self.model.answers_for["deepseek-r1:14b"] = {
+            phrase: {"kind": "meme", "meaning": "自嘲", "source": "我们是冠军",
+                     "source_how": "learned", "why": "..."} for phrase in ("我们是路边", "我们是区")}
+        self.write_run(more={"我们是路边": (["我们是路边兄弟们"], ["这波我们是路边"]),
+                             "我们是区": (["我们是区兄弟们"], ["这波我们是区"])})
+        self.judge()
+        rows = review.rows()
+        source = {row["phrase"]: row["source"] for row in rows}
+        # Your note names 我们是路边, not 我们是区: that one is only the model's guess
+        self.assertEqual((source["我们是路边"], source["我们是区"]),
+                         ({"phrase": "我们是冠军", "how": "learned"},
+                          {"phrase": "我们是冠军", "how": "guess"}))
+        self.assertIsNone(source["阿一古"])
+        self.choose(rows, [("lol:我们是路边", "", "Add", ""), ("lol:我们是区", "", "Add", "")])
+        result = review.finish(rows)
+        self.assertEqual(store.lookup("我们是路边")["source"], {"phrase": "我们是冠军", "how": "learned"})
+        self.assertIsNone(store.lookup("我们是区")["source"])  # a guess you didn't mark right
+        self.assertIn("    comes from 我们是冠军 (learned)", review.summary(result))
+        # A guess you marked right is kept; anything you marked Wrong isn't
+        row = next(row for row in rows if row["phrase"] == "我们是区")
+        self.assertEqual(review._source(row, "Correct"), {"phrase": "我们是冠军", "how": "guess"})
+        self.assertIsNone(review._source(dict(row, source={"phrase": "x", "how": "video"}),
+                                         "Wrong"))
+
     def test_the_page_holds_the_rows_and_no_line_can_end_its_script(self):
         rows = review.rows()
         line = "</script><script>alert(1)</script>"

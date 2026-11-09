@@ -262,6 +262,25 @@ def groups(phrases):
     return result
 
 
+@functools.lru_cache(maxsize=65536)
+def _units(phrase):
+    return tuple(surf.units(surf.clean(phrase)))
+
+
+def twists(phrase, others):
+    """The phrases among others that are another meme on the same template as phrase, in
+    their order: 我们是冠军 for 我们是路边, 千言万语感谢现役 for 千言万语感谢多兰. They share
+    their start and end, more than half of the longer one (surf.variant()), but aren't the
+    same meme (same_meme()): one may come from the other."""
+    mine, key, found = list(_units(phrase)), store.normal(phrase), []
+    for other in others:
+        if store.normal(other) == key or other in found:
+            continue
+        if surf.variant(mine, list(_units(other))) and not same_meme(phrase, other):
+            found.append(other)
+    return found
+
+
 def learned_of(groups_of, memes):
     """Which learned memes some groups of phrases are (a candidate: its phrase and its
     variants): {name: [learned phrase, ...]} for groups_of {name: [phrase, ...]}, the learned

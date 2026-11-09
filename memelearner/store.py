@@ -18,7 +18,10 @@ the model merged from them and its own (see meanings.py). A meme people write in
 way (超威同意了, chovy同意了 and 三叔不同意 are one meme, see variants.py) is one entry, under
 the phrase sent most, with the others as "variants": ["chovy同意了", "三叔不同意"], and
 lookup() and find() find it by any of them; it keeps EXAMPLES example lines for each. "apart"
-holds the phrases you said aren't that meme, though they look like it (in the report). Every
+holds the phrases you said aren't that meme, though they look like it (in the report). A
+meme made from another one has "source": {"phrase": "我们是冠军", "how": "learned"}: where it
+comes from, and how the judge knows ("video", "explanation" or "learned" when one of them
+says so, "guess" when it only looks like it; see judging.judge()). Every
 phrase is written the way the bot finds it (normal()): lowercase, half-width, only letters,
 digits and Chinese characters. "version" changes when a field changes meaning or goes away; a
 new field doesn't change it.
@@ -82,7 +85,8 @@ def _meme(phrase, entry):
             "english": entry.get("english", ""), "games": list(entry.get("games") or []),
             "added": entry.get("added", ""), "examples": list(entry.get("examples") or []),
             "sources": list(entry.get("sources") or []),
-            "variants": list(entry.get("variants") or [])}
+            "variants": list(entry.get("variants") or []),
+            "source": dict(entry["source"]) if entry.get("source") else None}
 
 
 def owners(memes):
@@ -171,7 +175,7 @@ def _merge(old, new):
 
 
 def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), note="",
-           variants=(), apart=()):
+           variants=(), apart=(), source=None):
     """Learn a phrase as a meme; returns it. Accepting it again updates it: a meaning or an
     English gloss given replaces the old one, and games, examples and sources are added.
     note: your own note on it, kept word for word in its "notes" (meanings.py merges it
@@ -182,7 +186,8 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), no
     this one has none), and its own entry goes: one meme, one entry. One that was another
     meme's variant moves here, and one you turned down isn't turned down any more. A phrase
     that is a variant of a learned meme already updates that meme (chovy同意了: 超威同意了).
-    apart: phrases you said aren't this meme, though they look like it."""
+    apart: phrases you said aren't this meme, though they look like it. source: the meme it
+    comes from, {"phrase", "how"} (judging.judge()'s "source"), replacing the one it had."""
     data = load()
     memes = data["memes"]
     key = _key(phrase)
@@ -207,6 +212,7 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), no
             examples = list(examples) + list(folded.get("examples") or [])
             sources = list(sources) + list(folded.get("sources") or [])
             notes += list(folded.get("notes") or [])
+            entry.setdefault("source", folded.get("source"))
             joined += [p for p in folded.get("variants") or [] if p != key and p not in away]
             away += [p for p in folded.get("apart") or [] if p not in away]
         joined.append(other)
@@ -223,9 +229,11 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), no
     notes += [" ".join(note.split())] if note.strip() else []
     if notes:
         entry["notes"] = _merge(entry.get("notes"), notes)
-    for field in ("variants", "apart"):
-        if not entry[field]:
-            del entry[field]
+    if source and normal(source.get("phrase")):
+        entry["source"] = {"phrase": source["phrase"], "how": source.get("how") or "guess"}
+    for field in ("variants", "apart", "source"):
+        if not entry.get(field):
+            entry.pop(field, None)
     for p in [key] + entry.get("variants", []):
         data["rejected"].pop(p, None)
     memes[key] = dict(sorted(entry.items(), key=lambda item: FIELDS.index(item[0])
@@ -234,8 +242,8 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), no
     return _meme(key, memes[key])
 
 
-FIELDS = ("meaning", "english", "games", "added", "examples", "sources", "notes", "variants",
-          "apart")  # the order of a meme's fields in the file
+FIELDS = ("meaning", "english", "games", "added", "examples", "sources", "notes", "source",
+          "variants", "apart")  # the order of a meme's fields in the file
 
 
 def _drop_variant(entry, phrase):

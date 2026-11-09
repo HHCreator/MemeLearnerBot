@@ -94,7 +94,9 @@ A meme is a dict:
 `phrase` is lowercase and half-width, the way the bot finds it; `meaning` (Chinese) and
 `english` are "" until someone fills them in. `variants` are the other ways the same meme
 is written (超威同意了 has chovy同意了, 大超同意了 and 三叔不同意: see Variants of one meme
-below); `lookup()` and `find()` find a meme by any of them. A candidate has the phrase, its game, how new
+below); `lookup()` and `find()` find a meme by any of them. A meme made from another one
+also has a `source`: `{"phrase": "我们是冠军", "how": "learned"}`, where it comes from and
+how the judge knows (`video`, `explanation`, `learned`, or `guess`; see The judge). A candidate has the phrase, its game, how new
 it is (`new`, `rising`, `steady`, `older`, or a `first look` when there's too little to
 compare with yet), how many `people` send it on its own and in how many `videos`, the share of the
 people using it who send it on its own (`alone`), its `variants` with how many send each,
@@ -373,6 +375,14 @@ faster than that, so the judge never goes by what the model remembers:
   likely no meme either: you don't correct the same mistake twice. When that changes (a
   meme like it learned, a meaning or note of yours changed, a phrase like it turned down,
   or a nickname in it added to the table), the next `judge` judges the phrase again.
+- For a meme made from another one (我们是路边 from 我们是冠军, 千言万语感谢多兰 from
+  千言万语感谢现役), it says which one: its **source**, from what it was shown (the learned
+  memes, the videos, the lines, and up to 3 phrases of the same run on its template that
+  are another meme, `alike`), never one it makes up; a variant of the meme itself is no
+  source. It also says how it knows, and the bot checks that: `video`, `explanation` or
+  `learned` only when a video, a line, or a learned meme's meaning or your notes name that
+  source (your note on 我们是冠军 saying 我们是路边 comes from it counts too); else it is a
+  `guess`.
 - Then a blind test: a second question, which never saw those lines, gets the other longer
   lines and two meanings, the model's and the literal one, and says which one each line
   means. The meaning passes when at least 2 lines, and three quarters of the lines that
@@ -420,7 +430,9 @@ For each phrase it:
    every explainer it reads, which a visitor gets without a captcha), and from Bilibili's
    search for "阿一古是什么梗". The search is tried until Bilibili asks for a captcha once in
    a run, then skipped (the bot never solves captchas), and for each phrase at most once a
-   week.
+   week. When no video names a meme the judge says comes from another one (see Where a meme
+   comes from), it looks the same way for videos about that one: 千言万语感谢现役是什么梗
+   for 千言万语感谢多兰, 超威同意了 for the pattern XX同意了.
 2. **Reads** up to 2 of them per phrase, each video once, as any visitor who isn't logged in
    sees them: the page (title, description, tags, the subtitles a visitor gets, related
    videos), the hot comments and the danmu. That is 3 or 4 requests, 5 to 7 seconds apart.
@@ -434,7 +446,9 @@ For each phrase it:
    video is dropped). The model is told to write only what the video says.
 5. **Judges again** the phrases a video explains: the model gets the videos' summaries
    beside the danmu, and a meaning a video backs isn't only a guess any more, so `accept`
-   takes it. `candidates` shows which video it came from.
+   takes it. `candidates` shows which video it came from. A video about where a meme comes
+   from shows the model that source, marked as such, but doesn't back the meme's own
+   meaning.
 
 What it read stays in `memelearner/.cache/surf/explainers.json` and `explainers/`. A phrase
 no video explains is looked up again after a week; `--again` looks up everything again.
@@ -477,7 +491,9 @@ the model's answer (its kind and meaning, marked when it is only a guess or fail
 test). Under it are its variants, with how many people sent each, and who the names in
 them are (Chovy = 超威、chovy、大超); click a variant that isn't this meme to keep it out
 of it (click again to take that back). A row that is a new variant of a learned meme says
-which one. You fill in, once for the whole meme:
+which one, and a meme made from another one says where it comes from (来源：「我们是冠军」),
+found (a video, a line or a learned meme says so) or only guessed. You fill in, once for
+the whole meme:
 
 - **Mark**: how right the answer is: Correct, Half correct, Correct, no meaning, No point,
   Wrong, or I don't know.
@@ -494,8 +510,10 @@ empty again. Click **完成** when you're done. The bot then:
   clicked out: those are kept as `apart`, so they aren't taken for it again), with the
   judge's meaning; with My meaning, the model merges the two into one whole meaning in
   which yours wins, as `accept --note` does. A meaning you marked Wrong isn't used, nor a
-  guess unless you marked it Correct or Half correct. A new variant of a learned meme goes
-  into that meme, which keeps its meaning (merged with My meaning, if you wrote one).
+  guess unless you marked it Correct or Half correct. Where it comes from is kept as its
+  `source`: one that was found, unless you marked the answer Wrong; a guessed one only when
+  you marked it Correct or Half correct. A new variant of a learned meme goes into that
+  meme, which keeps its meaning (merged with My meaning, if you wrote one).
 - turns down the ones marked Not a meme, with their variants, and My meaning as the reason.
   The judge is shown it for phrases that look alike, so a cheer like ig加油 isn't taken for
   a meme again.

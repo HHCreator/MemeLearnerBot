@@ -349,6 +349,42 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual(self.model.explained["大超同意了"]["names"],
                          [{"name": "大超", "player": "Chovy"}, {"name": "尺帝", "player": "Ruler"}])
 
+    # -- where a meme comes from -----------------------------------------------------------
+
+    ROADSIDE = (["我们是路边兄弟们", "我们是路边出自我们是冠军"], ["我们是路边！", "这波我们是路边"])
+    CHAMPION = (["我们是冠军！", "我们是冠军冲冲冲"], ["我们是冠军", "我们是冠军啊"])
+
+    def source_given(self, source, how):
+        """The verdict's source when the model says 我们是路边 comes from source, knowing it
+        how."""
+        self.model.answers_for["deepseek-r1:14b"] = {"我们是路边": {
+            "kind": "meme", "meaning": "自嘲水平差", "english": "we're roadside",
+            "literal": "我们在路边", "source": source, "source_how": how, "why": "..."}}
+        return self.judge(again=True)["我们是路边"]["source"]
+
+    def test_the_model_says_where_a_derived_meme_comes_from_and_how_it_knows(self):
+        self.write_run(more={"我们是路边": self.ROADSIDE, "我们是冠军": self.CHAMPION},
+                       people={"我们是冠军": 9})
+        self.judge()
+        # It sees the run's phrases on its template that are another meme
+        self.assertEqual(self.model.explained["我们是路边"]["alike"],
+                         [{"phrase": "我们是冠军", "people": 9}])
+        # A line explains it: found
+        self.assertEqual(self.source_given("我们是冠军", "explanation"),
+                         {"phrase": "我们是冠军", "how": "explanation"})
+        # Nothing it went by says so: a guess
+        for how in ("video", "learned", "maybe"):
+            self.assertEqual(self.source_given("我们是冠军", how),
+                             {"phrase": "我们是冠军", "how": "guess"}, how)
+        # A phrase it wasn't shown is made up, and the meme itself is no source
+        for made_up in ("我们是亚军", "我们是路边", "我们是路边啊", ""):
+            self.assertIsNone(self.source_given(made_up, "guess"), made_up)
+        # Your note on a learned meme says so: found
+        store.accept("我们是冠军", meaning="庆祝夺冠的口号", note="我们是路边是从它变来的")
+        self.assertEqual(self.source_given("我们是冠军", "learned"),
+                         {"phrase": "我们是冠军", "how": "learned"})
+        self.assertIsNone(self.judge(again=True)["阿一古"]["source"])  # none said
+
     def test_a_phrase_is_judged_again_once_a_meme_like_it_is_learned_or_your_note_changes(self):
         self.write_run(more={"大超同意了": self.SAME_AS})
         self.judge()

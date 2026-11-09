@@ -139,6 +139,20 @@ class EntryPointTest(unittest.TestCase):
         self.assertEqual(set(store.load()["rejected"]), {"大超同意了", "超威同意了", "chovy同意了"})
         self.assertEqual(store.load()["memes"], {})
 
+    def test_a_meme_keeps_where_it_comes_from(self):
+        meme = store.accept("我们是路边", meaning="自嘲水平差",
+                            source={"phrase": "我们是冠军", "how": "learned"})
+        self.assertEqual(meme["source"], {"phrase": "我们是冠军", "how": "learned"})
+        self.assertIsNone(store.accept("阿一古")["source"])
+        entry = store.load()["memes"]["我们是路边"]
+        self.assertEqual(list(entry), ["meaning", "english", "games", "added", "examples",
+                                       "sources", "source"])
+        # Folded into another meme, it brings its source along, unless that one has its own
+        meme = store.accept("我们是路边路边", variants=["我们是路边"])
+        self.assertEqual(meme["source"], {"phrase": "我们是冠军", "how": "learned"})
+        meme = store.accept("我们是路边路边", source={"phrase": "我们是区", "how": "guess"})
+        self.assertEqual(meme["source"], {"phrase": "我们是区", "how": "guess"})
+
     def test_find_prefers_longer_memes_and_whole_words(self):
         for phrase in ["绷不住了", "不住", "yyds", "下饭"]:
             memelearner.accept(phrase)

@@ -58,6 +58,9 @@ def _show_candidate(c):
             "watching": "  -> watching"}.get(verdict.get("verdict"), "")
     if verdict.get("verdict") == "untested":
         said = "  -> a meme, " + judging.untested(verdict)
+    source = verdict.get("source")
+    if said and source:
+        said += f" (from {source['phrase']}, {'a guess' if source['how'] == 'guess' else 'found'})"
     if said and verdict.get("model") and verdict["model"] != judging.MODEL:
         said += f"  (judged by {verdict['model']})"  # like the offline model, standing in
     pattern = f" 「{c['pattern']}」" if c.get("pattern") not in (None, c["phrase"]) else ""

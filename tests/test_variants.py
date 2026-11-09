@@ -103,6 +103,16 @@ class VariantTest(unittest.TestCase):
         self.assertEqual(summary(variants.groups(["超威同意了", "chovy同意了"])),
                          [("XX同意了", ["超威同意了", "chovy同意了"])])  # a list: in its order
 
+    def test_a_twist_is_another_meme_on_the_same_template(self):
+        self.assertEqual(variants.twists("我们是路边", ["超威同意了", "我们是冠军", "我们是路边"]),
+                         ["我们是冠军"])
+        self.assertEqual(variants.twists("千言万语感谢多兰", ["感谢多兰", "千言万语感谢现役"]),
+                         ["千言万语感谢现役"])
+        self.assertEqual(variants.twists("怎么输的", ["这怎么翻的", "怎么翻的"]), ["怎么翻的"])
+        # The same meme is no twist of itself, and too little alike is none either
+        self.assertEqual(variants.twists("ruler同意了", ["超威同意了", "超威会同意的"]), [])
+        self.assertEqual(variants.twists("怎么翻", ["怎么回事"]), [])
+
     def test_an_edited_table_counts_at_once(self):
         with open(self.table, "w", encoding="utf-8") as f:
             f.write("Chovy = 超威\n")

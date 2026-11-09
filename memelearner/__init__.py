@@ -24,8 +24,11 @@ A meme is a dict:
      "added": "2026-11-01",            when it was learned
      "examples": ["这下真的绷不住了"],    a few lines that used it
      "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"],   videos those came from
-     "variants": []}                   other ways the same meme is written: lookup() and
+     "variants": [],                   other ways the same meme is written: lookup() and
                                        find() find it by any (超威同意了: chovy同意了 ...)
+     "source": None}                   the meme it comes from, and how the judge knows:
+                                       {"phrase": "我们是冠军", "how": "learned"} for
+                                       我们是路边 (see store.py), or None
 
 A candidate is a short danmu that many people send on their own, with how new it is, its
 numbers, its variants (the same meme written differently: variants.py), its pattern
