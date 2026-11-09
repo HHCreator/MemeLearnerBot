@@ -103,6 +103,42 @@ class EntryPointTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             memelearner.accept("!!!")  # nothing left of it
 
+    def test_a_meme_written_in_more_ways_is_one_entry_found_by_any_of_them(self):
+        store.accept("超威同意了", meaning="调侃 Chovy 同意输", examples=["超威同意了没"])
+        store.accept("chovy同意了", meaning="同上", examples=["chovy同意了，队友没同意"],
+                     note="chovy就是超威")
+        store.reject("三叔不同意", "not sure")
+        meme = store.accept("超威同意了", variants=["CHOVY同意了", "三叔不同意", "大超同意了"],
+                            apart=["我不同意"])
+        # One entry: chovy同意了's note and example come along, and 三叔不同意 is learned now
+        self.assertEqual((meme["meaning"], meme["variants"], meme["examples"]),
+                         ("调侃 Chovy 同意输", ["chovy同意了", "三叔不同意", "大超同意了"],
+                          ["超威同意了没", "chovy同意了，队友没同意"]))
+        data = store.load()
+        self.assertEqual(list(data["memes"]), ["超威同意了"])
+        entry = data["memes"]["超威同意了"]
+        self.assertEqual(list(entry), ["meaning", "english", "games", "added", "examples",
+                                       "sources", "notes", "variants", "apart"])
+        self.assertEqual((entry["notes"], entry["apart"]), (["chovy就是超威"], ["我不同意"]))
+        self.assertNotIn("三叔不同意", data["rejected"])
+        for phrase in ["超威同意了", "Chovy同意了", "三叔不同意"]:
+            self.assertEqual(memelearner.lookup(phrase)["phrase"], "超威同意了", phrase)
+        self.assertEqual([m["phrase"] for m in memelearner.find("三叔不同意，大超同意了")],
+                         ["超威同意了"])
+        self.assertIn("大超同意了", surf.known_phrases())
+        # Accepting a variant updates its meme
+        store.accept("大超同意了", note="大超是chovy的外号")
+        self.assertEqual(list(store.load()["memes"]), ["超威同意了"])
+        # A variant turned down or forgotten is only taken out of its meme; a meme turned
+        # down takes its variants along
+        store.reject("大超同意了", "a name")
+        self.assertEqual(memelearner.lookup("超威同意了")["variants"], ["chovy同意了", "三叔不同意"])
+        self.assertTrue(store.forget("三叔不同意"))
+        self.assertIsNone(memelearner.lookup("三叔不同意"))
+        store.reject("超威同意了", "not a meme")
+        self.assertEqual(set(store.load()["rejected"]), {"大超同意了", "超威同意了", "chovy同意了"})
+        self.assertEqual(store.load()["memes"], {})
+
     def test_find_prefers_longer_memes_and_whole_words(self):
         for phrase in ["绷不住了", "不住", "yyds", "下饭"]:
             memelearner.accept(phrase)

@@ -53,41 +53,6 @@
     "chovy选手的一个称呼的一个变体"
    ]
   },
-  "chovy同意了": {
-   "meaning": "指GEN中单选手Chovy（超威）在关键比赛中发挥失常、让对手获胜；弹幕用它调侃Chovy是否“同意”输掉比赛。chovy就是超威，和“超威同意了”是同一个梗。",
-   "english": "Refers to Gen.G mid laner Chovy (Chaowei) underperforming in key matches and letting his opponent win; used in bullet comments to joke about whether Chovy \"agrees\" to lose.",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-08",
-   "examples": [
-    "chovy同意了，他的队友没同意",
-    "chovy同意了，三叔也不会同意的",
-    "IG牛逼chovy同意了3-0速通GENG"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
-   ],
-   "notes": [
-    "chovy就是超威，和超威同意了是同一个梗"
-   ]
-  },
-  "faker同意了": {
-   "meaning": "「XX同意了」梗的变体，指Faker在比赛中发挥失常、送出关键失误让对手获胜，弹幕调侃他是否「同意」输掉比赛。",
-   "english": "A variant of the \"XX agreed\" meme, joking that Faker threw the game or made a key mistake, thereby \"agreeing\" to lose.",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-08",
-   "examples": [
-    "Faker同意BLG夺冠了",
-    "还在Faker同意吧，t1就赢不了BLG",
-    "faker同意了，就他送的最关键一波"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
-   ]
-  },
   "ggg": {
    "meaning": "就是一种对于gg的刷屏，表示想让现在正在进行的游戏赶紧结束",
    "english": "",
@@ -105,22 +70,6 @@
    ],
    "notes": [
     "就是一种对于gg的刷屏，表示想让现在正在进行的游戏赶紧结束"
-   ]
-  },
-  "o出": {
-   "meaning": "“X出”梗的变体，“出”读 chu，谐音“畜生”，用来骂某位选手（这里指 ID 以 o 开头或带 o 的选手）打得差、表现像畜生。",
-   "english": "A variant of the 'X-chu' insult meme, calling a player (whose name starts with or contains 'o') trash, playing like an a",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-08",
-   "examples": [
-    "o出瞎开",
-    "O出乱开",
-    "o出有啥用"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
    ]
   },
   "o博士": {
@@ -152,32 +101,19 @@
    "examples": [
     "wei出早打完了",
     "wei出大问题了老想着开",
-    "真打不过一直喊wei出"
+    "真打不过一直喊wei出",
+    "o出瞎开",
+    "O出乱开",
+    "o出有啥用"
    ],
    "sources": [
     "https://live.bilibili.com/6"
    ],
    "notes": [
     "这是梗”X出“， 出 读作 chu， 和畜生的畜同音，这个梗是咒骂某选手玩的像个畜生（表现不佳或者人品很差）"
-   ]
-  },
-  "三叔不同意": {
-   "meaning": "“三叔”是选手Canyon的外号，“不同意”是“XX不同意”梗的变体，指Canyon在比赛中不认可、不配合或反对某种打法或决策，常与“超威同意了”等说法对举，用来调侃队内意见分歧。",
-   "english": "\"Third Uncle\" is Canyon's nickname; \"disagrees\" is a variant of the \"XX agrees/disagrees\" meme, used to say Canyon rejected or didn't go along with a play or decision.",
-   "games": [
-    "lol"
    ],
-   "added": "2026-11-08",
-   "examples": [
-    "超微同意，三叔不同意啊",
-    "超威同不同意不重要，关键三叔不同意",
-    "超威有点同意了，但是kiin和三叔不同意"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
-   ],
-   "notes": [
-    "”三叔“ 指代的是canyon选手的外号，不同意是梗”XX不同意“的变体"
+   "variants": [
+    "o出"
    ]
   },
   "三姆斯": {
@@ -404,22 +340,6 @@
     "兰出买了",
     "多兰出个大肉就难打了",
     "没兰出我不知道blg怎么赢两局"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
-   ]
-  },
-  "兰子同意了": {
-   "meaning": "“兰子”是选手的外号，这个说法是“XX同意了”梗的变体，用来调侃某位选手在关键比赛中发挥失常、让对手获胜，弹幕刷它表示“他同意（输）了”。",
-   "english": "A variant of the \"XX agreed\" meme, teasing that a player (Lanzi) underperformed and let the opponent win.",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-08",
-   "examples": [
-    "兰子同意，超威同意，齿轮开始转动",
-    "大O和兰子同意了",
-    "兰子同意无数次了"
    ],
    "sources": [
     "https://live.bilibili.com/6"
@@ -764,25 +684,6 @@
    "sources": [
     "https://www.bilibili.com/video/BV1vcaY6YEQQ",
     "https://www.bilibili.com/video/BV199h969EbR"
-   ]
-  },
-  "大超同意了": {
-   "meaning": "“大超”是GEN中单选手Chovy（超威）的外号，这个梗指Chovy在关键比赛中发挥失常、让对手获胜，弹幕用它调侃Chovy是否“同意”输掉比赛，是“XX同意了”的变体。",
-   "english": "A variant of the 'XX agreed' meme; 'Da Chao' is a nickname for Gen.G mid laner Chovy, used to joke that Chovy underperformed in a key match and 'agreed' to lose.",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-08",
-   "examples": [
-    "大超同意了，队友不同意",
-    "大超同意了，他队友今年不同意了",
-    "其实今天大超同意了，奈何有人兜底"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
-   ],
-   "notes": [
-    "”大超“是chovy选手的其中一个外号，这仍然是”XX同意了“的一个变体"
    ]
   },
   "太变态了": {
@@ -1560,10 +1461,16 @@
    "examples": [
     "chovy今年真不一样了",
     "超大哥真不一样了",
-    "今年超威是真不一样了，要进决赛了"
+    "今年超威是真不一样了，要进决赛了",
+    "都在调侃超威 今年真不一样了",
+    "超威今年真不一样了，真有夺冠像",
+    "我就说超威今年真不一样了"
    ],
    "sources": [
     "https://live.bilibili.com/6"
+   ],
+   "variants": [
+    "超威今年真不一样了"
    ]
   },
   "神bin": {
@@ -1911,22 +1818,6 @@
     "可以是梗的同时也可以是日常用语"
    ]
   },
-  "超威今年真不一样了": {
-   "meaning": "对选手 Chovy（超威）的调侃式说法，指他今年表现或状态似乎和以往不同，常带反讽或期待意味。",
-   "english": "Chovy really seems different this year — a teasing remark about his changed form.",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-08",
-   "examples": [
-    "都在调侃超威 今年真不一样了",
-    "超威今年真不一样了，真有夺冠像",
-    "我就说超威今年真不一样了"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
-   ]
-  },
   "超威同意了": {
    "meaning": "指GEN中单选手Chovy（超威）在关键比赛中发挥失常、让对手获胜；弹幕用它调侃Chovy是否“同意”输掉比赛。",
    "english": "A meme mocking Chovy for allegedly choking in important matches, as if he must 'agree' to lose.",
@@ -1937,10 +1828,37 @@
    "examples": [
     "刚来，超威同意了没",
     "超威同意了尺子没同意",
-    "Gen.G赢了真就超威同意了"
+    "Gen.G赢了真就超威同意了",
+    "chovy同意了，他的队友没同意",
+    "chovy同意了，三叔也不会同意的",
+    "IG牛逼chovy同意了3-0速通GENG",
+    "超微同意，三叔不同意啊",
+    "超威同不同意不重要，关键三叔不同意",
+    "超威有点同意了，但是kiin和三叔不同意",
+    "大超同意了，队友不同意",
+    "大超同意了，他队友今年不同意了",
+    "其实今天大超同意了，奈何有人兜底",
+    "Faker同意BLG夺冠了",
+    "还在Faker同意吧，t1就赢不了BLG",
+    "faker同意了，就他送的最关键一波",
+    "兰子同意，超威同意，齿轮开始转动",
+    "大O和兰子同意了",
+    "兰子同意无数次了"
    ],
    "sources": [
     "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "chovy就是超威，和超威同意了是同一个梗",
+    "”三叔“ 指代的是canyon选手的外号，不同意是梗”XX不同意“的变体",
+    "”大超“是chovy选手的其中一个外号，这仍然是”XX同意了“的一个变体"
+   ],
+   "variants": [
+    "chovy同意了",
+    "三叔不同意",
+    "大超同意了",
+    "faker同意了",
+    "兰子同意了"
    ]
   },
   "辛苦了ig": {
