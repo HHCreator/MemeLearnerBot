@@ -13,7 +13,7 @@ import urllib.parse
 import zlib
 from unittest import mock
 
-from memelearner import bilibili, store, surf
+from memelearner import bilibili, nicknames, store, surf
 
 NOW = 1_800_000_000
 DAY = 86400
@@ -172,15 +172,33 @@ def message(who, text, sent, n=[0]):
     return {"id": f"d{n[0]}", "kind": "danmu", "who": who, "text": text, "sent": sent}
 
 
+TABLE = "Chovy = 超威, 大超, chooovy\nCanyon = 三叔, 三姆斯\n"  # the nicknames tests go by
+
+
+def use_table(test, folder, text=TABLE):
+    """A nickname table of its own for one test, in folder (TABLE unless text says
+    otherwise), so the players you add to data/nicknames.txt don't change the results: its
+    path."""
+    path = os.path.join(folder, "nicknames.txt")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write(text)
+    patcher = mock.patch.object(nicknames, "NICKNAMES_FILE", path)
+    patcher.start()
+    test.addCleanup(patcher.stop)
+    return path
+
+
 def use_folder(test):
     """A new empty folder for one test: no learned memes and no MEMELEARNER_KNOWN files
-    count as known, so the real ones don't change the results."""
+    count as known, and the nickname table is TABLE, so the real ones don't change the
+    results."""
     folder = tempfile.TemporaryDirectory()
     test.addCleanup(folder.cleanup)
     for patcher in (mock.patch.object(store, "MEMES_FILE", os.path.join(folder.name, "memes.json")),
                     mock.patch.dict(os.environ, {surf.KNOWN_ENV: ""})):
         patcher.start()
         test.addCleanup(patcher.stop)
+    use_table(test, folder.name)
     return folder.name
 
 
@@ -265,7 +283,7 @@ class PhraseTest(unittest.TestCase):
             elif i < 150:
                 text = "怎么翻"  # the same as 怎么翻的
             elif i < 160:
-                text = "怎么输的"  # a variant of it
+                text = "怎么输的"  # a twist of it: another meme
             elif i < 190:
                 # Danmu that contain it: more send them than it, but on their own, so they
                 # aren't discussion that uses it
@@ -279,7 +297,7 @@ class PhraseTest(unittest.TestCase):
             elif i < 265:
                 text = "哈哈哈哈"  # everyday (data/surf_common.txt)
             elif i < 275:
-                text = "千言万语赶紧退役"  # a variant of 千言万语感谢现役, which faded
+                text = "千言万语赶紧退役"  # a twist of 千言万语感谢现役, which faded
             else:
                 text = f"第{i}个回合这个闪光弹给得好"
             lines.append(("cs2", video, message(f"r{i}", text, recent)))
@@ -288,7 +306,8 @@ class PhraseTest(unittest.TestCase):
                                               known=surf.known_phrases(), english_words={"nice"})
         by_phrase = {c["phrase"]: c for c in found}
         self.assertEqual(set(by_phrase), {"阿一古", "正义必胜", "怎么翻的", "我先来怎么翻的",
-                                          "老马又来了", "千言万语感谢现役"})
+                                          "怎么输的", "老马又来了", "千言万语感谢现役",
+                                          "千言万语赶紧退役"})
         ayigu = by_phrase["阿一古"]
         self.assertEqual((ayigu["status"], ayigu["people"], ayigu["people_before"]),
                          ("new", 30, 0))
@@ -300,27 +319,34 @@ class PhraseTest(unittest.TestCase):
         self.assertEqual(by_phrase["正义必胜"]["status"], "new")
         fan = by_phrase["怎么翻的"]  # the way most write it
         self.assertEqual((fan["people"], fan["alone"]), (25, 1.0))
-        self.assertEqual(fan["variants"], [{"phrase": "这怎么翻的", "people": 20},
-                                           {"phrase": "怎么输的", "people": 10}])
+        self.assertEqual(fan["variants"], [{"phrase": "这怎么翻的", "people": 20}])
+        self.assertEqual((fan["pattern"], fan["names"]), ("怎么翻的", []))
         self.assertEqual(by_phrase["老马又来了"]["status"], "steady")
         faded = by_phrase["千言万语感谢现役"]
         self.assertEqual((faded["status"], faded["people_recent"], faded["people_before"]),
                          ("older", 0, 40))
-        self.assertEqual(faded["variants"], [{"phrase": "千言万语赶紧退役", "people": 10}])
+        self.assertEqual(faded["variants"], [])
+        self.assertEqual(by_phrase["千言万语赶紧退役"]["status"], "new")
         self.assertEqual(found[0]["phrase"], "老马又来了")  # the most people, in most videos
         self.assertTrue(summary["cs2"]["baseline"])
         self.assertEqual((summary["cs2"]["recent"], summary["cs2"]["before"]), (300, 300))
 
-    def test_a_phrase_sent_in_one_video_only_counts_as_a_variant(self):
+    def test_the_variants_of_a_meme_are_listed_with_it_and_twists_on_their_own(self):
         lines = []
-        for i in range(30):
-            text = "我们是冠军" if i < 15 else "我们是路边" if i < 24 else "我们是区"
-            video = "BV1three" if text == "我们是区" else f"BV1v{i % 3}"
-            lines.append(("valorant", video, message(f"p{i}", text, NOW - DAY)))
+        for i in range(51):
+            text = ("超威同意了" if i < 15 else "chovy同意了" if i < 24 else "三叔不同意" if i < 30
+                    else "我们是冠军" if i < 39 else "我们是路边" if i < 45 else "我们是区")
+            # 三叔不同意 and 我们是区 are sent in one video only: one video's catchphrase
+            video = "BV1three" if text in ("三叔不同意", "我们是区") else f"BV1v{i % 3}"
+            lines.append(("lol", video, message(f"p{i}", text, NOW - DAY)))
         found, _ = surf.find_candidates(lines, days=7, now=NOW, known=set(), english_words=set())
-        self.assertEqual([(c["phrase"], c["variants"]) for c in found], [
-            ("我们是冠军", [{"phrase": "我们是路边", "people": 9},
-                       {"phrase": "我们是区", "people": 6}])])
+        self.assertEqual([(c["phrase"], c["pattern"], c["variants"]) for c in found], [
+            ("超威同意了", "XX同意了", [{"phrase": "chovy同意了", "people": 9},
+                                   {"phrase": "三叔不同意", "people": 6}]),
+            ("我们是冠军", "我们是冠军", []), ("我们是路边", "我们是路边", [])])
+        self.assertEqual(found[0]["names"], [{"name": "超威", "player": "Chovy"},
+                                             {"name": "chovy", "player": "Chovy"},
+                                             {"name": "三叔", "player": "Canyon"}])
 
     def test_a_handful_of_new_users_is_not_enough_to_call_it_new(self):
         lines = [("cs2", "BV1old", message(f"b{i}", "好家伙", NOW - 20 * DAY)) for i in range(300)]

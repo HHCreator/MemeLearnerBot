@@ -21,6 +21,7 @@ from unittest import mock
 
 import memelearner
 from memelearner import cli, judging, store, surf
+from tests import test_surf
 
 ASK = judging._ask  # the real one, which the tests of online models use
 KEY = "sk-test-0123456789"  # a made-up DeepSeek API key
@@ -146,12 +147,16 @@ class JudgeTest(unittest.TestCase):
                 mock.patch.object(judging, "_execution_state", self.awake.append)):
             patcher.start()
             self.addCleanup(patcher.stop)
+        self.table = test_surf.use_table(self, folder.name)
         self.now = time.time()
 
-    def write_run(self, people=None, more=None):
+    def write_run(self, people=None, more=None, variants=None, found=None):
         """What a run read and found: lines using 阿一古, fpx, 怎么翻, 正义必胜 and 神中神 under
         two LoL videos, and the five as candidates; more: {phrase: (its lines in the first
-        video, in the second)} for more candidates."""
+        video, in the second)} for more candidates. variants: {phrase: [(variant, people)]},
+        the variants the finder listed with a candidate (default: ig正义必胜 with 正义必胜);
+        found: {phrase: {field: value}}, more of what the finder says about one."""
+        variants = {"正义必胜": [("ig正义必胜", 3)]} if variants is None else variants
         lines = {
             "BV1aaaaaaaaa": ["阿一古阿一古 又来了", "这波阿一古了兄弟们", "阿一古！！！", "主播又在阿一古",
                              "阿一古来了家人们", "fpx加油", "FPX 这波可以", "这局怎么翻",
@@ -183,10 +188,11 @@ class JudgeTest(unittest.TestCase):
                             "people": people.get(phrase, 5), "people_recent": 5,
                             "people_before": 0, "alone": 0.9, "videos": 2, "rise": None,
                             "score": 10.0,
-                            "variants": [{"phrase": "正义必输", "people": 3}]
-                            if phrase == "正义必胜" else [],
+                            "variants": [{"phrase": variant, "people": n}
+                                         for variant, n in variants.get(phrase, [])],
                             "examples": [{"text": phrase, "video": bvid, "kind": "danmu",
-                                          "sent": "2026-10-31"} for bvid in videos]}
+                                          "sent": "2026-10-31"} for bvid in videos],
+                            **(found or {}).get(phrase, {})}
                            for phrase in ["阿一古", "fpx", "怎么翻", "正义必胜", "神中神"]
                            + list(more or {})]})
 
@@ -223,7 +229,11 @@ class JudgeTest(unittest.TestCase):
         self.assertEqual((chant["guess"], chant["explanations"]), (True, []))
         self.assertNotIn("正义必胜", self.model.tested)  # no longer lines to test it on
         self.assertNotIn("test", chant)
-        self.assertEqual(self.model.explained["正义必胜"]["variants"], ["正义必输"])
+        # With its variants, and who the names in them are
+        asked = self.model.explained["正义必胜"]
+        self.assertEqual((asked["variants"], asked["pattern"], asked["names"]),
+                         ([{"phrase": "ig正义必胜", "people": 3}], "正义必胜",
+                          [{"name": "ig", "player": ""}]))
         # 正义必胜 is the same line as the newer 正义必胜！
         self.assertEqual(sorted(self.model.explained["正义必胜"]["lines"]),
                          ["正义必胜正义必胜", "正义必胜！"])
@@ -284,7 +294,9 @@ class JudgeTest(unittest.TestCase):
         self.write_run(more={"大超同意了": self.SAME_AS, "blg加油": self.CHEER})
         verdicts = self.judge()
         asked = self.model.explained
-        learned = [{"phrase": "超威同意了", "meaning": "调侃超威点头认可", "notes": ["chovy就是超威"]}]
+        # 超威同意了 is the same meme as 大超同意了 (大超 is Chovy too): "same"
+        learned = [{"phrase": "超威同意了", "meaning": "调侃超威点头认可", "notes": ["chovy就是超威"],
+                    "variants": [], "same": True}]
         self.assertEqual((asked["大超同意了"]["learned"], asked["大超同意了"]["turned_down"]),
                          (learned, []))
         self.assertEqual((asked["blg加油"]["learned"], asked["blg加油"]["turned_down"]),
@@ -299,6 +311,79 @@ class JudgeTest(unittest.TestCase):
         shown = {phrase: q for _, kind, phrase, q in self.model.asked if kind == "explain"}
         self.assertEqual(shown["大超同意了"]["learned"], learned)
         self.assertEqual(shown["blg加油"]["turned_down"], asked["blg加油"]["turned_down"])
+
+    def test_the_model_sees_the_whole_meme_and_who_the_names_in_it_are(self):
+        store.accept("超威同意了", meaning="调侃超威点头认可", variants=["chovy同意了"])
+        self.write_run(more={"大超同意了": self.SAME_AS},
+                       variants={"大超同意了": [("三叔不同意", 6), ("ruler同意了", 4)]},
+                       found={"大超同意了": {"pattern": "XX同意了", "names": [
+                           {"name": "大超", "player": "Chovy"}, {"name": "三叔", "player": "Canyon"},
+                           {"name": "ruler", "player": ""}]}})
+        self.judge()
+        asked = self.model.explained["大超同意了"]
+        self.assertEqual((asked["variants"], asked["pattern"]), (
+            [{"phrase": "三叔不同意", "people": 6}, {"phrase": "ruler同意了", "people": 4}],
+            "XX同意了"))
+        self.assertEqual(asked["names"], [{"name": "大超", "player": "Chovy"},
+                                          {"name": "三叔", "player": "Canyon"},
+                                          {"name": "ruler", "player": ""}])
+        # The learned meme it is, with its variants, first
+        self.assertEqual(asked["learned"][0], {"phrase": "超威同意了", "meaning": "调侃超威点头认可",
+                                               "notes": [], "variants": ["chovy同意了"],
+                                               "same": True})
+        calls = self.model.calls
+        self.judge()
+        self.assertEqual(self.model.calls, calls)  # nothing new: not asked again
+        # A nickname you add to the table: asked again, with who it is
+        with open(self.table, "a", encoding="utf-8") as f:
+            f.write("Ruler = ruler, 尺帝\n")
+        self.judge()
+        self.assertEqual(self.model.calls, calls + 1)  # explained (its answer isn't JSON)
+        self.assertEqual(self.model.explained["大超同意了"]["names"][2],
+                         {"name": "ruler", "player": "Ruler"})
+        # ... and one the finder didn't see as a name
+        self.write_run(more={"大超同意了": self.SAME_AS},
+                       variants={"大超同意了": [("尺帝同意了", 2)]},
+                       found={"大超同意了": {"names": [{"name": "大超", "player": "Chovy"}]}})
+        self.judge()
+        self.assertEqual(self.model.explained["大超同意了"]["names"],
+                         [{"name": "大超", "player": "Chovy"}, {"name": "尺帝", "player": "Ruler"}])
+
+    # -- where a meme comes from -----------------------------------------------------------
+
+    ROADSIDE = (["我们是路边兄弟们", "我们是路边出自我们是冠军"], ["我们是路边！", "这波我们是路边"])
+    CHAMPION = (["我们是冠军！", "我们是冠军冲冲冲"], ["我们是冠军", "我们是冠军啊"])
+
+    def source_given(self, source, how):
+        """The verdict's source when the model says 我们是路边 comes from source, knowing it
+        how."""
+        self.model.answers_for["deepseek-r1:14b"] = {"我们是路边": {
+            "kind": "meme", "meaning": "自嘲水平差", "english": "we're roadside",
+            "literal": "我们在路边", "source": source, "source_how": how, "why": "..."}}
+        return self.judge(again=True)["我们是路边"]["source"]
+
+    def test_the_model_says_where_a_derived_meme_comes_from_and_how_it_knows(self):
+        self.write_run(more={"我们是路边": self.ROADSIDE, "我们是冠军": self.CHAMPION},
+                       people={"我们是冠军": 9})
+        self.judge()
+        # It sees the run's phrases on its template that are another meme
+        self.assertEqual(self.model.explained["我们是路边"]["alike"],
+                         [{"phrase": "我们是冠军", "people": 9}])
+        # A line explains it: found
+        self.assertEqual(self.source_given("我们是冠军", "explanation"),
+                         {"phrase": "我们是冠军", "how": "explanation"})
+        # Nothing it went by says so: a guess
+        for how in ("video", "learned", "maybe"):
+            self.assertEqual(self.source_given("我们是冠军", how),
+                             {"phrase": "我们是冠军", "how": "guess"}, how)
+        # A phrase it wasn't shown is made up, and the meme itself is no source
+        for made_up in ("我们是亚军", "我们是路边", "我们是路边啊", ""):
+            self.assertIsNone(self.source_given(made_up, "guess"), made_up)
+        # Your note on a learned meme says so: found
+        store.accept("我们是冠军", meaning="庆祝夺冠的口号", note="我们是路边是从它变来的")
+        self.assertEqual(self.source_given("我们是冠军", "learned"),
+                         {"phrase": "我们是冠军", "how": "learned"})
+        self.assertIsNone(self.judge(again=True)["阿一古"]["source"])  # none said
 
     def test_a_phrase_is_judged_again_once_a_meme_like_it_is_learned_or_your_note_changes(self):
         self.write_run(more={"大超同意了": self.SAME_AS})
@@ -451,7 +536,7 @@ class JudgeTest(unittest.TestCase):
         self.assertIn(f"-> a meme, only the model's guess: {CHANT}", printed)
         self.assertIn("-> not a meme: a name", printed)
         self.assertIn("90% on its own", printed)
-        self.assertIn("also 正义必输", printed)
+        self.assertIn("also ig正义必胜", printed)
         code, printed = self.run_cli("watching", "--json")
         self.assertEqual(sorted(v["phrase"] for v in json.loads(printed)), ["怎么翻", "神中神"])
         with mock.patch.object(judging, "_get_json", lambda path: {"models": []}):
@@ -723,7 +808,7 @@ class JudgeTest(unittest.TestCase):
                       "(blind test: 3 of 4 lines)", report)
         self.assertIn("- **qwen3:14b**: not a meme, an everyday word: 就是感叹", report)
         self.assertIn("5 people send it on its own (90% of those who use it), in 2 videos; "
-                      "also 正义必输", report)
+                      "also ig正义必胜", report)
 
     def test_the_command_line_compares_the_top_phrases_and_keeps_them_when_a_model_stops(self):
         self.write_run()

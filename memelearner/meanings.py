@@ -31,7 +31,7 @@ instead.
 import re
 import unicodedata
 
-from . import judging, store
+from . import judging, store, variants
 
 MEANING_LENGTH = 400  # characters kept of a merged meaning: your notes can be long
 ENGLISH_LENGTH = 300  # ... and of its English gloss (both cut at the end of a sentence)
@@ -43,6 +43,9 @@ NAME = 8  # characters an X in a pattern ("XX同意了") stands for: a name
 # "XX同意了"的变体, 和"卑鄙的外乡人"意思一样)
 SAME = re.compile(r"同一个?梗|是同一个|一样的梗|意思(一样|相同)|来源同|出处同|同出|同源|变体|变种"
                   r"|同上")
+# What says where a meme comes from ("阿一古"的变体, 来源于"搏至无憾", 从我们是冠军变来的),
+# but not that it has the same one as another (来源同"wei出": that's the same meme)
+FROM = re.compile(r"变体|变种|来源(?!同)|来自|源于|源自|出自|出处(?!同)|变来|演变|改编|改的|谐音")
 # A word in quotes, written either way round (“涅槃” or ”涅槃“)
 QUOTED = re.compile(r"[“”\"「」『』]\s*([^“”\"「」『』\n]{1,20}?)\s*[“”\"「」『』]")
 PLACEHOLDER = re.compile(r"(?<![a-z])x+(?![a-z])", re.I)  # the X in "X出": a name
@@ -115,6 +118,27 @@ def same_as(phrase, note, known):
                                 if other != phrase and pattern.fullmatch(other))
         found += [other for other in named if other not in found]
     return found[:SAME_MEMES]
+
+
+def source_in(phrase, note, known=(), own=()):
+    """The meme your note on phrase says it comes from, or "": a word it quotes in a part
+    that says so (”阿一古“的变体, 来源于“搏至无憾”), or else the longest of known (phrases,
+    like the learned memes) that such a part names (从我们是冠军变来的). Not a pattern
+    ("XX翻了"), nor phrase, nor one of own (its variants), nor any other way of writing it
+    (variants.same_meme()): a meme doesn't come from itself."""
+    mine = [store.normal(p) for p in [phrase, *own]]
+    for clause in CLAUSE.findall(unicodedata.normalize("NFKC", note or "")):
+        if not FROM.search(clause):
+            continue
+        text = store.normal(clause)
+        named = [q.strip() for q in QUOTED.findall(clause) if not PLACEHOLDER.search(q)]
+        named += sorted((other for other in known if len(other) > 1 and other in text),
+                        key=lambda other: (-len(other), text.index(other)))
+        for other in named:
+            key = store.normal(other)
+            if key and key not in mine and not any(variants.same_meme(p, other) for p in mine):
+                return other
+    return ""
 
 
 def _common(a, b):

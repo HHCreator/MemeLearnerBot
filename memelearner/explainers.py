@@ -15,7 +15,9 @@ TOP a run):
                   without a captcha: the lists the collector reads, and those beside every
                   explainer it reads), and Bilibili's search for "阿一古是什么梗", which is
                   tried until it asks for a captcha once in a run (the bot never solves
-                  captchas), and for each phrase once in AGAIN_DAYS days.
+                  captchas), and for each phrase once in AGAIN_DAYS days. When none names
+                  it, the same for where it may come from, as the judge says (its source:
+                  千言万语感谢现役 for 千言万语感谢多兰, 超威同意了 for the pattern XX同意了).
     2. Read       Up to VIDEOS of them per phrase, each video once: its page (title,
                   description, tags, subtitles when a visitor gets them, related videos),
                   its hot comments and its danmu, as any visitor who isn't logged in sees
@@ -31,7 +33,9 @@ TOP a run):
                   the video. A quote the video doesn't contain is dropped.
     4. Judge      The phrases with new summaries are judged again, the model getting what
                   the videos say beside the danmu (judging.judge_one()). A meaning a video
-                  backs isn't only a guess any more, so accept takes it.
+                  backs isn't only a guess any more, so accept takes it; a video about where
+                  a meme comes from shows the model that source, but doesn't back the
+                  meaning of the meme itself.
 
 What it read goes to explainers.json and explainers/ in the cache folder, so a video is read
 once. A phrase no video explained is looked up again after AGAIN_DAYS days.
@@ -50,7 +54,7 @@ import re
 import time
 import urllib.error
 
-from . import bilibili, judging, store, surf
+from . import bilibili, judging, store, surf, variants
 
 TOP = 10  # phrases looked up in one run
 VIDEOS = 2  # videos read for each phrase
@@ -132,7 +136,8 @@ def _save(data):
 
 def explained():
     """{"game:phrase": [summary, ...]}: what the videos read so far say each phrase means,
-    only from the videos that explain it (see summarize()), for the judge."""
+    only from the videos that explain it, or where it may come from ("for" says which, see
+    summarize()), for the judge."""
     found = {}
     for key, entry in load()["phrases"].items():
         told = [video for video in entry.get("videos") or []
@@ -373,8 +378,9 @@ def summarize(phrase, game, video, model):
     """Step 3 for one video: what it says a phrase means. Returns {"bvid", "url", "title",
     "author", "about" (whether it explains the phrase), "meaning", "origin", "english",
     "quote" (a line it says that shows the meaning, "" when the model's quote isn't in it),
-    "heard", "model", "summarized"}. Raises judging.ModelUnavailable when the model can't be
-    asked."""
+    "heard", "model", "summarized"}; explain() adds "for", the phrase it explains, to a
+    video about where a meme may come from. Raises judging.ModelUnavailable when the model
+    can't be asked."""
     shown = question(phrase, game, video)
     answer = judging._answer(SUMMARY, shown, model)
     about = answer.get("about") is True or \
@@ -434,7 +440,7 @@ def _wanted(phrases, games, top, again, data):
         entry = data["phrases"].get(f"{candidate['game']}:{candidate['phrase']}") or {}
         if need is None or candidate["phrase"] in done:
             continue
-        told = any(video.get("about") and video.get("meaning")
+        told = any(video.get("about") and video.get("meaning") and not video.get("for")
                    for video in entry.get("videos") or [])
         if not again and (told or _recent(entry.get("looked"))):
             continue  # explained already, or looked up lately
@@ -442,12 +448,46 @@ def _wanted(phrases, games, top, again, data):
     return [c for _, _, c in sorted(ranked, key=lambda item: item[:2])][:top]
 
 
+def source_of(candidate, memes=None):
+    """The phrase a candidate may come from, by the judge (its "source"), to look for
+    videos explaining it: a phrase as it is written, or for a pattern (XX同意了), the
+    learned meme of that pattern (超威同意了); None when there's none to look for."""
+    source = ((candidate.get("judge") or {}).get("source") or {}).get("phrase") or ""
+    if "X" not in source:
+        return store.normal(source) or None
+    memes = store.load()["memes"] if memes is None else memes
+    wanted = re.sub("X+", "X", source)
+    return next((phrase for phrase in memes
+                 if re.sub("X+", "X", variants.pattern(phrase).upper()) == wanted.upper()), None)
+
+
+def _search(query, search, names, how="search"):
+    """Bilibili's search for query (阿一古是什么梗): the videos it found whose titles name
+    one of names, or None when it couldn't search; search is shared by a run (see find())."""
+    try:
+        results = bilibili.search_videos(query, order="totalrank")
+    except bilibili.Captcha:
+        search["refused"] = True
+        print("    Bilibili wants a captcha for the search, so it's skipped for the rest "
+              "of this run")
+    except bilibili.Error as error:
+        print(f"    the search failed: {error}")
+    except (urllib.error.URLError, OSError) as error:
+        print(f"    the search failed (network trouble: {error})")
+    else:
+        remember(results, "search")
+        return [dict(video, how=how) for video in results
+                if any(mentions(video.get("title"), name) for name in names)]
+    return None
+
+
 def find(candidate, links=(), search=None, data=None, again=False):
     """Step 1 for a candidate: the videos that may explain it, best first: [{"bvid",
-    "title", "how"}]. With links, just those; else the explainer videos seen before whose
-    titles name it or one of its variants, and when none does, a search, once per
+    "title", "how", "for"}]. With links, just those; else the explainer videos seen before
+    whose titles name it or one of its variants, and when none does, a search, once per
     AGAIN_DAYS days (search is shared by a run: {"refused": True} once Bilibili asked for a
-    captcha)."""
+    captcha). When that finds none either, the same for where it may come from
+    (source_of(): 千言万语感谢现役 for 千言万语感谢多兰), with "for" naming it."""
     search = {} if search is None else search
     data = load() if data is None else data
     names = [candidate["phrase"]] + [v["phrase"] for v in candidate.get("variants") or []]
@@ -471,21 +511,21 @@ def find(candidate, links=(), search=None, data=None, again=False):
                if any(mentions(video.get("title"), name) for name in names)]
     if not matches and not search.get("refused") and \
             (again or not _recent(entry.get("searched"))):
-        try:
-            results = bilibili.search_videos(f"{candidate['phrase']}是什么梗", order="totalrank")
-        except bilibili.Captcha:
-            search["refused"] = True
-            print("    Bilibili wants a captcha for the search, so it's skipped for the rest "
-                  "of this run")
-        except bilibili.Error as error:
-            print(f"    the search failed: {error}")
-        except (urllib.error.URLError, OSError) as error:
-            print(f"    the search failed (network trouble: {error})")
-        else:
+        results = _search(f"{candidate['phrase']}是什么梗", search, names)
+        if results is not None:
             entry["searched"] = time.strftime("%Y-%m-%d %H:%M")
-            remember(results, "search")
-            matches += [dict(video, how="search") for video in results
-                        if any(mentions(video.get("title"), name) for name in names)]
+            matches += results
+    source = None if matches else source_of(candidate)
+    if source:  # nothing explains it: what explains where it may come from
+        matches = [dict(video, bvid=bvid, about=source) for bvid, video in seen.items()
+                   if mentions(video.get("title"), source)]
+        if not matches and not search.get("refused") and \
+                (again or not _recent(entry.get("source_searched"))):
+            results = _search(f"{source}是什么梗", search, [source])
+            if results is not None:
+                entry["source_searched"] = time.strftime("%Y-%m-%d %H:%M")
+                matches += [dict(video, about=source) for video in results]
+        names = [source]
 
     def rank(video):
         title = video.get("title") or ""
@@ -493,8 +533,10 @@ def find(candidate, links=(), search=None, data=None, again=False):
         return (not MADE_TO_EXPLAIN.search(title), named, -(video.get("plays") or 0))
 
     for video in sorted(matches, key=rank):
-        found.setdefault(video["bvid"], {"bvid": video["bvid"], "title": video.get("title", ""),
-                                         "how": video.get("how", "related")})
+        found.setdefault(video["bvid"], dict(
+            {"bvid": video["bvid"], "title": video.get("title", ""),
+             "how": video.get("how", "related")},
+            **({"for": video["about"]} if video.get("about") else {})))
     return list(found.values())
 
 
@@ -568,9 +610,13 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
             if not found:
                 print(f"    no new video (read {len(summed)} before)" if summed else
                       "    found no video that explains it")
+            elif found[0].get("for"):
+                print(f"    found no video that explains it, so these explain "
+                      f"{found[0]['for']}, which it may come from:")
             for video in found:
+                about = video.get("for") or phrase  # what the video explains: it, or its source
                 try:
-                    material = read(video["bvid"], phrase, hearing)
+                    material = read(video["bvid"], about, hearing)
                 except bilibili.Captcha as error:
                     print(f"    skipped {video['bvid']}: {error}")
                     continue
@@ -585,14 +631,16 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
                           f"way: {error!r})")
                     continue
                 try:
-                    summary = summarize(phrase, game, material, model)
+                    summary = summarize(about, game, material, model)
                 except judging._Unreachable as error:  # the online model stopped answering
                     model = _stand_in(error, rest=True)
-                    summary = summarize(phrase, game, material, model)
+                    summary = summarize(about, game, material, model)
+                if video.get("for"):
+                    summary["for"] = video["for"]
                 entry["videos"] = [v for v in entry.get("videos") or []
                                    if v["bvid"] != summary["bvid"]] + [summary]
                 new.setdefault(key, []).append(summary)
-                show(summary, phrase)
+                show(summary, about)
             if phrase not in links:  # links you give don't stop it looking by itself
                 entry["looked"] = time.strftime("%Y-%m-%d %H:%M")
             _save(data)
@@ -603,10 +651,15 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
         print("Stopped reading Bilibili.")
     finally:
         _save(data)
-    told = {c["phrase"] for c in wanted
-            if any(summary["about"] for summary in new.get(f"{c['game']}:{c['phrase']}", ()))}
+    said = lambda c, source: any(summary["about"] and bool(summary.get("for")) == source
+                                 for summary in new.get(f"{c['game']}:{c['phrase']}", ()))
+    told = {c["phrase"] for c in wanted if said(c, False)}
+    sourced = {c["phrase"] for c in wanted if said(c, True)}  # where it may come from
     print(f"\n{len(told)} of {len(wanted)} phrases are explained by a video now.")
-    again = {c["phrase"] for c in wanted if c["phrase"] in told and not c.get("made_up")}
+    if sourced:
+        print(f"{len(sourced)} more have a video about where they may come from.")
+    again = {c["phrase"] for c in wanted if c["phrase"] in told | sourced
+             and not c.get("made_up")}
     if judge and again:
         print()
         # With the model asked for: judge() has LOCAL_MODEL stand in by itself, and the

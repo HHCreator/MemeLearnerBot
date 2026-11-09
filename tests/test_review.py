@@ -82,8 +82,9 @@ class ReviewTest(unittest.TestCase):
                            ("lol:fpx", "", "Not a meme", "")])
         review.choose(rows, "lol:fpx", "decision", "")  # taken back
         self.assertEqual(review.chosen(review.rows())["lol:阿一古"],
-                         {"mark": "Correct", "decision": "Add", "note": "主播的口头禅"})
-        self.assertEqual(review.chosen(rows)["lol:fpx"], {"mark": "", "decision": "", "note": ""})
+                         {"mark": "Correct", "decision": "Add", "note": "主播的口头禅", "apart": []})
+        self.assertEqual(review.chosen(rows)["lol:fpx"],
+                         {"mark": "", "decision": "", "note": "", "apart": []})
         for bad in (("lol:阿一古", "mark", "Great"), ("lol:没有", "mark", "Correct"),
                     ("lol:阿一古", "meaning", "x"), ("lol:阿一古", "note", None)):
             with self.assertRaises(ValueError, msg=bad):
@@ -94,7 +95,7 @@ class ReviewTest(unittest.TestCase):
             test_judge.FakeModel.ANSWERS["阿一古"], meaning="另一个意思")}
         self.judge(again=True)  # another answer: the Mark was on the old one
         self.assertEqual(review.chosen(review.rows())["lol:阿一古"],
-                         {"mark": "", "decision": "Add", "note": "主播的口头禅"})
+                         {"mark": "", "decision": "Add", "note": "主播的口头禅", "apart": []})
 
     def test_done_learns_the_adds_with_your_notes_merged_and_turns_down_the_rest(self):
         rows = review.rows()
@@ -115,7 +116,8 @@ class ReviewTest(unittest.TestCase):
         self.assertEqual([row["phrase"] for row in review.rows()], ["神中神"])  # for next time
         self.assertEqual([(a["phrase"], a["from"]) for a in result["added"]],
                          [("阿一古", "judge"), ("正义必胜", "merged"), ("怎么翻", "note")])
-        self.assertEqual(result["rejected"], [{"phrase": "fpx", "reason": "FPX 战队的名字"}])
+        self.assertEqual(result["rejected"],
+                         [{"phrase": "fpx", "reason": "FPX 战队的名字", "variants": []}])
         self.assertEqual(result["left"], [{"phrase": "神中神", "decision": "Not sure yet"}])
         self.assertEqual(result["score"], {"deepseek-r1:14b": {
             "points": 2, "answers": 4, "marks": {"Correct": 3, "Wrong": 1, "I don't know": 1}}})
@@ -125,7 +127,8 @@ class ReviewTest(unittest.TestCase):
         again = review.finish(review.rows())
         self.assertEqual((again["added"], again["rejected"], again["score"]), ([], [], {}))
         self.assertEqual(review.chosen(review.rows())["lol:神中神"],
-                         {"mark": "I don't know", "decision": "Not sure yet", "note": ""})
+                         {"mark": "I don't know", "decision": "Not sure yet", "note": "",
+                          "apart": []})
 
     def test_a_guess_you_didnt_mark_right_is_not_learned_and_no_note_gives_the_date(self):
         rows = review.rows()
@@ -149,6 +152,147 @@ class ReviewTest(unittest.TestCase):
             review.finish(rows)
         self.assertEqual(store.load()["memes"], {})
         self.assertEqual(review.chosen(rows)["lol:正义必胜"]["decision"], "Add")
+
+    # -- one row for each meme ------------------------------------------------------------
+
+    AGREED = {"大超同意了": test_judge.JudgeTest.SAME_AS}
+    NAMES = [{"name": "大超", "player": "Chovy"}, {"name": "三叔", "player": "Canyon"},
+             {"name": "ruler", "player": ""}]
+
+    def test_a_meme_is_one_row_with_its_variants_and_one_decision_takes_them_all(self):
+        self.write_run(more=self.AGREED, variants={"大超同意了": [
+            ("三叔不同意", 6), ("ruler同意了", 4), ("我不同意", 2)]}, found={"大超同意了": {
+                "pattern": "XX同意了", "names": self.NAMES}})
+        self.judge()
+        rows = review.rows()
+        row = next(row for row in rows if row["phrase"] == "大超同意了")
+        self.assertEqual((row["pattern"], row["learned"]), ("XX同意了", None))
+        self.assertEqual(row["variants"], [{"phrase": "三叔不同意", "people": 6},
+                                           {"phrase": "ruler同意了", "people": 4},
+                                           {"phrase": "我不同意", "people": 2}])
+        self.assertEqual(row["names"], self.NAMES)
+        # One click keeps a variant out: it isn't this meme
+        review.choose(rows, row["key"], "decision", "Add")
+        review.choose(rows, row["key"], "apart", ["我不同意", "我不同意"])
+        for bad in (["没有这个"], "我不同意", [1]):
+            with self.assertRaises(ValueError, msg=bad):
+                review.choose(rows, row["key"], "apart", bad)
+        self.assertEqual(review.chosen(rows)[row["key"]]["apart"], ["我不同意"])
+        review.choose(rows, "lol:fpx", "decision", "Not a meme")
+        result = review.finish(rows)
+        meme = store.load()["memes"]["大超同意了"]  # one entry, found by any of its variants
+        self.assertEqual((meme["variants"], meme["apart"]),
+                         (["三叔不同意", "ruler同意了"], ["我不同意"]))
+        self.assertEqual(store.lookup("ruler同意了")["phrase"], "大超同意了")
+        self.assertIsNone(store.lookup("我不同意"))
+        self.assertNotIn("我不同意", store.load()["rejected"])  # not this meme, but maybe one
+        added = next(a for a in result["added"] if a["phrase"] == "大超同意了")
+        self.assertEqual((added["variants"], added["learned"]), (["三叔不同意", "ruler同意了"], False))
+        self.assertIn("    variants: 三叔不同意, ruler同意了", review.summary(result))
+
+    def test_not_a_meme_turns_down_its_variants_too(self):
+        self.write_run(variants={"fpx": [("fpx加油", 3), ("fpxs", 2)]})
+        self.judge()
+        rows = review.rows()
+        review.choose(rows, "lol:fpx", "decision", "Not a meme")
+        review.choose(rows, "lol:fpx", "apart", ["fpxs"])
+        result = review.finish(rows)
+        self.assertEqual(sorted(store.load()["rejected"]), ["fpx", "fpx加油"])
+        self.assertEqual(result["rejected"][0]["variants"], ["fpx加油"])
+        self.assertIn("    with its variants: fpx加油", review.summary(result))
+
+    def test_a_new_variant_of_a_learned_meme_joins_it(self):
+        store.accept("超威同意了", meaning="调侃超威点头认可", english="Chovy agrees",
+                     variants=["chovy同意了"])
+        ruler = (["ruler同意了兄弟们", "ruler同意了"], ["ruler同意了！", "这波ruler同意了吧"])
+        self.write_run(more={"ruler同意了": ruler}, variants={"ruler同意了": [("kiin不同意", 3)]})
+        self.judge()
+        rows = review.rows()
+        row = next(row for row in rows if row["phrase"] == "ruler同意了")
+        self.assertEqual(row["learned"], {"phrase": "超威同意了", "meaning": "调侃超威点头认可",
+                                          "english": "Chovy agrees"})
+        review.choose(rows, row["key"], "decision", "Add")
+        result = review.finish(rows)
+        memes = store.load()["memes"]
+        self.assertNotIn("ruler同意了", memes)  # one meme, one entry: it went into 超威同意了
+        self.assertEqual((memes["超威同意了"]["meaning"], memes["超威同意了"]["variants"]),
+                         ("调侃超威点头认可", ["chovy同意了", "ruler同意了", "kiin不同意"]))
+        self.assertEqual([(a["phrase"], a["from"], a["learned"], a["variants"])
+                          for a in result["added"]],
+                         [("超威同意了", "learned", True, ["ruler同意了", "kiin不同意"])])
+        self.assertIn("    new variants: ruler同意了, kiin不同意", review.summary(result))
+        # Your note on a new variant goes into the learned meme's meaning
+        self.write_run(more={"faker同意了": ruler})
+        self.judge()
+        rows = review.rows()
+        self.assertEqual(next(row["learned"]["phrase"] for row in rows
+                              if row["phrase"] == "faker同意了"), "超威同意了")
+        review.choose(rows, "lol:faker同意了", "decision", "Add")
+        review.choose(rows, "lol:faker同意了", "note", "谁都可以同意")
+        review.finish(rows)
+        self.assertEqual([(q["phrase"], q["model"], q["note"]) for q in self.merged],
+                         [("超威同意了", "调侃超威点头认可", "谁都可以同意")])
+        meme = store.load()["memes"]["超威同意了"]
+        self.assertEqual((meme["meaning"], meme["notes"], meme["variants"][-1]),
+                         ("调侃超威点头认可；谁都可以同意", ["谁都可以同意"], "faker同意了"))
+
+    def test_where_a_meme_comes_from_is_shown_and_kept_as_far_as_your_mark_lets_it(self):
+        store.accept("我们是冠军", meaning="庆祝夺冠的口号", note="我们是路边是从它变来的")
+        self.model.answers_for["deepseek-r1:14b"] = {
+            phrase: {"kind": "meme", "meaning": "自嘲", "source": "我们是冠军",
+                     "source_how": "learned", "why": "..."} for phrase in ("我们是路边", "我们是区")}
+        self.write_run(more={"我们是路边": (["我们是路边兄弟们"], ["这波我们是路边"]),
+                             "我们是区": (["我们是区兄弟们"], ["这波我们是区"])})
+        self.judge()
+        rows = review.rows()
+        source = {row["phrase"]: row["source"] for row in rows}
+        # Your note names 我们是路边, not 我们是区: that one is only the model's guess
+        self.assertEqual((source["我们是路边"], source["我们是区"]),
+                         ({"phrase": "我们是冠军", "how": "learned"},
+                          {"phrase": "我们是冠军", "how": "guess"}))
+        self.assertIsNone(source["阿一古"])
+        self.choose(rows, [("lol:我们是路边", "", "Add", ""), ("lol:我们是区", "", "Add", "")])
+        result = review.finish(rows)
+        self.assertEqual(store.lookup("我们是路边")["source"], {"phrase": "我们是冠军", "how": "learned"})
+        self.assertIsNone(store.lookup("我们是区")["source"])  # a guess you didn't mark right
+        self.assertIn("    comes from 我们是冠军 (learned)", review.summary(result))
+        # A guess you marked right is kept; anything you marked Wrong isn't
+        row = next(row for row in rows if row["phrase"] == "我们是区")
+        self.assertEqual(review._source(row, "Correct"), {"phrase": "我们是冠军", "how": "guess"})
+        self.assertIsNone(review._source(dict(row, source={"phrase": "x", "how": "video"}),
+                                         "Wrong"))
+
+    def test_your_note_says_where_a_meme_comes_from(self):
+        self.choose(review.rows(), [
+            ("lol:正义必胜", "Correct", "Add", "来源于“正义永不缺席”，常常在比赛前刷"),
+            ("lol:阿一古", "Correct", "Add", "“啊一古”的变体，啊和阿基本是同一个字"),
+            ("lol:怎么翻", "Wrong", "Add", "“XX翻了”的变体，嘲笑落后太多")])
+        result = review.finish(review.rows())
+        self.assertEqual(store.lookup("正义必胜")["source"], {"phrase": "正义永不缺席", "how": "note"})
+        self.assertIn("    comes from 正义永不缺席 (note)", review.summary(result))
+        # Another way of writing it, or a pattern, is no source
+        self.assertIsNone(store.lookup("阿一古")["source"])
+        self.assertIsNone(store.lookup("怎么翻")["source"])
+
+    def test_two_memes_dont_come_from_each_other(self):
+        rows = [{"key": "lol:把光借给ig", "phrase": "把光借给ig", "variants": [{"phrase": "把光借给blg"}]},
+                {"key": "lol:把力量借给ig", "phrase": "把力量借给ig", "variants": []},
+                {"key": "lol:豹一豹", "phrase": "豹一豹", "variants": []}]
+        guess = lambda phrase: {"phrase": phrase, "how": "guess"}
+        # The model guessed each of them comes from the other: neither is kept
+        sources = {"lol:把光借给ig": guess("把力量借给ig"), "lol:把力量借给ig": guess("把光借给blg"),
+                   "lol:豹一豹": guess("豹一把")}
+        review._untangle(rows, sources, {})
+        self.assertEqual(sources, {"lol:把光借给ig": None, "lol:把力量借给ig": None,
+                                   "lol:豹一豹": guess("豹一把")})
+        # A guess gives way to a source found, here or in a learned meme
+        found = {"phrase": "把光借给ig", "how": "note"}
+        sources = {"lol:把光借给ig": guess("把力量借给ig"), "lol:把力量借给ig": found}
+        review._untangle(rows[:2], sources, {})
+        self.assertEqual(sources, {"lol:把光借给ig": None, "lol:把力量借给ig": found})
+        sources = {"lol:把光借给ig": guess("把力量借给ig")}
+        review._untangle(rows[:1], sources, {"把力量借给ig": {"source": found}})
+        self.assertEqual(sources, {"lol:把光借给ig": None})
 
     def test_the_page_holds_the_rows_and_no_line_can_end_its_script(self):
         rows = review.rows()

@@ -23,11 +23,17 @@ A meme is a dict:
      "games": ["lol"],                 where it was seen: cs2, lol, valorant, dota2
      "added": "2026-11-01",            when it was learned
      "examples": ["这下真的绷不住了"],    a few lines that used it
-     "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"]}   videos those came from
+     "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"],   videos those came from
+     "variants": [],                   other ways the same meme is written: lookup() and
+                                       find() find it by any (超威同意了: chovy同意了 ...)
+     "source": None}                   the meme it comes from, and how the judge knows:
+                                       {"phrase": "我们是冠军", "how": "learned"} for
+                                       我们是路边 (see store.py), or None
 
 A candidate is a short danmu that many people send on their own, with how new it is, its
-numbers, its variants and example lines (see surf.find_candidates()), and once judged, the
-model's verdict and meaning ("judge", see judging.judge()). Apps that aren't written
+numbers, its variants (the same meme written differently: variants.py), its pattern
+(XX同意了), the names in it and example lines (see surf.find_candidates()), and once
+judged, the model's verdict and meaning ("judge", see judging.judge()). Apps that aren't written
 in Python get the same through the command line with --json (cli.py), or read
 data/memes.json, which holds the learned memes (its format is in store.py). API_VERSION
 changes when a field changes meaning or goes away; a new field doesn't change it.
@@ -41,7 +47,8 @@ from .judging import ModelUnavailable, watching
 from .store import find, forget, lookup, memes, reject
 
 __version__ = "0.3.0"
-API_VERSION = 2  # 2: a candidate is a phrase people send on their own, new or not
+API_VERSION = 3  # 2: a candidate is a phrase people send on their own, new or not;
+#                 3: a meme written in more than one way is one meme, with its "variants"
 
 __all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "explain", "watching",
            "accept", "reject", "forget", "ModelUnavailable", "API_VERSION"]
@@ -52,7 +59,8 @@ def candidates(game=None):
     down since; only one game's when game is given. [] before the first run."""
     found = surf._load_json(surf.CANDIDATES_FILE, {}).get("candidates") or []
     done = store.phrases()
-    return [c for c in found if c["phrase"] not in done and game in (None, c["game"])]
+    return [c for c in found if store.normal(c["phrase"]) not in done
+            and game in (None, c["game"])]
 
 
 def learn(games=None, videos=surf.VIDEOS_PER_GAME, days=surf.DAYS, people=surf.MIN_PEOPLE,

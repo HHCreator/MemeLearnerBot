@@ -92,6 +92,25 @@ class MeaningsTest(unittest.TestCase):
         self.assertEqual(meanings.same_as("三叔不同意", "”三叔“ 指代的是canyon选手的外号，"
                                           "不同意是梗”XX不同意“的变体", self.known), [])
 
+    def test_a_note_says_where_a_meme_comes_from(self):
+        # Your notes in the IG vs GEN test
+        self.assertEqual(meanings.source_in("阿一占", "”阿一古“的变体，占和古长得像，但是没有左边，"
+                                            "用来嘲讽theshy选手有手伤"), "阿一古")
+        self.assertEqual(meanings.source_in(
+            "脖子捂汗", "tes曾经的战前宣言“搏至无憾”的变体，改成了同音字“脖子捂汗”调侃现在已经被打"
+            "的满头大汗了。 “类似的还有”泊至武汉“，一样是同音字"), "搏至无憾")
+        # Not a pattern, nor another way of writing the meme itself, nor a meme it only is
+        self.assertEqual(meanings.source_in("桌子翻了", "跟皮包翻了一样，”XX翻了“的变体，XX可以是"
+                                            "任何可以翻动的物品"), "")
+        self.assertEqual(meanings.source_in("啊一占", "“阿一占”的变体，啊和阿基本是同一个字"), "")
+        self.assertEqual(meanings.source_in("尺出", "来源同”wei出“", self.known), "")
+        self.assertEqual(meanings.source_in("chovy同意了", "“chovy同意了”的变体",
+                                            own=["超威同意了"]), "")
+        self.assertEqual(meanings.source_in("开一局", "杜蕾斯在lpl的广告语里面有一个”开一局“"), "")
+        # A learned meme a part of the note names, the longest one
+        self.assertEqual(meanings.source_in("我们是路边", "从我们是冠军变来的",
+                                            ["冠军", "我们是冠军"]), "我们是冠军")
+
     def test_learned_memes_that_look_alike_are_related(self):
         self.assertEqual(meanings.related("三叔不同意", self.known)[:1], ["大超同意了"])
         self.assertIn("超威同意了", meanings.related("三叔不同意", self.known))

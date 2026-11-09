@@ -238,6 +238,35 @@ class FindTest(Folder):
             self.assertEqual(found[0], {"bvid": "BV1linked001", "title": "", "how": "link"})
         search.assert_not_called()  # it had videos for it
 
+    def test_with_no_video_for_a_meme_the_ones_about_where_it_comes_from_are_found(self):
+        explainers.remember([video("BV1explain08", "千言万语感谢现役是什么梗"),
+                             video("BV1explain09", "阿一古是什么梗")])
+        thanks = {"phrase": "千言万语感谢多兰", "game": "lol", "variants": [],
+                  "judge": {"source": {"phrase": "千言万语感谢现役", "how": "learned"}}}
+        with mock.patch.object(bilibili, "search_videos", return_value=[]) as search:
+            found = explainers.find(thanks)
+        self.assertEqual(found, [{"bvid": "BV1explain08", "title": "千言万语感谢现役是什么梗",
+                                  "how": "related", "for": "千言万语感谢现役"}])
+        self.assertEqual(search.call_args.args, ("千言万语感谢多兰是什么梗",))  # itself first
+        # None seen either: searched for, once a week too
+        roadside = {"phrase": "我们是路边", "game": "lol", "variants": [],
+                    "judge": {"source": {"phrase": "我们是冠军", "how": "guess"}}}
+        data = explainers.load()
+        with mock.patch.object(bilibili, "search_videos", side_effect=[
+                [], [video("BV1explain10", "我们是冠军是什么梗")]]) as search:
+            found = explainers.find(roadside, data=data)
+        self.assertEqual([call.args for call in search.call_args_list],
+                         [("我们是路边是什么梗",), ("我们是冠军是什么梗",)])
+        self.assertEqual([(v["bvid"], v["how"], v["for"]) for v in found],
+                         [("BV1explain10", "search", "我们是冠军")])
+        self.assertIn("source_searched", data["phrases"]["lol:我们是路边"])
+        # A pattern means the learned meme of that pattern
+        store.accept("超威同意了", meaning="调侃")
+        self.assertEqual(explainers.source_of({"judge": {"source": {"phrase": "XX同意了"}}}),
+                         "超威同意了")
+        for nothing in ({"phrase": "XX没学过"}, None):
+            self.assertIsNone(explainers.source_of({"judge": {"source": nothing}}))
+
     def test_the_search_is_tried_until_it_wants_a_captcha_and_once_a_week(self):
         results = [video("BV1explain05", "千言万语感谢现役是什么梗"),
                    video("BV1explain06", "无畏契约 千言万语感谢现役 合集"),
@@ -462,6 +491,46 @@ class ExplainTest(Folder):
                                             "title": "正义必胜是什么梗？", "says": FROM_VIDEO}])
         self.assertIn("from 1 video explaining it, like 正义必胜是什么梗？", judging.untested(chant))
         self.assertEqual(memelearner.accept("正义必胜")["meaning"], FROM_VIDEO)
+
+    def test_a_video_about_where_a_meme_comes_from_is_read_for_it(self):
+        self.write_run()
+        self.titles["BV1explain08"] = "千言万语感谢现役是什么梗"
+        explainers.remember([video("BV1explain08", "千言万语感谢现役是什么梗")])
+        last = surf._load_json(surf.CANDIDATES_FILE, {})
+        last["candidates"].append({
+            "phrase": "千言万语感谢多兰", "game": "lol", "people": 5, "videos": 2, "score": 5.0,
+            "variants": [], "examples": [{"text": "千言万语感谢多兰", "video": "BV1aaaaaaaaa"}],
+            "judge": {"verdict": "untested", "kind": "meme", "meaning": GUESS, "guess": True,
+                      "source": {"phrase": "千言万语感谢现役", "how": "guess"}}})
+        surf._save_json(surf.CANDIDATES_FILE, last)
+        found, printed = self.quietly(memelearner.explain, ["千言万语感谢多兰"])
+        summary = found["lol:千言万语感谢多兰"][0]
+        self.assertEqual((summary["for"], summary["about"], summary["meaning"]),
+                         ("千言万语感谢现役", True, FROM_VIDEO))
+        # The video was read and summed up for its source, the phrase it explains
+        self.assertEqual(self.model.summed["千言万语感谢现役是什么梗"]["phrase"], "千言万语感谢现役")
+        self.assertIn("which it may come from", printed)
+        self.assertIn("0 of 1 phrases are explained by a video now.\n1 more have a video about "
+                      "where they may come from.", printed)
+        # Judged again: the model sees what the video says, and which phrase it is about
+        asked = self.model.explained["千言万语感谢多兰"]
+        self.assertEqual(asked["videos"], [{"title": "千言万语感谢现役是什么梗", "says": FROM_VIDEO,
+                                            "origin": "2025 年的比赛", "about": "千言万语感谢现役"}])
+        verdict = next(c["judge"] for c in memelearner.candidates()
+                       if c["phrase"] == "千言万语感谢多兰")
+        # A video about its source doesn't back the meaning of the meme itself
+        self.assertEqual((verdict["guess"], verdict["videos"][0]["for"]), (True, "千言万语感谢现役"))
+        self.assertIn("only the model's guess", judging.untested(verdict))
+        # ... and doesn't count as explaining it: it is looked up again later
+        self.assertNotIn("千言万语感谢多兰", [c["phrase"] for c in explainers._wanted(
+            None, None, 10, False, explainers.load())])  # looked up lately
+        entry = explainers.load()["phrases"]["lol:千言万语感谢多兰"]
+        entry.pop("looked")
+        data = explainers.load()
+        data["phrases"]["lol:千言万语感谢多兰"] = entry
+        explainers._save(data)
+        self.assertIn("千言万语感谢多兰", [c["phrase"] for c in explainers._wanted(
+            None, None, 10, False, explainers.load())])
 
     def test_what_was_read_and_judged_isnt_done_again(self):
         self.write_run()

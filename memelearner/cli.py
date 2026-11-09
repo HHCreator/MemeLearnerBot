@@ -32,7 +32,7 @@ import sys
 import time
 
 from . import (ModelUnavailable, accept, candidates, explainers, find, forget, judging, lookup,
-               meanings, memes, reject, store, surf, watching)
+               meanings, memes, nicknames, reject, store, surf, watching)
 
 
 def _print_json(value):
@@ -42,7 +42,9 @@ def _print_json(value):
 def _show_meme(meme):
     games = ", ".join(meme["games"]) or "-"
     meaning = " / ".join(part for part in (meme["meaning"], meme["english"]) if part)
-    print(f"  {meme['phrase']}  [{games}]  {meaning or '(no meaning yet)'}")
+    written = meme.get("variants") or []
+    also = f"  (also {', '.join(written[:3])}{' ...' if len(written) > 3 else ''})" if written else ""
+    print(f"  {meme['phrase']}  [{games}]  {meaning or '(no meaning yet)'}{also}")
 
 
 def _show_candidate(c):
@@ -56,9 +58,13 @@ def _show_candidate(c):
             "watching": "  -> watching"}.get(verdict.get("verdict"), "")
     if verdict.get("verdict") == "untested":
         said = "  -> a meme, " + judging.untested(verdict)
+    source = verdict.get("source")
+    if said and source:
+        said += f" (from {source['phrase']}, {'a guess' if source['how'] == 'guess' else 'found'})"
     if said and verdict.get("model") and verdict["model"] != judging.MODEL:
         said += f"  (judged by {verdict['model']})"  # like the offline model, standing in
-    print(f"  {c['game']:<9} {how:<12} {c['phrase']}  ({c['people']} people{alone}, "
+    pattern = f" 「{c['pattern']}」" if c.get("pattern") not in (None, c["phrase"]) else ""
+    print(f"  {c['game']:<9} {how:<12} {c['phrase']}{pattern}  ({c['people']} people{alone}, "
           f"{c['videos']} videos{also})  e.g. {example[:40]}{said}")
 
 
@@ -516,4 +522,7 @@ def main(argv=None):
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")  # Chinese in the Windows console and in --json
     args = parser().parse_args(argv)
-    args.run(args)
+    try:
+        args.run(args)
+    except nicknames.TableError as error:  # a line of data/nicknames.txt it can't read
+        sys.exit(str(error))

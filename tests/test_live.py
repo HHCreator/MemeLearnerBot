@@ -15,6 +15,7 @@ from unittest import mock
 
 from memelearner import bilibili, cli, live, surf
 
+from . import test_surf
 from .test_surf import VISITOR, FakeBilibili
 
 CRC = "7c2c6a45"
@@ -319,6 +320,7 @@ class FindTest(unittest.TestCase):
             patcher = mock.patch.object(surf, name, value)
             patcher.start()
             self.addCleanup(patcher.stop)
+        test_surf.use_table(self, self.folder)
         self.start = 1_800_000_000
         # Two replays, read before: 正义必胜 is old news, 汽车人 is from Valorant's
         replay = [{"id": f"d{i}", "kind": "danmu", "who": f"r{i}", "text": "正义必胜",
