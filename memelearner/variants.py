@@ -16,7 +16,9 @@ Two phrases are the same meme when they are the same once these differences are 
     Left out       One is the other with one or two parts left out: 真不一样了 is
                    超威今年真不一样了 without 超威今年, and 超威同意了 is 超威会同意的
                    without 会. What's left must be at least 2 characters that aren't a name,
-                   and at least half of the other's: 同意 alone isn't 超威同意一下兄弟们.
+                   and what's left out names and at most 2 other characters: 感谢多兰 isn't
+                   千言万语感谢多兰. Two characters alone need a name with them to leave
+                   other characters out: wei发狂了 is 发狂了, but 退役 isn't 感谢退役.
     Turned around  不 or 没 added: 三叔不同意 is 三叔同意了 turned around.
     Written longer A character written more than once in a row (同意意意了, chooooovy), and
                    mood words at the end (了 呢 吧 啊 ...), as the finder counts them.
@@ -37,6 +39,8 @@ PATTERN_NAME = "XX"  # ... and in a pattern you read: 「XX同意了」
 NEGATIONS = "不没"  # added to turn a meme around: 三叔不同意
 MAX_LEFT_OUT = 2  # parts of a phrase another one may leave out
 MIN_KEPT = 2  # characters, not counting names, that one that leaves parts out must keep
+MAX_ADDED = 2  # characters, not counting names, that it may leave out
+ALONE_KEPT = 3  # ... and that it must keep for that without a name (退役 isn't 感谢退役)
 NAME_CHARS = (2, 3)  # characters of a Chinese name that isn't in the table (兰子): one
 #                      alone is too often a word (还在洗, 还在送 aren't names)
 SHOWN_NAMES = 2  # different names that must go where XX is before an unknown one counts
@@ -120,11 +124,13 @@ def _left_out(short, long):
 
 
 def _leaves_out(a, b):
-    """Whether one shape is the other with up to MAX_LEFT_OUT parts left out, keeping at
-    least MIN_KEPT characters and half of the other's (see the top of this file)."""
+    """Whether one shape is the other with up to MAX_LEFT_OUT parts left out: it keeps at
+    least MIN_KEPT characters that aren't names, and leaves out names and up to MAX_ADDED
+    other characters; to leave out any of those, it must keep ALONE_KEPT characters or a
+    name (see the top of this file)."""
     short, long = sorted((a, b), key=len)
-    kept = _kept(short)
-    if kept < MIN_KEPT or 2 * kept < _kept(long):
+    kept, added = _kept(short), _kept(long) - _kept(short)
+    if kept < MIN_KEPT or added > MAX_ADDED or added and kept < ALONE_KEPT and SLOT not in short:
         return False
     parts = _left_out(short, long)
     return parts is not None and parts <= MAX_LEFT_OUT

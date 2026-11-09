@@ -56,14 +56,18 @@ class VariantTest(unittest.TestCase):
                      ("真不一样了", "超威今年真不一样了"),    # the start left out
                      ("chooooovy同意了", "chovy同意了"),     # written longer
                      ("超威同意意意了", "超威同意了"),
-                     ("超威不同意", "超威同意一下")]:          # turned around and a word added
+                     ("超威不同意", "超威同意一下"),          # turned around and a word added
+                     ("发狂了", "wei发狂了"),                 # a name added to a word
+                     ("蝴蝶飞不过沧海", "蝴蝶终究飞不过沧海")]:
             self.assertTrue(variants.same_meme(a, b), (a, b))
         for a, b in [("我们是冠军", "我们是路边"),            # another meaning
                      ("目前不知道怎么赢", "目前不知道怎么输"),
                      ("同意", "超威同意一下兄弟们"),           # too little left
                      ("chooovy", "超威"),                    # two names, no meme
                      ("还在洗", "还在ig"),
-                     ("我不同意", "超威同意了")]:
+                     ("我不同意", "超威同意了"),
+                     ("退役", "感谢退役"),                    # a word added to a word
+                     ("感谢多兰", "千言万语感谢多兰")]:        # too much added
             self.assertFalse(variants.same_meme(a, b), (a, b))
 
     def test_shapes_patterns_and_names(self):
