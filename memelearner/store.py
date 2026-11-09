@@ -64,7 +64,8 @@ def save(data):
                "rejected": dict(sorted(data["rejected"].items()))}
     os.makedirs(os.path.dirname(MEMES_FILE), exist_ok=True)
     temporary = MEMES_FILE + ".tmp"
-    with open(temporary, "w", encoding="utf-8") as f:
+    # newline="\n": the same line ends on Windows, so git shows only the lines that changed
+    with open(temporary, "w", encoding="utf-8", newline="\n") as f:
         json.dump(content, f, ensure_ascii=False, indent=1)
         f.write("\n")
     os.replace(temporary, MEMES_FILE)  # all at once, so a reader never sees half a file

@@ -2,6 +2,38 @@
  "_comment": "Memes learned by MemeLearnerBot (https://github.com/HHCreator/MemeLearnerBot). Change them with py -m memelearner accept, reject or forget; the format is in memelearner/store.py and the README.",
  "version": 1,
  "memes": {
+  "bin神": {
+   "meaning": "对英雄联盟选手 Bin 的称呼，带夸张吹捧或调侃意味，用来夸他表现神勇。",
+   "english": "A nickname for LoL player Bin, used to hype or praise his godlike play.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "bin神王！",
+    "bin，神兵天降！",
+    "bin 神王附体"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "blgnb": {
+   "meaning": "对 BLG 战队的称赞，意思是「BLG 牛逼」，常用来夸 BLG 打得好。",
+   "english": "BLG is awesome / BLG rocks",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "blgnb，飞也强",
+    "一碰就碎 blgnb",
+    "合影blgnb"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "chooovy": {
    "meaning": "chovy选手的一个称呼的一个变体",
    "english": "",
@@ -40,6 +72,22 @@
     "chovy就是超威，和超威同意了是同一个梗"
    ]
   },
+  "faker同意了": {
+   "meaning": "「XX同意了」梗的变体，指Faker在比赛中发挥失常、送出关键失误让对手获胜，弹幕调侃他是否「同意」输掉比赛。",
+   "english": "A variant of the \"XX agreed\" meme, joking that Faker threw the game or made a key mistake, thereby \"agreeing\" to lose.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "Faker同意BLG夺冠了",
+    "还在Faker同意吧，t1就赢不了BLG",
+    "faker同意了，就他送的最关键一波"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "ggg": {
    "meaning": "就是一种对于gg的刷屏，表示想让现在正在进行的游戏赶紧结束",
    "english": "",
@@ -57,6 +105,41 @@
    ],
    "notes": [
     "就是一种对于gg的刷屏，表示想让现在正在进行的游戏赶紧结束"
+   ]
+  },
+  "o出": {
+   "meaning": "“X出”梗的变体，“出”读 chu，谐音“畜生”，用来骂某位选手（这里指 ID 以 o 开头或带 o 的选手）打得差、表现像畜生。",
+   "english": "A variant of the 'X-chu' insult meme, calling a player (whose name starts with or contains 'o') trash, playing like an a",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "o出瞎开",
+    "O出乱开",
+    "o出有啥用"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "o博士": {
+   "meaning": "”X博士“的变体梗，有选手打的很差的时候战绩1/十几就会调侃他在研发，就叫他”X博士“， 也可以是正面调侃某个选手经常选出不常规的选角或者战术，也就是”科研“ 这里O博士指代oner，他在第三把的战绩是1/6，调侃他打得差",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "应该给O博士",
+    "o博士要来了",
+    "神bin，中国队长，手，公，O博士"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "”X博士“的变体梗，有选手打的很差的时候战绩1/十几就会调侃他在研发，就叫他”X博士“， 也可以是正面调侃某个选手经常选出不常规的选角或者战术，也就是”科研“ 这里O博士指代oner，他在第三把的战绩是1/6，调侃他打得差"
    ]
   },
   "wei出": {
@@ -135,6 +218,22 @@
     "这个梗一般只用在theshy选手或者类似theshy选手风格的选手进行比赛的场合"
    ]
   },
+  "中华有兰": {
+   "meaning": "由「中华有尺」变来的反讽说法，把尺帝换成多兰（Doran），调侃多兰做出离谱操作、像在帮 LPL 一样。",
+   "english": "A sarcastic twist on \"Zhonghua you Chi,\" swapping Ruler for Doran to mock his throws as if he were helping the LPL.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "中华有兰，安心哈哈哈哈",
+    "中华有兰子，求求你了兰子",
+    "中华有兰，多兰加油"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "中华有尺": {
    "meaning": "尺帝（ruler）选手曾在lpl打过两年，当时这句话是夸奖当时代表lpl赛区做出贡献的尺帝的夸奖，现在这句话是对于在lck赛区尺帝的反讽，嘲笑他作为对手却做出让自己可能输掉游戏的举动，好像仍然向着lpl做出贡献",
    "english": "",
@@ -152,6 +251,25 @@
    ],
    "notes": [
     "尺帝（ruler）选手曾在lpl打过两年，当时这句话是夸奖当时代表lpl赛区做出贡献的尺帝的夸奖，现在这句话是对于在lck赛区尺帝的反讽，嘲笑他作为对手却做出让自己可能输掉游戏的举动，好像仍然向着lpl做出贡献"
+   ]
+  },
+  "中国队长": {
+   "meaning": "指在与外赛区对战时表现好的中国选手，这里特指BLG战队的xun选手，用来称赞他的表现。",
+   "english": "A title for a Chinese player who performs well against teams from other regions, here referring to BLG's player xun.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "中国队长加油！blg加油！",
+    "没话说 中国队长",
+    "中国队长在带我们冲一次吧[委屈]"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "跟外赛区对战时表现好的中国选手会被冠以这个称呼。这里指代的是xun选手"
    ]
   },
   "二战转折点": {
@@ -221,6 +339,127 @@
     "https://www.bilibili.com/video/BV19wnQ6sExk"
    ]
   },
+  "允许狂": {
+   "meaning": "赢了强队（如T1）后可以得意、嚣张一阵子的调侃说法，常带「只允许狂一天」这类限定。",
+   "english": "A joking way of saying you're allowed to be cocky for a limited time after beating a strong team.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "一穿四，允许狂一点3：0干掉GEN",
+    "今天允许狂",
+    "允许狂妄"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "允许钢背": {
+   "meaning": "「刚背兽」的衍生梗，用来形容某个选手不会弯腰，弹幕里刷来调侃。",
+   "english": "A meme derived from \"刚背兽\" (steelback beast), used to tease a player who can't bend over.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "得了冠军的话，允许钢背",
+    "允许钢背十分钟",
+    "允许钢背，救救我"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "“刚背兽”的衍生梗，形容某个选手不会弯腰"
+   ]
+  },
+  "全放": {
+   "meaning": "指BP选人时把所有强势英雄都放给对面拿，不ban也不抢，常用来吐槽教练的选人。",
+   "english": "In draft, to let the opponent take all the strong picks.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "全放的，看不了一点",
+    "全放了 家也放了",
+    "韩国队长全放"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "布置是bp选人，“全放”指代把所有东西都给对面拿。"
+   ]
+  },
+  "兰出": {
+   "meaning": "「X出」梗的变体，这里「兰出」指选手多兰（Doran），「出」与「畜」同音，用来骂他打得差、像畜生一样送。",
+   "english": "A variant of the \"X-chu\" insult meme, here targeting player Doran (\"Lan\") for playing badly.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "兰出买了",
+    "多兰出个大肉就难打了",
+    "没兰出我不知道blg怎么赢两局"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "兰子同意了": {
+   "meaning": "“兰子”是选手的外号，这个说法是“XX同意了”梗的变体，用来调侃某位选手在关键比赛中发挥失常、让对手获胜，弹幕刷它表示“他同意（输）了”。",
+   "english": "A variant of the \"XX agreed\" meme, teasing that a player (Lanzi) underperformed and let the opponent win.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "兰子同意，超威同意，齿轮开始转动",
+    "大O和兰子同意了",
+    "兰子同意无数次了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "兰神王": {
+   "meaning": "对选手多兰（Doran）的夸张称呼，把他叫作「兰神王」，用来调侃或吹捧他的表现，常带反讽意味。",
+   "english": "An exaggerated nickname for the player Doran, calling him 'God King Lan', used to mock or hype his performance.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "好久没听兰神王的故事了",
+    "兰神王发力了",
+    "兰神王再来一把"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "兰补": {
+   "meaning": "”X补“的变体，拼多多广告百亿补贴宣传语买什么都有国家补贴帮你，也就是”国补“，所以”X补“表示某某某帮你，比如让你赢或者让你杀。兰补就是多兰帮对方赢",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "吃到兰补了，3把副作用",
+    "希望吃到百亿兰补",
+    "兰补再给点力"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "”X补“的变体，拼多多广告百亿补贴宣传语买什么都有国家补贴帮你，也就是”国补“，所以”X补“表示某某某帮你，比如让你赢或者让你杀。兰补就是多兰帮对方赢"
+   ]
+  },
   "别吃": {
    "meaning": "TheShy直播时压着对线对手、不让对面吃兵的时候会说“别吃”，所以上单这样压制对手时弹幕就刷这句。",
    "english": "",
@@ -239,6 +478,22 @@
     "https://www.bilibili.com/video/BV1wNHw6PEdQ"
    ]
   },
+  "别奶": {
+   "meaning": "劝别人别再说看好、夸赞某队的话，因为观众觉得被看好（\"奶\"）反而会让队伍输，是一种反向毒奶的迷信。",
+   "english": "Don't jinx them by praising or predicting a win.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "别奶谢谢",
+    "兄弟们别奶，保持质疑，加油BLG",
+    "别奶对方，还是奶自己吧"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "区区区": {
    "meaning": "跟蛆的读音一样，蛆对应龙。 游龙形容选手操作很秀，很carry，像龙在天上游，蛆在地上爬就是这句话的反面，形容一个选手打的很垃圾。",
    "english": "",
@@ -253,6 +508,22 @@
    "sources": [
     "https://www.bilibili.com/video/BV1ie8t6UEzH",
     "https://www.bilibili.com/video/BV199h969EbR"
+   ]
+  },
+  "千言万语感谢多兰": {
+   "meaning": "套用「千言万语感谢现役」的句式，把感谢对象换成选手多兰，用来调侃式地感谢他（多兰好兄弟），带反讽意味。",
+   "english": "A playful, ironic thank-you to player Doran, modeled on the 'thanks to active players' meme.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "qian千言万语感谢多兰",
+    "千言万语，感谢多兰好兄弟",
+    "千言万语，感谢多兰现役"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
    ]
   },
   "千言万语感谢现役": {
@@ -321,6 +592,22 @@
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
    ]
   },
+  "合影": {
+   "meaning": "在直播间人气达到某个数字（如三亿、500万）时刷「合影」，表示一起见证、留念这个时刻。",
+   "english": "group photo; used to mark a milestone viewer count together",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "合影留念",
+    "BLG3:1T1合影",
+    "三亿人气合影"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "吓哭了": {
    "meaning": "夸张地表示被某操作或场面震撼、吓到，常带调侃意味。",
    "english": "scared to tears (exaggerated reaction to something impressive or shocking)",
@@ -357,6 +644,41 @@
     "https://www.bilibili.com/video/BV1wNHw6PEdQ"
    ]
   },
+  "吸血": {
+   "meaning": "贬义说法，指英雄或选手只靠吸血、回复赖线，打不出伤害；也可以指让队友帮自己、自己却不帮队友的行为。",
+   "english": "A derogatory term for a champion or player who only sustains through lifesteal/healing without dealing damage, or who takes teammates' help without helping them in return.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "多兰吸血一整把",
+    "吸血 bin",
+    "妖姬真是吸血没伤害副作用"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "这个也可以指代一种让队友帮自己但是自己不帮队友的行为。"
+   ]
+  },
+  "啃老": {
+   "meaning": "指战队过度依赖老将或核心选手carry，像子女靠父母养活一样。",
+   "english": "relying heavily on veteran players to carry the team",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "t1啃老啃的太狠了",
+    "老补 啃老啊",
+    "啃老战队。"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "喜欢笑": {
    "meaning": "嘲讽某队或某人爱笑、爱亮表情，结果笑到最后输了比赛",
    "english": "",
@@ -390,6 +712,26 @@
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV1CvaN6iE9t",
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ]
+  },
+  "团队": {
+   "meaning": "用来形容某位选手“很团队”，有时是正面称赞其配合队友，有时是反讽其打法并不团队、只顾自己发育或追残血。",
+   "english": "Calling a player \"team-oriented,\" sometimes genuinely and sometimes sarcastically.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "团队是指追残血小炮，不管正面队友吗",
+    "今天我必须给团队稳健bin一票！",
+    "为了证明自己而证明，不是为了团队 为了赢，结果越容易输"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV17XxP6CE7n",
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "有时是正面有时是反讽"
    ]
   },
   "复刻s7": {
@@ -459,6 +801,54 @@
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV1CvaN6iE9t",
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ]
+  },
+  "好兄弟": {
+   "meaning": "指在比赛中帮对手忙、送分或表现拉胯的选手，常带调侃意味，如称多兰、超威为LPL的好兄弟。",
+   "english": "A joking term for a player who helps the opposing team, often by playing badly or throwing.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "多兰LPL好兄弟啊多兰LPL好兄弟啊",
+    "但是多兰，好兄弟",
+    "多兰永远好兄弟"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "家也放了": {
+   "meaning": "嘲讽队伍在比赛里什么资源都放给对手，连基地（家）也干脆放掉不守了。",
+   "english": "A sarcastic jab at a team that gives up every objective, even its own base.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "又放又放家也放了",
+    "全放了 家也放了",
+    "小龙大龙潮虫塔全放，直接家也放了吧，喜欢亮剑哈哈哈"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "尊重": {
+   "meaning": "在弹幕里常用来反讽或调侃：嘴上说「尊重」，实际是在嘲讽对手或某方不尊重人（如放对手强势英雄），也用于真心称赞对手。",
+   "english": "A sarcastic or genuine call for \"respect\" toward an opponent or player, often used ironically.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "恭喜blg!!!尊重faker",
+    "尊重T1，感谢faker的同意",
+    "尊重李哥"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
    ]
   },
   "就在今天": {
@@ -582,6 +972,22 @@
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
    ]
   },
+  "怎么翻的": {
+   "meaning": "在比赛里感叹某一方劣势太大、看不出还能怎么翻盘取胜；也常被已经知道结果的人拿来事后调侃。",
+   "english": "How could they possibly come back from this?",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "真不知道t1怎么翻了",
+    "刚来，t1怎么翻的",
+    "这把怎么翻的？"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "急急急": {
    "meaning": "形容人着急、急躁，常用来调侃别人太急或自己很急。",
    "english": "anxious; impatient; \"so urgent\"",
@@ -615,6 +1021,22 @@
    ],
    "notes": [
     "任何“涅槃”组的选手发挥不佳是都可以用这个梗，尤其是Wei选手"
+   ]
+  },
+  "感谢多兰": {
+   "meaning": "调侃式地感谢选手多兰（Doran），多用于他表现失误、帮了对手时，反讽地「感谢」他。",
+   "english": "Sarcastic thanks to Doran, usually when his mistakes benefit the other team.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "千言万语，感谢多兰",
+    "faker还是神，但是感谢多兰",
+    "Blg 感谢多兰大哥Blg 感谢多兰大哥Blg 感谢多兰大哥Blg 感谢多兰大哥"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
    ]
   },
   "感谢退役": {
@@ -702,6 +1124,38 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "我软脚了": {
+   "meaning": "看比赛紧张到腿软、不敢看下去时刷的话，用来表达自己紧张、害怕。",
+   "english": "My legs have gone weak (from nervousness); I'm too nervous to watch.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "我软脚了兄弟们",
+    "经典闭眼，经典第五局要来了，我软脚了",
+    "我软脚了，别搞我啊"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "打工": {
+   "meaning": "在游戏里指白费力气、为别人做嫁衣，比如刷了很久资源或打出优势却没能转化为自己的收益，反而让对手得利。",
+   "english": "Doing work that benefits the opponent; wasted effort.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "又打工",
+    "依旧打工仔",
+    "全员打工仔哈哈"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "打笑了": {
    "meaning": "指某人（常是选手）被比赛局面或操作逗笑，多带调侃、看笑话的意味。",
    "english": "to be made to laugh by the game, often mockingly",
@@ -774,6 +1228,22 @@
     "theshy选手的其中一个梗，来源于theshy选手曾表达过如果在年轻一回的感概，但是因为刷频这句话的人太多引起了反感现在多用于调侃theshy选手输不起，怪别人年龄比自己小"
    ]
   },
+  "晚安": {
+   "meaning": "在比赛视频里刷「晚安」是跟某队或某人道别的意思，多用于该队输掉、被淘汰或比赛结束时，带调侃或送走的意味。",
+   "english": "A teasing \"good night\" said to a team or player when they lose or are eliminated.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "晚安了兄弟们",
+    "允许晚安",
+    "多兰晚安"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "最后一舞": {
    "meaning": "指某场比赛或某个阶段是最后一次登场、最后的拼搏，常带告别或放手一搏的意味。",
    "english": "one last dance; the final run",
@@ -816,6 +1286,57 @@
     "杀尺帝！就杀尺帝！",
     "26年了还在杀尺帝",
     "杀尺帝就赢了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "来就有": {
+   "meaning": "跟日常用语里“来了就有东西拿”意思接近，指人一来就能得到好处；游戏里有时也指某些选手一被抓就死。",
+   "english": "Similar to the everyday phrase 'come and you get something'; in games it can also mean certain players die as soon as they get caught.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "配子哭完了，不是说来就有吗",
+    "多兰来就有",
+    "这多兰真是来就有"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "跟日常用语中的来了就有东西拿意思接近，游戏里有时也可以指代某些选手被抓就死"
+   ]
+  },
+  "杨洋": {
+   "meaning": "在弹幕里用来调侃某位选手（如 Bin）长相或气质像明星杨洋，或直接拿杨洋的名字开玩笑刷屏。",
+   "english": "A joke comparing an esports player's looks to the celebrity Yang Yang.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "电竞杨洋",
+    "杨洋加油",
+    "冷知识，这不是杨洋"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "标记": {
+   "meaning": "在弹幕里指给选手或队伍「打上弱者标记」，即认定对方是弱者、可以轻松击败，带嘲讽和自信的意味。",
+   "english": "To mark someone as a weakling, i.e. dismiss them as easy prey.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "标记一下IG=弱者",
+    "E标记在霞阵上了",
+    "信念不变，给标记加油吧，兄弟们，给标记加油吧，最关键的时刻了，Fer也进入到2阶段了"
    ],
    "sources": [
     "https://live.bilibili.com/6"
@@ -924,6 +1445,22 @@
     "任何一个”涅槃“组的打野在发挥不佳时都可以使用这个梗"
    ]
   },
+  "混乱将随后而至": {
+   "meaning": "弹幕里配合鳄鱼表情刷的一句台词式口号，用来起哄、制造「要乱起来」的气氛，具体出处和确切含义从现有材料看不出来。",
+   "english": "A spammy catchphrase chanted with crocodile emojis to hype chaos.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "你说的一点都对，混乱将随后而至🐊🐊🐊",
+    "呃啊！混乱将随后而至🐊",
+    "🐊🐊混乱将随后而至🐊🐊🐊🐊混乱将随后而至🐊🐊"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "游戏结束": {
    "meaning": "在比赛里表示局势已经无法挽回、胜负已定，常用来夸张地宣布某一方已经赢了或输了",
    "english": "",
@@ -1029,6 +1566,38 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "神bin": {
+   "meaning": "对选手 Bin 的夸张称呼，常配合「天降」等词使用，表示他像神一样降临、发挥神勇。",
+   "english": "A exaggerated nickname for the player Bin, often used with \"descend from heaven\" to praise his godlike performance.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "灭烛见真火 忘剑得神bin！！",
+    "神bin天降",
+    "来一把神bin天降"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "神bin天降": {
+   "meaning": "把「神兵天降」的「兵」换成选手 Bin 的名字，用来夸 Bin 在比赛里像天降神兵一样突然打出关键操作。",
+   "english": "A pun on '神兵天降' (divine troops descending from heaven), swapping in Bin's name to praise his clutch plays.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "你有绝境飞我有神bin天降",
+    "来一把神bin天降",
+    "神bin天降一锤四"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "神像尽显": {
    "meaning": "英雄联盟里的“神”是一个梗，指选手Uzi。某个选手像Uzi的时候，不管是打法像还是只是长得像：通常先是长得像，等他打出像Uzi那样激进的操作，弹幕就会刷这句。",
    "english": "",
@@ -1047,6 +1616,22 @@
     "https://www.bilibili.com/video/BV1t4Hu6wEXB"
    ]
   },
+  "稳健": {
+   "meaning": "在弹幕里用来形容选手或队伍打法保守、不敢操作、求稳，常带调侃或反讽意味；也用来给选手加油，希望稳扎稳打拿下比赛。",
+   "english": "steady/conservative play, often used teasingly or ironically",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "今天我必须给团队稳健bin一票！",
+    "稳健大师",
+    "我求你了，第四把稳健拿下吧"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
   "空悲切": {
    "meaning": "在输掉比赛或表现不佳时刷的感叹，带点自嘲和无奈，意思是白忙一场、徒留遗憾",
    "english": "",
@@ -1062,6 +1647,41 @@
    "sources": [
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV17vxq6NEBi"
+   ]
+  },
+  "绝境李相赫": {
+   "meaning": "指选手李相赫（Faker）在队伍陷入绝境时往往能爆发出超常发挥、带队翻盘，弹幕用来调侃或期待这种「绝境模式」被触发。",
+   "english": "Faker's clutch mode when his team is on the brink of elimination.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "触发绝境李相赫了",
+    "绝境李相赫，开！开开！开开开！",
+    "绝境李相赫，开挂了吧"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "绝境飞": {
+   "meaning": "指在绝境中由「飞」挺身而出、力挽狂澜的表现，常用来夸赞或期待这种救场操作；「飞」一般用来指代 faker（faker 同音「飞科」），可参考「飞飞飞」的用法。",
+   "english": "A clutch, game-saving play by \"Fei\" (Faker) in a desperate situation.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "那波绝境飞真吓人",
+    "绝境飞加油啊",
+    "又是亮表情 又是绝境飞 爷春回"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "参考“飞飞飞” ，faker同音飞科，所以“飞”一般用来指代faker"
    ]
   },
   "老九他没毛病": {
@@ -1096,6 +1716,25 @@
     "https://www.bilibili.com/video/BV19wnQ6sExk",
     "https://www.bilibili.com/video/BV1woHM6XEtP",
     "https://www.bilibili.com/video/BV17XxP6CE7n"
+   ]
+  },
+  "耶律": {
+   "meaning": "耶律同音“野驴”，咒骂某选手是野驴，这里是oner的其中一个黑称",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "那就当耶律",
+    "耶律尽力了队友lpl",
+    "耶律sc"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "耶律同音“野驴”，咒骂某选手是野驴，这里是oner的其中一个黑称"
    ]
   },
   "肯恰那": {
@@ -1183,6 +1822,60 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "警钟长鸣": {
+   "meaning": "提醒自己和队友保持警惕、别松懈、稳住心态的刷屏口号，常和「稳住」「加油」连用。",
+   "english": "A rallying cry to stay alert and not get complacent.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "计划有变，继续警钟长鸣",
+    "最后一舞，警钟长鸣",
+    "警钟长鸣！！小心蒙多，加里奥！警钟长鸣！！小心蒙多，加里奥！"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "许哥牛逼": {
+   "meaning": "给选手许哥（许秀）加油、夸他打得好的口号，大家一起刷；有时是真心夸，有时是反讽。",
+   "english": "Xu-ge is awesome! (a cheer for player Xu, sometimes sincere and sometimes sarcastic)",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "许哥牛逼1",
+    "许哥不是区许哥牛逼",
+    "许哥牛逼，许哥伟大，抱团也够三慕斯跪下！"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV179H36HEgG"
+   ],
+   "notes": [
+    "有时是夸有时是反讽"
+   ]
+  },
+  "读书": {
+   "meaning": "指代的是游戏中出”杀人书“的行为",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "标记了，读书了",
+    "所以还是要多读书，一群网瘾少年玩游戏有啥脑子。",
+    "满层读书人"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "指代的是游戏中出”杀人书“的行为"
+   ]
+  },
   "豹一豹": {
    "meaning": "鼓励选手拿出豹女（奈德丽）这个英雄拼一把、不留遗憾的说法。",
    "english": "A call to pick Nidalee and go all out, leaving no regrets.",
@@ -1261,6 +1954,22 @@
     "geng辛苦了，ig不辛苦",
     "0：3辛苦了IG",
     "辛苦了ig一直送"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "还在ig": {
+   "meaning": "调侃对方还念念不忘、还在提 IG（战队），常带嘲讽或黏着不放的意味。",
+   "english": "Still going on about IG / still hung up on IG.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "ig都到家了还在ig",
+    "我就说iG皮肤放风水不好吧，还在iG",
+    "还在ig，ig游到哪了"
    ],
    "sources": [
     "https://live.bilibili.com/6"
@@ -1389,6 +2098,89 @@
     "https://www.bilibili.com/video/BV1Eas967EY9"
    ]
   },
+  "陌生": {
+   "meaning": "调侃某支队伍或选手表现反常、不像平时那样，常用「稳得陌生」「有点陌生」表示对反常发挥的惊讶。",
+   "english": "A joking way to say a team or player is acting unusually, not like their normal self.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "纪律，陌生",
+    "blg领我陌生",
+    "t1有点陌生"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "难道说": {
+   "meaning": "比赛里用来表达期待或猜测的口头禅，常接一个假设，比如「难道说今年……」「难道说真让AL赢了」，带点调侃和悬念。",
+   "english": "A teasing rhetorical opener like \"Could it be that...?\" used to hype or speculate about a match outcome.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "难道说今年",
+    "难道说今年LPL真能冠军？",
+    "刚来，难道说还是逗逗你"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "雪原双子": {
+   "meaning": "指两个关系好、互相帮忙的玩家（常是双排搭档），像「双子」一样绑定出现，带调侃和玩梗意味。",
+   "english": "A playful term for two players who are inseparable and always help each other, like twins.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "这就是雪原双子的羁绊",
+    "雪原双子给我杀！",
+    "雪原双子星"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "飞神": {
+   "meaning": "对选手 Faker（李相赫）的尊称/外号，带调侃和吹捧意味，常用来夸他关键发挥或玩梗。",
+   "english": "A reverent/teasing nickname for Faker (Lee Sang-hyeok), used to praise his clutch plays.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "飞神赛前又装了[哇][哇][哇]",
+    "飞神不请神了",
+    "手大哥再让飞神一把吧"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "飞飞飞": {
+   "meaning": "faker同音飞科，所以“飞”faker的外号外号之一",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-08",
+   "examples": [
+    "飞飞飞1！！",
+    "经典飞飞飞中路送那波没人敢提，哈哈哈",
+    "钢背飞飞飞"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "faker同音飞科，所以“飞”faker的外号外号之一"
+   ]
+  },
   "马桶赛区": {
    "meaning": "对 VCT CN（中国赛区）的贬称，用来嘲讽赛区及其队伍、观众水平差",
    "english": "",
@@ -1425,6 +2217,18 @@
   }
  },
  "rejected": {
+  "ban塞拉斯": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "bin哥加油": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "blg加油": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
   "ig冲啊": {
    "reason": "not a meme (IG vs GEN live report)",
    "date": "2026-11-08"
@@ -1441,8 +2245,28 @@
    "reason": "not a meme (IG vs GEN live report)",
    "date": "2026-11-08"
   },
+  "ig牛逼": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "t1必胜": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
   "不买": {
    "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "不亏": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "专业": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "乌鸦": {
+   "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
   "几比几了": {
@@ -1453,24 +2277,68 @@
    "reason": "not a meme (IG vs GEN live report)",
    "date": "2026-11-08"
   },
+  "加油blg": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
   "加油ig": {
    "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "合理": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "太帅了": {
+   "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
   "实时胜率": {
    "reason": "not a meme (IG vs GEN live report)",
    "date": "2026-11-08"
   },
+  "少人": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
   "尽力就好": {
    "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "屏蔽w": {
+   "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
   "恭喜gen": {
    "reason": "not a meme (IG vs GEN live report)",
    "date": "2026-11-08"
   },
+  "恭喜t1": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
   "戏耍": {
    "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "拿下": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "早安": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "明年见": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "比分": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "泪目": {
+   "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
   "漂亮": {
@@ -1481,8 +2349,32 @@
    "reason": "not a meme (IG vs GEN live report)",
    "date": "2026-11-08"
   },
+  "稳住": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "稳住啊blg": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "红包": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "纪律": {
+   "reason": "not a meme (report 2026-11-08)",
+   "date": "2026-11-08"
+  },
+  "纽约见": {
+   "reason": "日常用语，道别时约好在哪里或者什么时候见",
+   "date": "2026-11-08"
+  },
   "让2追3": {
    "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "让一追三": {
+   "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
   "让二追三": {
@@ -1495,6 +2387,10 @@
   },
   "辛苦了": {
    "reason": "not a meme (IG vs GEN live report)",
+   "date": "2026-11-08"
+  },
+  "队长": {
+   "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   }
  }
