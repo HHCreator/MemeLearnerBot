@@ -63,6 +63,7 @@ FALLBACK_HOST = {"host": "broadcastlv.chat.bilibili.com", "wss_port": 443}
 HEARTBEAT = 30  # seconds between heartbeats, like the live page
 SILENCE = 75  # seconds without a byte from Bilibili before the connection counts as dead
 STATUS_EVERY = 60  # seconds between status lines
+STOP_EVERY = 600  # seconds between two asks whether to stop (record()'s stop)
 SHOW_FIRST = 5  # danmu printed as they come at the start, to show it works
 CHECK_AFTER = 100  # danmu after which it says whether the sender codes are there
 SAMPLES = 20  # DANMU_MSG messages kept as Bilibili sent them, to check their shape
@@ -357,7 +358,7 @@ def parse_combo(message, now=None):
 class Recording:
     """Writes what the feed sends to the .jsonl file, and keeps count."""
 
-    def __init__(self, path, room, out=sys.stdout):
+    def __init__(self, path, room, out=None):
         self.path, self.room, self.out = path, room, out
         self.file = open(path, "a", encoding="utf-8")
         self.started = time.time()
@@ -371,6 +372,7 @@ class Recording:
         self.minute = collections.deque()  # times of the danmu in the last minute
         self.checked = False
         self.joins = 0
+        self.stopped = False  # record()'s stop() said to stop
         self.save_info()
 
     def message(self, body):
@@ -480,16 +482,22 @@ def _readable(sock, wait):
     return bool(select.select([sock], [], [], wait)[0])
 
 
-def listen(sock, rest, room_id, token, buvid, recording, until=None):
+def listen(sock, rest, room_id, token, buvid, recording, until=None, stop=None):
     """Join the room on an open WebSocket and record until the end time or the connection
-    ends (Closed), or Bilibili refuses to let it join (Refused)."""
+    ends (Closed), or Bilibili refuses to let it join (Refused), or stop() says to stop
+    (asked every STOP_EVERY seconds; recording.stopped is then True)."""
     auth = {"uid": 0, "roomid": room_id, "protover": 3 if brotli else 2, "buvid": buvid,
             "platform": "web", "type": 2, "key": token}
     sock.sendall(ws_frame(packet(OP_AUTH, json.dumps(auth, separators=(",", ":")).encode())))
     buffer, parts = bytearray(rest), []
-    last_beat, last_byte = 0.0, time.time()
+    last_beat, last_byte, last_ask = 0.0, time.time(), time.time()
     while until is None or time.time() < until:
         now = time.time()
+        if stop is not None and now - last_ask >= STOP_EVERY:
+            last_ask = now
+            if stop():
+                recording.stopped = True
+                return
         if now - last_beat >= HEARTBEAT:
             sock.sendall(ws_frame(packet(OP_HEARTBEAT, b"[object Object]")))
             last_beat = now
@@ -562,10 +570,12 @@ def _stay_awake(on):
         pass
 
 
-def record(link, until=None, path=None, game="lol", out=sys.stdout):
-    """Record a live room's danmu until the unix time until (None: until Ctrl+C); returns
-    the .jsonl file's path. Joins again by itself when the connection drops. game is what
-    the room is about, for finding phrases later."""
+def record(link, until=None, path=None, game="lol", out=None, stop=None):
+    """Record a live room's danmu until the unix time until (None: until Ctrl+C), or until
+    stop() says to stop (asked every STOP_EVERY seconds: the room went offline, say);
+    returns the .jsonl file's path. Joins again by itself when the connection drops. game is
+    what the room is about, for finding phrases later; out is where it says what it does
+    (None: sys.stdout, as it is then)."""
     room = room_info(room_of(link))
     started = time.strftime("%Y%m%d-%H%M")
     name = room["short_id"] or room["room_id"]
@@ -598,10 +608,13 @@ def record(link, until=None, path=None, game="lol", out=sys.stdout):
                 try:
                     say(f"Connected to the danmu feed at {host['host']}" if not joins
                         else f"Connected again at {host['host']}")
-                    listen(sock, rest, room["room_id"], token, buvid, recording, until)
+                    listen(sock, rest, room["room_id"], token, buvid, recording, until, stop)
                     fails = 0
                 finally:
                     sock.close()
+                if recording.stopped:
+                    say("Stopping: " + (getattr(stop, "why", "") or "asked to stop"))
+                    break
             except (Refused, Closed, OSError, ValueError, KeyError, TypeError,
                     bilibili.Error, zlib.error) as error:
                 if recording.joins > joins:

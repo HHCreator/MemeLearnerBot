@@ -9,6 +9,7 @@
 ```
 MemeLearnerBot/
 ├── surf.py            根目录的入口：py surf.py，等于 py -m memelearner learn
+├── 开始自动跑.bat、停止自动跑.bat、看看进度.bat、打开报告.bat   双击用的 auto start、stop、status、report（第 3.7 节）
 ├── pyproject.toml     pip 安装配置，定义 memelearner 命令
 ├── tests/             离线测试：py -m unittest（不上网）
 ├── docs/DESIGN.md     这份文档
@@ -16,13 +17,15 @@ MemeLearnerBot/
 └── memelearner/       真正的代码（一个 Python 包）
     ├── __init__.py    门面：memes()、lookup()、find()、candidates()、learn()、judge()、explain()、watching()、accept()、reject()，别的程序只调用它
     ├── __main__.py    py -m memelearner
-    ├── cli.py         命令行：learn、judge、explain、compare、candidates、watching、accept、reject、forget、memes、lookup、find、live、live-phrases、report、live-report、sources
+    ├── cli.py         命令行：learn、judge、explain、compare、candidates、watching、accept、reject、forget、memes、lookup、find、live、live-phrases、report、live-report、sources、auto
     ├── surf.py        梗机器人：找 B 站上很多人单独发的说法
     ├── judging.py     模型（本地的或在线的）判断候选：是梗、名字、游戏术语还是普通的话，梗是什么意思；比较几个模型（第 3 节）
     ├── explainers.py  找、看、总结讲梗的视频（「XX是什么梗」）和网页，给模型判断用（第 3.5 节）
     ├── web.py         B 站以外：搜索引擎（Bing、DuckDuckGo、百度）和百科（萌娘百科、百度百科、小鸡词典），只读（第 3.5 节）
     ├── meanings.py    把 Hao 的补充和模型的解释合成一句完整的含义（第 4 节）
     ├── review.py      浏览器里的报告：标记、决定，点「完成」就学（第 3.6 节）
+    ├── live.py        录直播间的弹幕，找里面单独发的说法
+    ├── auto.py        用 Windows 任务计划程序自己跑几天（第 3.7 节）
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评、视频页、字幕和音频（只读）
     ├── store.py       学到的梗和不要的说法，存在 data/memes.json
     ├── nicknames.py   选手外号表 data/nicknames.txt：哪个外号是哪个选手（超威、大超 = Chovy）
@@ -120,6 +123,17 @@ flowchart TD
 - **完成**（`finish()`）。先把 Add 里写了 My meaning 的一起合并（`meanings.merge_all()`，补充之间说「和 X 是同一个梗」也能用上）：模型的意思标了 Wrong 的不用，猜的意思只有标了 Correct 或 Half correct 才用；合并要问模型，问不了就什么都不学、选择都留着，等会儿再点。然后 Add 的 `store.accept()`：一个梗一条，带着它的变体（点掉的不带，记在 `apart` 里），例句和来源用表里的句子和它们的视频；已学的梗的新变体加进那个梗，意思还是那个梗的（写了 My meaning 就和那个意思合并）。来源存成 `source`：My meaning 里写了它从哪来（”阿一古“的变体、来源于“搏至无憾”，`meanings.source_in()`；句式“XX翻了”和这个梗自己的别的写法不算）就用那个，`how` 是 `note`；不然用 judge 的（`_source()`）：查到的只要没标 Wrong 就存，猜的要标了 Correct 或 Half correct 才存。两个梗不能互为来源（`_untangle()`）：IG vs GEN 的测试里模型猜 把光借给ig 来自 把力量借给ig，又猜 把力量借给ig 来自 把光借给ig；这样两个都是猜的就都不存，一个查到一个猜的就只存查到的。Not a meme 的连变体一起 `store.reject()`，理由是 My meaning（没写就是日期）：下次判断相近的说法时模型会看到这个理由（第 3 节 `learned_like()`）。Not sure yet 和没选的留到下次。最后按第一次评分的分数算模型的分（Correct 1，Half correct 0.5，Correct, no meaning 0.5，No point 0，Wrong −1，I don't know 不算），同一个回答只算一次（`scored`）；结果显示在网页上和窗口里，`review.json` 的 `done` 里也留一份。然后 bot 停下。
 - **只给这台电脑用**（`Report`）。只听 127.0.0.1（不会弹防火墙），端口默认随便挑一个空的；链接里带一个随机的 token，网页每次存都带上它（`X-Token` 头），Host 也要是 127.0.0.1：别的网页（哪怕在同一个浏览器里）改不了你的选择。网页里的弹幕和意思都当文字放（`textContent`），不当 HTML；数据放在 JSON 里，`<` 写成 `\u003c`，一句弹幕也结束不了 `<script>`。只用 Python 自带的 `http.server`，不用装别的。
 
+## 3.7 自己跑几天（`auto.py`）
+
+2026-11-10 Hao 的计划（PR #9）：机器人在他电脑上自己跑 3 天，每天读一次 LoL 和无畏契约的视频弹幕，有比赛时也录直播，每个梗先查解释再存；3 天后出一份报告，Hao 决定加哪些梗。
+
+- **两个计划任务**（`start()`）。`py -m memelearner auto start`（`开始自动跑.bat`）用 XML 给当前用户建任务（`schtasks /Create /XML`，不用管理员）：「MemeLearnerBot daily」每天 `--at`（12:00）跑一次 `auto daily`，第一次马上跑（`/Run`）；每个直播间一个「MemeLearnerBot live 房间号」，每 `--every`（30）分钟跑一次 `auto live --rooms 房间号:游戏`，两个直播间同时开播也都能录。都用 `pythonw`（没有窗口）、只在用户登录时跑（`InteractiveToken`，不存密码；锁屏也跑）、错过的开机后补跑（`StartWhenAvailable`）、上一次没跑完就不开新的（`IgnoreNew`）、`--days`（3）天后自己停（`EndBoundary`）。设置存在 `.cache/surf/auto/settings.json`。`auto stop`（`停止自动跑.bat`）结束并删掉这些任务；换了直播间再 start，不要的那个任务会删掉。
+- **一次运行**（`daily()`、`watch()`、`_process()`）。daily 跟 `learn` 一样读视频；live 看直播间开没开播（`room_info()`），开播就录（`live.record()`），下播（每 10 分钟问一次，`_Offline`）或录满 `--hours`（6）小时停，再跟 `live-phrases` 一样找说法（新的最多 40 个，老的最多 10 个）。然后都一样：judge，再 explain 每个找到的梗（`top=None`，不限个数；视频和网页，第 3.5 节），存进 `.cache/surf/auto/pool.json`（`keep()`）：几天里每次找到的说法都在里面，带最新的结论、哪几次找到的（`runs`）、第一次的时间（`first`）和一次里最多的人数；这次没判的（没有模型）留着上次的结论。没有模型的话说法先不判，照样存着。
+- **轮流**（`_turn()`）。几次运行共用 `candidates.json`，所以找说法、判断、查解释要轮流：锁文件 `.cache/surf/auto/lock`，等不到就每分钟看一次，等 `WAIT_MINUTES`（4 小时）还等不到就跳过这次；锁放了 `LOCK_HOURS`（8 小时）以上的，是死掉的运行留下的，直接拿走。录直播不用等。运行的编号在开始时就定（`started.txt`），录几个小时直播的时候开始的 daily 不会重号。
+- **日志**（`_running()`、`PROBLEMS`、`summary()`）。运行打印的都写进 `.cache/surf/auto/log.txt`（`cli._log_to()`）；直播间没开播的那几次只写 `rooms.json`，不然日志全是「没开播」。每次运行最后写一行总结：读了什么、找到几个说法几个梗、查到几个解释、没查到的是哪些、出了什么问题。问题是从打印的话里数出来的：B 站限速（412）或风控、B 站要验证码、连不上 B 站、在线模型问不了（DeepSeek 没密钥或没余额）本地模型顶上、模型都问不了、有网站挡住了机器人、出错（带 traceback，下一次照样跑）。`auto status`（`看看进度.bat`）显示任务的下次运行时间和状态、每次的总结、直播间最后一次看的结果和日志最后 40 行。
+- **新代码**（`--pull`）。daily 先在代码的文件夹里 `git pull --ff-only`，拉到新的就用新代码另开一个 Python 跑这一次（`--no-pull`），这样 3 天里推上去的修复第二天就用上了；拉不下来就用原来的代码跑。
+- **报告**（`report()`、`overview()`）。`auto report`（`打开报告.bat`）把 pool 里还没学、没拒的说法交给第 3.6 节的报告（`review.rows(pool)`），第一行是这几天的总结：跑了几次（每天的、直播的）、找到几个说法几个梗、几个查到了解释、出过哪些问题。
+
 ## 4. 学到的梗（`store.py`、`data/memes.json`）
 
 ```
@@ -172,6 +186,7 @@ flowchart TD
 | `data/words/common_english.txt` | 1 万个常用英文单词，用来分开英文单词（nice）和字母梗（yyds） | surf.py 读 |
 | `.cache/surf/` | 读到的弹幕和评论（每个视频一个 `.jsonl`，发送者是短哈希）、`videos.json`、`candidates.json`；`judge.json`：模型的结论；`explainers.json`：见过的讲梗视频和每个说法的视频总结，`explainers/`：看过的讲梗视频（每个一个 `.json`）；`review.json`：报告里的选择、算过分的回答和每次「完成」的结果 | surf.py、judging.py、explainers.py 和 review.py 读写，不进 git；环境变量 `MEMELEARNER_HOME` 可以换地方，exe 里放在 `%LOCALAPPDATA%\MemeLearnerBot` |
 | `.cache/whisper/` | Whisper 模型（装了 faster-whisper、第一次听视频的时候下载） | explainers.py 读，不进 git |
+| `.cache/surf/auto/` | 自己跑几天（第 3.7 节）：`pool.json`（每次运行和找到的说法）、`log.txt`（日志）、`settings.json`、`rooms.json`（直播间最后一次看的结果）、`started.txt`（运行编号）、`lock`、每个任务的 XML | auto.py 读写，不进 git |
 
 ## 7. 为什么这样设计
 
@@ -203,3 +218,4 @@ flowchart TD
 | 某个梗的讲解视频机器人找不到 | `py -m memelearner explain 说法 --video 视频链接` |
 | 哪些标题算讲梗的视频 | `explainers.py` 开头的 `EXPLAINS_SOMETHING` 和 `MADE_TO_EXPLAIN` |
 | 换一个 Whisper 模型（更快或更准） | 环境变量 `MEMELEARNER_WHISPER`（`medium`、`small`……） |
+| 自己跑几天：几点、几天、哪些直播间、多久看一次 | `开始自动跑.bat` 里 `auto start` 后面加 `--at 09:30 --days 3 --rooms 6 房间号:valorant --every 30 --hours 6`；默认值在 `auto.py` 开头 |

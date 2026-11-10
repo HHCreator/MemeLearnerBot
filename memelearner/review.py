@@ -150,8 +150,9 @@ def _examples(lines, phrase):
     return picked
 
 
-def rows():
-    """The report's rows, one for each meme: the last run's candidates not learned or turned
+def rows(last=None):
+    """The report's rows, one for each meme: the last run's candidates (or last's, in the
+    shape of candidates.json, like auto.py's pool of several runs) not learned or turned
     down yet, the likeliest memes first (_group()), and the most people first within a
     group. A row is {"key": "game:phrase", "phrase": the way most people write it, "pattern":
     the meme's, a name in it as XX (XX同意了), "game", "people", "variants": [{"phrase",
@@ -165,7 +166,7 @@ def rows():
     "answer": which answer a Mark is on, "group", "told": where its meaning comes from
     (_told()), "unexplained": True when explain looked it up and found nothing that explains
     it}."""
-    last = surf._load_json(surf.CANDIDATES_FILE, {})
+    last = surf._load_json(surf.CANDIDATES_FILE, {}) if last is None else last
     done = store.phrases()
     found = [c for c in last.get("candidates") or [] if store.normal(c["phrase"]) not in done]
     memes = store.load()["memes"]

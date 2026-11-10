@@ -569,6 +569,50 @@ that need it most (`--explain-top`, `--no-explain`, `--no-audio`) and then `repo
 is the model for all of it (deepseek-flash, with qwen3:14b standing in when it can't be
 reached).
 
+## Running by itself for days
+
+On Windows, the bot can run by itself for some days with Task Scheduler while you're away,
+and you look at what it found at the end. Double-click, in the bot's folder:
+
+| | |
+|---|---|
+| `开始自动跑.bat` | `py -m memelearner auto start`: makes the scheduled tasks that run it for 3 days |
+| `看看进度.bat` | `py -m memelearner auto status`: the tasks, each run's summary line and the end of the log |
+| `打开报告.bat` | `py -m memelearner auto report`: what every run found, as the report |
+| `停止自动跑.bat` | `py -m memelearner auto stop`: ends and deletes the tasks (what was found stays) |
+
+`auto start` makes these tasks for you, which run while you're logged on (the screen may be
+locked), in the background without a window:
+
+- **MemeLearnerBot daily** reads the newest LoL and Valorant videos once a day, as `learn`
+  does: at 12:00 (`--at 09:30`), the first time at once (`--games` picks the games).
+- **MemeLearnerBot live 6**, one for each live room, looks at its room every 30 minutes
+  (`--every`). When it's live, it records its danmu until it goes offline, or for 6 hours
+  (`--hours`), as `live` does, then finds its phrases as `live-phrases` does. The rooms are
+  given as `--rooms 6 21144080:valorant`: a room's number or link, and the game after a
+  colon (lol when there's none); room 6, the LPL's, by default. Two rooms live at the same
+  time are both recorded.
+
+After reading, each run judges the phrases, looks up every meme found (`explain`: the videos
+and web pages that explain it, then it is judged again) and keeps them in the pool,
+`memelearner/.cache/surf/auto/pool.json`, so the report has what every run found, each
+phrase with its newest verdict. A run missed while the computer was off or asleep runs as
+soon as it's back; two runs take turns judging and looking up; and the tasks stop by
+themselves after 3 days (`--days`). With `--pull`, each daily run first pulls the newest code
+of the folder's branch (`git pull --ff-only`), so a fix pushed meanwhile is used from then on.
+
+What the runs print goes to `memelearner/.cache/surf/auto/log.txt`. Each run ends there with
+a summary line, `== 总结：…`: what it read and found, how many memes it found explained,
+the ones nothing explains, and the problems it ran into: Bilibili's rate limit (412) or
+captcha, Bilibili out of reach, the online model out of reach (DeepSeek with no key or no
+balance) so that qwen3:14b stood in, no model at all, sites that refused the bot, or an
+error (logged with its traceback; the next run goes on). A look at rooms that aren't live
+isn't logged, only kept in `rooms.json`, which `auto status` shows.
+
+`auto report` opens [the report](#the-report) with every phrase the runs found that isn't
+learned or turned down yet; its first line sums the days up: the runs, the phrases and memes
+found, how many memes were explained, and the problems.
+
 ## Files
 
 | File | What it is |
@@ -577,7 +621,10 @@ reached).
 | `memelearner/cli.py` | the command line (`py -m memelearner`) |
 | `memelearner/surf.py` | the bot: find videos, read them, find the phrases people send on their own |
 | `memelearner/judging.py` | the judge: a model tells memes from names and explains them; compare |
-| `memelearner/explainers.py` | finds, reads and sums up the videos that explain memes |
+| `memelearner/explainers.py` | finds, reads and sums up the videos and web pages that explain memes |
+| `memelearner/web.py` | search engines and wikis, for what explains a meme (read only) |
+| `memelearner/live.py` | records a live room's danmu, and finds its phrases |
+| `memelearner/auto.py` | runs by itself for days with Windows Task Scheduler (`auto`) |
 | `memelearner/meanings.py` | merges your notes with the model's meanings |
 | `memelearner/review.py` | the report in your browser: your marks and decisions, and what 完成 learns |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
@@ -587,6 +634,7 @@ reached).
 | `memelearner/data/nicknames.txt` | players' nicknames, which you edit (`nicknames.py` reads it) |
 | `memelearner/variants.py` | tells the variants of one meme (XX同意了) |
 | `surf.py` | `py surf.py`, short for `py -m memelearner learn` |
+| `开始自动跑.bat` and the three beside it | `auto start`, `stop`, `status` and `report`, to double-click |
 
 The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs/DESIGN.md).
 

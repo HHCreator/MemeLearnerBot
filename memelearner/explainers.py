@@ -522,6 +522,8 @@ def _search(query, search, names, how="search"):
         search["refused"] = True
         print("    Bilibili wants a captcha for the search, so it's skipped for the rest "
               "of this run")
+    except bilibili.Blocked as error:
+        _blocked(search, error)
     except bilibili.Error as error:
         print(f"    the search failed: {error}")
     except (urllib.error.URLError, OSError) as error:
@@ -545,6 +547,14 @@ def _web(phrase, names, entry, field, again):
                                    "results": results}
     return [video for video in web.videos(kept.get("results") or [], names)
             if any(mentions(video["title"], name) for name in names)]
+
+
+def _blocked(search, error):
+    """Bilibili refuses this computer for now (its rate limit, HTTP 412): no more Bilibili
+    in this run (search is shared by the run), but the web goes on."""
+    if not search.get("blocked"):
+        print(f"    {error}\n    Not reading Bilibili again in this run: the web goes on.")
+    search["blocked"] = search["refused"] = True
 
 
 def find(candidate, links=(), search=None, data=None, again=False):
@@ -774,12 +784,17 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
                 print(f"    found no video that explains it, so these explain "
                       f"{found[0]['for']}, which it may come from:")
             for video in found:
+                if search.get("blocked"):
+                    break
                 about = video.get("for") or phrase  # what the video explains: it, or its source
                 try:
                     material = read(video["bvid"], about, hearing)
                 except bilibili.Captcha as error:
                     print(f"    skipped {video['bvid']}: {error}")
                     continue
+                except bilibili.Blocked as error:
+                    _blocked(search, error)
+                    break
                 except bilibili.Error as error:
                     print(f"    skipped {video['bvid']}: {error}")
                     continue
@@ -837,6 +852,9 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
         print(f"{len(by_page)} more are explained by a web page.")
     if sourced:
         print(f"{len(sourced)} more have a video about where they may come from.")
+    if search.get("blocked"):
+        print("Bilibili refused this computer for a while in this run (its rate limit), so "
+              "some videos weren't read.")
     if web.refused:
         print("Left alone for the rest of the run: " +
               "; ".join(f"{site} ({why})" for site, why in web.refused.items()))

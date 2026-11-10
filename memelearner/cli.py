@@ -18,6 +18,8 @@
     py -m memelearner report                   the report in your browser: mark, decide, then 完成
     py -m memelearner live-report              live-phrases, judge and explain, then the report
     py -m memelearner sources 阿一古 --explain   which search engines and wikis explain some memes
+    py -m memelearner auto start               run by itself for days (Windows Task Scheduler)
+    py -m memelearner auto status | stop | report   how it's going, stop it, what it found
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
 learn --judge also judges what it found (learn --explain then also reads videos that explain
@@ -34,8 +36,8 @@ import os
 import sys
 import time
 
-from . import (ModelUnavailable, accept, candidates, explainers, find, forget, judging, lookup,
-               meanings, memes, nicknames, reject, store, surf, watching, web)
+from . import (ModelUnavailable, accept, auto, candidates, explainers, find, forget, judging,
+               lookup, meanings, memes, nicknames, reject, store, surf, watching, web)
 
 
 def _print_json(value):
@@ -434,6 +436,33 @@ def _sources_text(report):
     return lines
 
 
+def _auto(args):
+    """auto start, stop, status, report, daily or live (auto.py)."""
+    logging = not os.environ.get("MEMELEARNER_LOG")  # else main() logs there already
+    log = lambda: _log_to(auto.log_file(), ["auto", args.action]) if logging else None
+    try:
+        if args.action == "start":
+            if not auto.start(args.at, args.days, args.every, args.rooms or list(auto.ROOMS),
+                              args.games or list(auto.GAMES), args.hours, bool(args.pull)):
+                sys.exit(1)
+        elif args.action == "stop":
+            auto.stop()
+        elif args.action == "status":
+            auto.status(args.lines)
+        elif args.action == "report":
+            auto.report(args.model, args.port, not args.no_browser)
+        elif args.action == "daily":
+            log()
+            auto.daily(args.model, args.pull)
+        else:
+            auto.watch(args.model, log, args.rooms)
+    except ValueError as error:
+        sys.exit(str(error))
+    except OSError as error:
+        sys.exit(f"Couldn't open the report on port {args.port}: {error}"
+                 if args.action == "report" else str(error))
+
+
 def _recording_options(command):
     """The options of live-phrases, which live-report has too."""
     command.add_argument("recordings", nargs="*", metavar="RECORDING",
@@ -636,6 +665,43 @@ def parser():
                       f"{judging.LOCAL_MODEL} when it can't be reached)")
     look.add_argument("--no-audio", action="store_true", help="don't hear videos (--explain)")
     look.set_defaults(run=_sources)
+
+    by_itself = sub.add_parser(
+        "auto", help="run by itself for days with Windows Task Scheduler: start, stop, status, "
+        "report (what the runs found), or one daily or live run (what the tasks run)")
+    by_itself.add_argument("action", choices=("start", "stop", "status", "report", "daily",
+                                              "live"))
+    by_itself.add_argument("--at", default=auto.AT, metavar="HH:MM",
+                           help="start: when the daily run starts (default %(default)s; the "
+                           "first one starts at once)")
+    by_itself.add_argument("--days", type=int, default=auto.DAYS, metavar="N",
+                           help="start: days to run, then the tasks stop (default %(default)s)")
+    by_itself.add_argument("--games", nargs="+", metavar="GAME",
+                           help="start: whose videos the daily run reads (default: "
+                           f"{' '.join(auto.GAMES)})")
+    by_itself.add_argument("--rooms", nargs="+", metavar="ROOM[:GAME]",
+                           help="start: the live rooms watched, each by a task of its own: a "
+                           "room's number or link, :valorant after it for a Valorant room "
+                           f"(default: {' '.join(auto.ROOMS)}); live: the rooms to look at "
+                           "(default: start's)")
+    by_itself.add_argument("--every", type=int, default=auto.EVERY, metavar="MINUTES",
+                           help="start: minutes between two looks at the live rooms (default "
+                           "%(default)s)")
+    by_itself.add_argument("--hours", type=int, default=auto.LIVE_HOURS, metavar="N",
+                           help="start: a recording stops after this many hours, if the room is "
+                           "still live (default %(default)s)")
+    pulling = by_itself.add_mutually_exclusive_group()
+    pulling.add_argument("--pull", action="store_true", default=None,
+                         help="start, daily: pull the newest code of this folder's branch "
+                         "before each daily run (git pull --ff-only)")
+    pulling.add_argument("--no-pull", dest="pull", action="store_false",
+                         help="daily: don't pull, even if start was given --pull")
+    by_itself.add_argument("--lines", type=int, default=auto.TAIL, metavar="N",
+                           help="status: lines of the log shown (default %(default)s)")
+    _report_options(by_itself, "the model that judges and sums up (daily, live), or merges your "
+                    f"notes (report) (default %(default)s; {judging.LOCAL_MODEL} when it can't "
+                    "be reached)")
+    by_itself.set_defaults(run=_auto)
 
     scan = sub.add_parser("find", help="the learned memes in a text")
     scan.add_argument("text")
