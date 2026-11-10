@@ -513,7 +513,7 @@ py -m memelearner live-report     # the last live recording: live-phrases, judge
 ```
 
 One row per meme, the likeliest memes first (a meaning that passed its blind test, then
-one that lines or videos explain, the other memes, what the model couldn't tell, and last
+one that lines, videos or web pages explain, the other memes, what the model couldn't tell, and last
 names, game words and everyday words): its pattern and the way most people write it
 (「XX同意了」, 超威同意了), how many people sent that on its own, two lines that use it, and
 the model's answer (its kind and meaning, marked when it is only a guess or failed its
@@ -521,8 +521,12 @@ test). Under it are its variants, with how many people sent each, and who the na
 them are (Chovy = 超威、chovy、大超); click a variant that isn't this meme to keep it out
 of it (click again to take that back). A row that is a new variant of a learned meme says
 which one, and a meme made from another one says where it comes from (来源：「我们是冠军」),
-found (a video, a line or a learned meme says so) or only guessed. You fill in, once for
-the whole meme:
+found (a video, a web page, a line or a learned meme says so) or only guessed. Under each
+meme's meaning, 解释来源 says where it comes from: the video or web page that explains it
+(with its link), a line explaining it (观众弹幕里的解释), the learned meme it is, or else the
+model (模型猜的, or 模型猜的，盲测通过 when it passed its blind test); 没查到解释 marks a
+meme the bot looked up and found nothing that explains. You fill in, once for the whole
+meme:
 
 - **Mark**: how right the answer is: Correct, Half correct, Correct, no meaning, No point,
   Wrong, or I don't know.
