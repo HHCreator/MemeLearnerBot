@@ -20,8 +20,8 @@ the phrase sent most, with the others as "variants": ["chovy同意了", "三叔�
 lookup() and find() find it by any of them; it keeps EXAMPLES example lines for each. "apart"
 holds the phrases you said aren't that meme, though they look like it (in the report). A
 meme made from another one has "source": {"phrase": "我们是冠军", "how": "learned"}: where it
-comes from, and how the judge knows ("video", "explanation" or "learned" when one of them
-says so, "guess" when it only looks like it; see judging.judge()). Every
+comes from, and how the judge knows ("video", "page", "explanation" or "learned" when one
+of them says so, "guess" when it only looks like it; see judging.judge()). Every
 phrase is written the way the bot finds it (normal()): lowercase, half-width, only letters,
 digits and Chinese characters. "version" changes when a field changes meaning or goes away; a
 new field doesn't change it.

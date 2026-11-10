@@ -639,7 +639,7 @@ button:disabled { opacity: .5; cursor: default; }
 const DATA = JSON.parse(document.getElementById("data").textContent);
 const KINDS = {meme: "meme", name: "a name", term: "a game word", everyday: "everyday words",
                unclear: "unclear"};
-const HOW = {video: "查到的：视频里说的", explanation: "查到的：弹幕里有人说",
+const HOW = {video: "查到的：视频里说的", page: "查到的：网页里说的", explanation: "查到的：弹幕里有人说",
              learned: "查到的：已学的梗里写着", note: "查到的：你的补充里写着",
              guess: "猜的"};  // how the source is known
 const WHOSE = {merged: "和你的补充合成的", note: "你的原话", judge: "模型的意思",

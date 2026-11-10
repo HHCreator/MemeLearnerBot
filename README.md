@@ -414,11 +414,12 @@ run 萌娘百科 refused programs that aren't logged in, and 维基百科's sear
 pages (奥拉夫 led to Olaf Scholz), which misled the model more than they helped. Videos made
 to explain a meme work better: see the next part.
 
-## Videos that explain memes
+## Videos and web pages that explain memes
 
-Bilibili is full of videos made to explain new memes (阿一古是什么梗？). They say what a meme
-means and where it comes from, which the danmu rarely do: most memes are sent on their own.
-So the bot reads them for the memes the judge found, and the judge goes by what they say:
+Bilibili is full of videos made to explain new memes (阿一古是什么梗？), and wikis and Q&A
+sites have pages that do. They say what a meme means and where it comes from, which the
+danmu rarely do: most memes are sent on their own. So the bot reads them for the memes the
+judge found, and the judge goes by what they say:
 
 ```
 py -m memelearner explain                    # the 10 memes whose meaning is least sure
@@ -432,10 +433,11 @@ For each phrase it:
 1. **Finds** videos whose titles name the phrase (or a variant) and look made to explain
    something (是什么梗, 什么意思, 出处, 由来). They come from the links you give, from the
    explainer videos the bot saw in related-video lists (the collector's and those beside
-   every explainer it reads, which a visitor gets without a captcha), and from Bilibili's
-   search for "阿一古是什么梗". The search is tried until Bilibili asks for a captcha once in
-   a run, then skipped (the bot never solves captchas), and for each phrase at most once a
-   week. When no video names a meme the judge says comes from another one (see Where a meme
+   every explainer it reads, which a visitor gets without a captcha), from a search engine's
+   results for "阿一古是什么梗" (Bing, or DuckDuckGo or Baidu when Bing doesn't answer:
+   `memelearner/web.py`), and from Bilibili's own search for it. Bilibili's search is tried
+   until it asks for a captcha once in a run, then skipped (the bot never solves captchas);
+   both searches happen for each phrase at most once a week. When no video names a meme the judge says comes from another one (see Where a meme
    comes from), it looks the same way for videos about that one: 千言万语感谢现役是什么梗
    for 千言万语感谢多兰, 超威同意了 for the pattern XX同意了.
 2. **Reads** up to 2 of them per phrase, each video once, as any visitor who isn't logged in
@@ -449,14 +451,36 @@ For each phrase it:
    reached, as for the judge): does it explain the phrase, what does it say the phrase
    means and where it comes from, and a line quoted from it (a quote that isn't in the
    video is dropped). The model is told to write only what the video says.
-5. **Judges again** the phrases a video explains: the model gets the videos' summaries
-   beside the danmu, and a meaning a video backs isn't only a guess any more, so `accept`
-   takes it. `candidates` shows which video it came from. A video about where a meme comes
-   from shows the model that source, marked as such, but doesn't back the meme's own
-   meaning.
+5. **Reads the web** when no video explains the phrase: 萌娘百科's entry for it (through the
+   public API of its mobile site), 百度百科's and what 小鸡词典's search page shows, and up
+   to 3 of the other pages the search engine found that name it, explainer sites first
+   (萌娘百科, 百度百科, 知乎, 贴吧 ...); for the rest, the search results' snippets. Only the
+   lines around the phrase go to the model, which sums them up as it does a video, names
+   the page it went by and quotes it (a quote that page doesn't contain is dropped). A page
+   may be about something else of the same name, so the model is told which game the phrase
+   is from. 小鸡词典's own API wants an encrypted header that only its page makes; the bot
+   doesn't make one, so it only reads what anyone sees there.
+6. **Judges again** the phrases a video or a page explains: the model gets their summaries
+   beside the danmu, and a meaning a video or a page backs isn't only a guess any more, so
+   `accept` takes it. `candidates` shows which video or page it came from. A video about
+   where a meme comes from shows the model that source, marked as such, but doesn't back
+   the meme's own meaning.
 
 What it read stays in `memelearner/.cache/surf/explainers.json` and `explainers/`. A phrase
-no video explains is looked up again after a week; `--again` looks up everything again.
+nothing explains is looked up again after a week; `--again` looks up everything again. A
+site that wants a captcha, refuses the bot (HTTP 403, 429) or can't be reached twice is left
+alone for the rest of the run; there are a few seconds between two requests to the same site.
+
+Which search engines and wikis answer depends on where your computer is, so you can try them:
+
+```
+py -m memelearner sources 阿一古 正义必胜 --explain   # ask each one, then look them up as explain does
+py -m memelearner sources --file phrases.txt --raw   # phrases one a line; keep every page as it came
+```
+
+It writes what each place found to `.cache/surf/sources/` (`--out` for another folder):
+`sources.md` to read, beside what `memes.json` says the learned ones mean, `sources.json`,
+and `links.json`, the Bilibili videos found for each phrase.
 
 **Hearing the videos (optional).** Most explainer videos are spoken, and Bilibili only gives
 its AI subtitles to logged-in viewers, which the bot never is. To hear them, install Whisper:
