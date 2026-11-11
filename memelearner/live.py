@@ -463,20 +463,23 @@ class Recording:
             self.say("  No danmu yet: is the room live? It keeps listening.")
         self.save_info()
 
-    def save_info(self):
-        """Write ROOM-....json beside the danmu: the room, times, counts and samples."""
+    def save_info(self, ended=False):
+        """Write ROOM-....json beside the danmu: the room, times, counts and samples, and
+        "ended" (when) once the recording ended."""
         self.last_saved = time.time()
         self.file.flush()
-        surf._save_json(os.path.splitext(self.path)[0] + ".json", {
-            "room": self.room, "file": os.path.basename(self.path),
-            "started": int(self.started), "updated": int(time.time()),
-            "danmu": self.lines, "senders": len(self.people), "auto": self.auto,
-            "stickers": self.stickers, "without_code": self.weak, "combos": self.combos,
-            "joins": self.joins, "kinds": dict(self.kinds.most_common()),
-            "samples": self.samples})
+        info = {"room": self.room, "file": os.path.basename(self.path),
+                "started": int(self.started), "updated": int(time.time()),
+                "danmu": self.lines, "senders": len(self.people), "auto": self.auto,
+                "stickers": self.stickers, "without_code": self.weak, "combos": self.combos,
+                "joins": self.joins, "kinds": dict(self.kinds.most_common()),
+                "samples": self.samples}
+        if ended:
+            info["ended"] = int(time.time())
+        surf._save_json(os.path.splitext(self.path)[0] + ".json", info)
 
     def close(self):
-        self.save_info()
+        self.save_info(ended=True)
         self.file.close()
 
 
@@ -583,7 +586,8 @@ def record(link, until=None, path=None, game="lol", out=None, stop=None,
     what the room is about, for finding phrases later; out is where it says what it does
     (None: sys.stdout, as it is then), with a status line every status_every seconds. While
     it records, the recording's .json is rewritten at least every STATUS_EVERY seconds (and
-    a minute or two apart while it joins again), so others can tell (auto.py)."""
+    a minute or two apart while it joins again), and says "ended" once it stopped, so others
+    can tell (auto.py)."""
     room = room_info(room_of(link))
     started = time.strftime("%Y%m%d-%H%M")
     name = room["short_id"] or room["room_id"]

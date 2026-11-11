@@ -25,9 +25,12 @@ it is back (StartWhenAvailable); the daily task doesn't start again while it sti
 starts at once, the next ones at AT on the days after. A live task looks every EVERY
 minutes, also while an earlier look still runs (Parallel): a run that recorded a room
 finds, judges and looks up what it recorded while the next one already records the room,
-so a match isn't missed meanwhile, and a room whose recording's .json changed in the last
-FRESH_MINUTES minutes is left to the run recording it (_being_recorded()). extend makes the
-tasks again with a later end, without starting a daily run. With --pull, a daily run first
+so a match isn't missed meanwhile. A run whose recording stopped because it was long enough
+(not because the room went offline) has its task look again at once (_record_on()), so the
+next part starts within seconds; a room whose recording's .json changed in the last
+FRESH_MINUTES minutes and doesn't say it ended is left to the run recording it
+(_being_recorded()). extend makes the tasks again with a later end, without starting a
+daily run. With --pull, a daily run first
 pulls the newest code of the folder's branch (git pull --ff-only) and runs that, so a fix
 pushed during the days is used from the next run.
 
@@ -402,31 +405,55 @@ class _Offline:
 
     def __init__(self, room):
         self.room = room
+        self.gone = False  # whether it said the room went offline
 
     def __call__(self):
         try:
-            return not live.room_info(self.room)["live"]
+            self.gone = not live.room_info(self.room)["live"]
         except (bilibili.Error, bilibili.Blocked, OSError, KeyError, TypeError):
             return False  # can't tell: go on
+        return self.gone
 
 
 def _being_recorded(name):
     """Whether a room (its number as recordings are named: the short one, 6) is being
     recorded now, by another live run or the live command: the .json of a recording of it,
     which the recorder rewrites every minute (live.STATUS_EVERY), changed in the last
-    FRESH_MINUTES minutes."""
-    newest = 0
+    FRESH_MINUTES minutes and doesn't say the recording ended (one being written right now
+    counts as being recorded)."""
     for path in glob.glob(os.path.join(glob.escape(live.live_dir()), f"{name}-*.json")):
-        with contextlib.suppress(OSError):
-            newest = max(newest, os.path.getmtime(path))
-    return time.time() - newest < FRESH_MINUTES * 60
+        try:
+            fresh = time.time() - os.path.getmtime(path) < FRESH_MINUTES * 60
+        except OSError:
+            continue
+        if fresh and "ended" not in surf._load_json(path, {}):
+            return True
+    return False
+
+
+def _record_on(spec, found):
+    """After a room's recording stopped because it was long enough ("hours"), not because
+    the room went offline: have the room's task look at it again now, so the next part of
+    the recording starts within seconds instead of at the task's next look, while this run
+    finds, judges and looks up the part it recorded. Only while the auto run is on (from
+    start to "until"); the task, which may run more than once at a time (Parallel), finds
+    the room live and its last recording ended (_being_recorded())."""
+    if not found.get("started") or not found.get("until"):
+        return
+    if datetime.datetime.now() >= datetime.datetime.strptime(found["until"], "%Y-%m-%d %H:%M"):
+        return
+    name = task_names([spec])[1]
+    code, said = _schtasks("/Run", "/TN", name)
+    print(f"录满 {found['hours']} 小时：下一段现在接着录（{name}）" if not code
+          else f"下一段没能现在接着录（{said.strip()}）：等下一次看直播间")
 
 
 def watch(model=None, log=None, rooms=None):
     """One look at some live rooms (rooms: ROOM[:GAME]s, by default the ones in settings()),
     what a live task runs: record the first one that is live and not being recorded already
     (_being_recorded(): by the run an earlier look started), until it goes offline (or for
-    "hours"), then find its phrases and _process() them. Returns the recording's path, or
+    "hours": then the next part starts at once, _record_on()), then find its phrases and
+    _process() them. Returns the recording's path, or
     None when no room is to be recorded. Each room's last look is kept in
     surf/auto/rooms.json; log() is called first when a room is to be recorded (cli.py starts
     the log then, so the log has the recordings but not every look at a room)."""
@@ -445,7 +472,7 @@ def watch(model=None, log=None, rooms=None):
             looked[str(room)] = "开播了，正在录"
         else:
             looked[str(room)] = "开播了"
-            chosen = room, game
+            chosen = room, game, spec
             break
     when = time.strftime("%Y-%m-%d %H:%M")
     seen = surf._load_json(_file("rooms.json"), {})
@@ -453,13 +480,16 @@ def watch(model=None, log=None, rooms=None):
     surf._save_json(_file("rooms.json"), seen)
     if chosen is None:
         return None
-    room, game = chosen
+    room, game, spec = chosen
     if log:
         log()
     path = None
     with _running("live", f"[直播 {room}] ") as run:
+        offline = _Offline(room)
         path = live.record(room, until=time.time() + found["hours"] * 3600, game=game,
-                           stop=_Offline(room), status_every=LIVE_STATUS_MINUTES * 60)
+                           stop=offline, status_every=LIVE_STATUS_MINUTES * 60)
+        if not offline.gone:
+            _record_on(spec, found)
         with _turn():
             try:
                 phrases, counts, compared = live.find([path])
@@ -661,24 +691,26 @@ def extend(days, every=None):
     """Have the auto run last days from when it started (settings.json): its tasks are made
     again with the new end (and every minutes between two looks at the live rooms, when
     given), from this code (so a live task that came before Parallel gets it). No daily run
-    starts now: the next one is at AT, today when that is still to come. Returns True when
-    all the tasks were made. ValueError when it never started, or would end by now."""
+    starts now: the next one is at AT, today when that is still to come, but not on the day
+    it started (start ran that day's run then). Returns True when all the tasks were made.
+    ValueError when it never started, or would end by now."""
     found = settings()
     if not found["started"]:
         raise ValueError("自动跑还没开始过：先双击 开始自动跑.bat")
     if days < 1 or every is not None and every < 1:
         raise ValueError("--days and --every want 1 or more")
     now = datetime.datetime.now().replace(second=0, microsecond=0)
-    until = datetime.datetime.strptime(found["started"], "%Y-%m-%d %H:%M") + \
-        datetime.timedelta(days=days)
+    started = datetime.datetime.strptime(found["started"], "%Y-%m-%d %H:%M")
+    until = started + datetime.timedelta(days=days)
     if until <= now:
         raise ValueError(f"从 {found['started']} 算 {days} 天，现在已经过了")
     found.update(days=days, until=until.strftime("%Y-%m-%d %H:%M"), folder=code_folder(),
                  every=every or found["every"])
     hour, minute = (int(part) for part in re.fullmatch(r"(\d{1,2})[:：](\d{2})",
                                                       found["at"]).groups())
-    first = now.date() if (now.hour, now.minute) < (hour, minute) else \
-        now.date() + datetime.timedelta(days=1)
+    first = max(now.date() if (now.hour, now.minute) < (hour, minute) else
+                now.date() + datetime.timedelta(days=1),
+                started.date() + datetime.timedelta(days=1))
     if not _make(_tasks(found, now, first), found["folder"]):
         return False
     surf._save_json(_file("settings.json"), found)
@@ -686,7 +718,7 @@ def extend(days, every=None):
     print(f"- 下一次每天的运行：{first.strftime('%m-%d')} {found['at']}。")
     if found["rooms"]:
         print(f"- 每 {found['every']} 分钟看一次直播间 {'、'.join(found['rooms'])}；录满 "
-              f"{found['hours']} 小时的一段在找梗、judge、查解释时，下一段已经接着录了。")
+              f"{found['hours']} 小时的一段在找梗、judge、查解释时，下一段马上接着录。")
     return True
 
 

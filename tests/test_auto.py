@@ -235,12 +235,20 @@ class AutoTest(Folder):
         self.assertEqual(at(trigger, "EndBoundary").text, end)
         self.assertEqual(at(trigger, "Repetition/Interval").text, "PT10M")
         self.assertEqual(at(recording, "Settings/MultipleInstancesPolicy").text, "Parallel")
-        # The next daily run: at 12:00 today when that is still to come, else tomorrow
+        # The next daily run: tomorrow, as start ran today's (not a second one today)
+        tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+        self.assertEqual(at(at(daily, "Triggers/CalendarTrigger"), "StartBoundary").text,
+                         f"{tomorrow}T12:00:00")
+        self.assertIn(f"延长了：从 {found['started']} 跑到 {until.strftime('%m-%d %H:%M')}", printed)
+        # Started on an earlier day: at 12:00 today when that is still to come, else tomorrow
+        earlier = datetime.datetime.now() - datetime.timedelta(days=1, minutes=1)
+        surf._save_json(os.path.join(auto.auto_dir(), "settings.json"),
+                        dict(auto.settings(), started=earlier.strftime("%Y-%m-%d %H:%M")))
+        self.run_quietly(auto.extend, 4)
         now = datetime.datetime.now()
         day = now.date() if now.hour < 12 else now.date() + datetime.timedelta(days=1)
-        self.assertEqual(at(at(daily, "Triggers/CalendarTrigger"), "StartBoundary").text,
-                         f"{day}T12:00:00")
-        self.assertIn(f"延长了：从 {found['started']} 跑到 {until.strftime('%m-%d %H:%M')}", printed)
+        self.assertEqual(at(at(self.task("daily"), "Triggers/CalendarTrigger"),
+                            "StartBoundary").text, f"{day}T12:00:00")
         # Without --every it stays as it was; a day count that ended already won't do
         self.run_quietly(auto.extend, 5)
         self.assertEqual(auto.settings()["every"], 10)
@@ -484,6 +492,11 @@ class AutoTest(Folder):
         self.assertEqual(printed, "")
         looked = surf._load_json(os.path.join(auto.auto_dir(), "rooms.json"), {})
         self.assertEqual(looked["6"]["how"], "开播了，正在录")
+        surf._save_json(info, {"danmu": 5, "ended": int(time.time())})  # it just stopped
+        self.assertFalse(auto._being_recorded(6))
+        with open(info, "w", encoding="utf-8") as f:
+            f.write('{"danmu": ')  # being written right now
+        self.assertTrue(auto._being_recorded(6))
         # Not rewritten for a while: that run ended (or died), so this one records the room
         old = time.time() - (auto.FRESH_MINUTES + 1) * 60
         os.utime(info, (old, old))
@@ -495,6 +508,51 @@ class AutoTest(Folder):
         self.assertEqual(record.call_args[0][0], 6)
         self.assertIn("[直播 6] No danmu: nothing to look for.", printed)
         self.assertIn("\n== 总结：第 1 次（直播）", printed)  # the summary line stands alone
+
+    def test_after_a_part_long_enough_the_next_part_starts_at_once(self):
+        now = datetime.datetime.now()
+        settings = {"rooms": ["6:lol"], "hours": 6,
+                    "started": (now - datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M"),
+                    "until": (now + datetime.timedelta(days=1)).strftime("%Y-%m-%d %H:%M")}
+        answers = []  # whether the room is live, room_info's answers in turn (else live)
+
+        def record(link, until=None, path=None, game="lol", out=None, stop=None,
+                   status_every=None):
+            if answers:
+                self.assertTrue(stop())  # the room went offline
+            self.assertEqual(self.tasks, [])  # the next part starts once this one stopped
+            return "6-20261114-1300.jsonl"
+
+        def run(**sets):
+            self.tasks.clear()
+            surf._save_json(os.path.join(auto.auto_dir(), "settings.json"),
+                            dict(settings, **sets))
+            room_info = lambda room: {"live": answers.pop(0) if answers else True, "short_id": 6}
+            with mock.patch.object(live, "room_info", room_info), \
+                    mock.patch.object(live, "record", record), \
+                    mock.patch.object(live, "find", side_effect=ValueError("No danmu")):
+                path, printed = self.run_quietly(auto.watch, None, None, ["6:lol"])
+            self.assertEqual(path, "6-20261114-1300.jsonl")
+            return printed
+
+        # Recorded for 6 hours: the room's task looks again now (it may run twice at once)
+        printed = run()
+        self.assertEqual(self.tasks, [("/Run", "/TN", "MemeLearnerBot live 6")])
+        self.assertIn("[直播 6] 录满 6 小时：下一段现在接着录（MemeLearnerBot live 6）", printed)
+        # The task can't be run: the next look records it
+        self.answers["/Run"] = (1, "ERROR: The system cannot find the file specified.\n")
+        self.assertIn("下一段没能现在接着录（ERROR: The system cannot find the file specified.）",
+                      run())
+        del self.answers["/Run"]
+        # Not after the auto run's end, nor when it never started (the live command)
+        ended = (now - datetime.timedelta(minutes=1)).strftime("%Y-%m-%d %H:%M")
+        for printed in (run(until=ended), run(started="")):
+            self.assertNotIn("接着录", printed)
+            self.assertEqual(self.tasks, [])
+        # Nor when the room went offline
+        answers.extend([True, False])
+        self.assertNotIn("接着录", run())
+        self.assertEqual((self.tasks, answers), ([], []))
 
     def test_a_recording_without_danmu_has_nothing_to_look_for(self):
         with mock.patch.object(live, "room_info", lambda room: {"live": True}), \

@@ -583,8 +583,9 @@ and you look at what it found at the end. Double-click, in the bot's folder:
 | `停止自动跑.bat` | `py -m memelearner auto stop`: ends and deletes the tasks (what was found stays) |
 
 To have it run longer, `py -m memelearner auto extend --days 4` makes the tasks again so that
-they stop 4 days after the start instead (no extra run starts; `--every 10` changes how often
-the live rooms are looked at).
+they stop 4 days after the start instead (no extra run starts: the next daily run is at the
+usual time, never a second one on the day it started; `--every 10` changes how often the
+live rooms are looked at).
 
 `auto start` makes these tasks for you, which run while you're logged on (the screen may be
 locked), in the background without a window:
@@ -596,10 +597,11 @@ locked), in the background without a window:
   (`--hours`), as `live` does, then finds its phrases as `live-phrases` does. The rooms are
   given as `--rooms 6 21144080:valorant`: a room's number or link, and the game after a
   colon (lol when there's none); room 6, the LPL's, by default. Two rooms live at the same
-  time are both recorded. A look starts on time even while the last one still runs, so while
-  a run looks up what it recorded, the next one already records the room (a room whose
-  recording is still being written is left to the run writing it): a long match isn't
-  missed in between.
+  time are both recorded. A look starts on time even while the last one still runs, and a
+  run whose recording stopped after 6 hours (the room still live) has its task look again at
+  once, so while it looks up what it recorded, the next part is already being recorded,
+  seconds later (a room whose recording is still being written is left to the run writing
+  it): a long match isn't missed in between.
 
 After reading, each run judges the phrases, looks up every meme found (`explain`: the videos
 and web pages that explain it, then it is judged again) and keeps them in the pool,
