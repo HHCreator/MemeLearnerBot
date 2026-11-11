@@ -451,8 +451,9 @@ For each phrase it:
    reached, as for the judge): does it explain the phrase, what does it say the phrase
    means and where it comes from, and a line quoted from it (a quote that isn't in the
    video is dropped). The model is told to write only what the video says.
-5. **Reads the web** when no video explains the phrase: 萌娘百科's entry for it (through the
-   public API of its mobile site), 百度百科's and what 小鸡词典's search page shows, and up
+5. **Reads the web** when no video explains the phrase: 萌娘百科's entry for it (the page
+   its mobile site's search goes to; its API wants a login since November 2026), 百度百科's
+   and what 小鸡词典's search page shows, and up
    to 3 of the other pages the search engine found that name it, explainer sites first
    (萌娘百科, 百度百科, 知乎, 贴吧 ...); for the rest, the search results' snippets. Only the
    lines around the phrase go to the model, which sums them up as it does a video, names
@@ -581,17 +582,24 @@ and you look at what it found at the end. Double-click, in the bot's folder:
 | `打开报告.bat` | `py -m memelearner auto report`: what every run found, as the report |
 | `停止自动跑.bat` | `py -m memelearner auto stop`: ends and deletes the tasks (what was found stays) |
 
+To have it run longer, `py -m memelearner auto extend --days 4` makes the tasks again so that
+they stop 4 days after the start instead (no extra run starts; `--every 10` changes how often
+the live rooms are looked at).
+
 `auto start` makes these tasks for you, which run while you're logged on (the screen may be
 locked), in the background without a window:
 
 - **MemeLearnerBot daily** reads the newest LoL and Valorant videos once a day, as `learn`
   does: at 12:00 (`--at 09:30`), the first time at once (`--games` picks the games).
-- **MemeLearnerBot live 6**, one for each live room, looks at its room every 30 minutes
+- **MemeLearnerBot live 6**, one for each live room, looks at its room every 10 minutes
   (`--every`). When it's live, it records its danmu until it goes offline, or for 6 hours
   (`--hours`), as `live` does, then finds its phrases as `live-phrases` does. The rooms are
   given as `--rooms 6 21144080:valorant`: a room's number or link, and the game after a
   colon (lol when there's none); room 6, the LPL's, by default. Two rooms live at the same
-  time are both recorded.
+  time are both recorded. A look starts on time even while the last one still runs, so while
+  a run looks up what it recorded, the next one already records the room (a room whose
+  recording is still being written is left to the run writing it): a long match isn't
+  missed in between.
 
 After reading, each run judges the phrases, looks up every meme found (`explain`: the videos
 and web pages that explain it, then it is judged again) and keeps them in the pool,
@@ -607,7 +615,9 @@ the ones nothing explains, and the problems it ran into: Bilibili's rate limit (
 captcha, Bilibili out of reach, the online model out of reach (DeepSeek with no key or no
 balance) so that qwen3:14b stood in, no model at all, sites that refused the bot, or an
 error (logged with its traceback; the next run goes on). A look at rooms that aren't live
-isn't logged, only kept in `rooms.json`, which `auto status` shows.
+isn't logged, only kept in `rooms.json`, which `auto status` shows. A live run's lines start
+with `[直播 6]`, as they come between a daily run's while it records, and its status line
+comes every half hour.
 
 `auto report` opens [the report](#the-report) with every phrase the runs found that isn't
 learned or turned down yet; its first line sums the days up: the runs, the phrases and memes

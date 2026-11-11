@@ -62,7 +62,8 @@ except ImportError:  # pragma: no cover - depends on what is installed
 FALLBACK_HOST = {"host": "broadcastlv.chat.bilibili.com", "wss_port": 443}
 HEARTBEAT = 30  # seconds between heartbeats, like the live page
 SILENCE = 75  # seconds without a byte from Bilibili before the connection counts as dead
-STATUS_EVERY = 60  # seconds between status lines
+STATUS_EVERY = 60  # seconds between status lines (record()'s status_every), and between two
+# rewrites of the recording's .json, which tells others it is still being recorded
 STOP_EVERY = 600  # seconds between two asks whether to stop (record()'s stop)
 SHOW_FIRST = 5  # danmu printed as they come at the start, to show it works
 CHECK_AFTER = 100  # danmu after which it says whether the sender codes are there
@@ -358,8 +359,8 @@ def parse_combo(message, now=None):
 class Recording:
     """Writes what the feed sends to the .jsonl file, and keeps count."""
 
-    def __init__(self, path, room, out=None):
-        self.path, self.room, self.out = path, room, out
+    def __init__(self, path, room, out=None, status_every=STATUS_EVERY):
+        self.path, self.room, self.out, self.status_every = path, room, out, status_every
         self.file = open(path, "a", encoding="utf-8")
         self.started = time.time()
         self.lines = self.auto = self.stickers = self.weak = self.combos = 0
@@ -368,7 +369,7 @@ class Recording:
         self.samples = collections.defaultdict(list)
         self.seen = collections.OrderedDict()  # recent ids, so a danmu sent twice counts once
         self.last_text = ""
-        self.last_status = self.last_flush = time.time()
+        self.last_status = self.last_flush = self.last_saved = time.time()
         self.minute = collections.deque()  # times of the danmu in the last minute
         self.checked = False
         self.joins = 0
@@ -442,11 +443,14 @@ class Recording:
         print(text, file=self.out, flush=True)
 
     def status(self, force=False):
-        """A status line every STATUS_EVERY seconds."""
+        """A status line every status_every seconds, and the .json rewritten every
+        STATUS_EVERY seconds (others can tell by its time that it is being recorded)."""
         now = time.time()
         while self.minute and self.minute[0] < now - 60:
             self.minute.popleft()
-        if not force and now - self.last_status < STATUS_EVERY:
+        if not force and now - self.last_saved >= STATUS_EVERY:
+            self.save_info()
+        if not force and now - self.last_status < self.status_every:
             return
         self.last_status = now
         extra = "".join(part for part in (
@@ -461,6 +465,7 @@ class Recording:
 
     def save_info(self):
         """Write ROOM-....json beside the danmu: the room, times, counts and samples."""
+        self.last_saved = time.time()
         self.file.flush()
         surf._save_json(os.path.splitext(self.path)[0] + ".json", {
             "room": self.room, "file": os.path.basename(self.path),
@@ -570,19 +575,22 @@ def _stay_awake(on):
         pass
 
 
-def record(link, until=None, path=None, game="lol", out=None, stop=None):
+def record(link, until=None, path=None, game="lol", out=None, stop=None,
+           status_every=STATUS_EVERY):
     """Record a live room's danmu until the unix time until (None: until Ctrl+C), or until
     stop() says to stop (asked every STOP_EVERY seconds: the room went offline, say);
     returns the .jsonl file's path. Joins again by itself when the connection drops. game is
     what the room is about, for finding phrases later; out is where it says what it does
-    (None: sys.stdout, as it is then)."""
+    (None: sys.stdout, as it is then), with a status line every status_every seconds. While
+    it records, the recording's .json is rewritten at least every STATUS_EVERY seconds (and
+    a minute or two apart while it joins again), so others can tell (auto.py)."""
     room = room_info(room_of(link))
     started = time.strftime("%Y%m%d-%H%M")
     name = room["short_id"] or room["room_id"]
     path = path or os.path.join(live_dir(), f"{name}-{started}.jsonl")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     link = f"https://live.bilibili.com/{name}"
-    recording = Recording(path, dict(room, link=link, game=game), out)
+    recording = Recording(path, dict(room, link=link, game=game), out, status_every)
     say = recording.say
     say(f"Room {name} (room {room['room_id']}): {room['title'] or '(no title)'}"
         + ("" if room["live"] else "  - not live right now, listening anyway"))
@@ -626,6 +634,7 @@ def record(link, until=None, path=None, game="lol", out=None, stop=None):
                     token = None  # a fresh token, in case this one went stale
             if until is not None and time.time() >= until:
                 break
+            recording.status()  # still being recorded, while it joins again
             time.sleep(min(120, 5 * 2 ** min(fails, 5)) if fails else 2)
     except KeyboardInterrupt:
         say("Stopped.")

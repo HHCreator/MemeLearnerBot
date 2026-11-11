@@ -1,6 +1,7 @@
 """Running by itself for days on this computer, with Windows Task Scheduler.
 
     py -m memelearner auto start      make the scheduled tasks (开始自动跑.bat)
+    py -m memelearner auto extend --days 4   make them last 4 days from the start instead
     py -m memelearner auto stop       end and delete them (停止自动跑.bat)
     py -m memelearner auto status     the runs so far, the pool and the log's end (看看进度.bat)
     py -m memelearner auto report     the pool's memes in the browser report (打开报告.bat)
@@ -19,16 +20,22 @@ commands they run.
 start writes surf/auto/settings.json and registers the tasks for this user, from XML: the
 daily one, and a live one for each room, so two rooms can be recorded at once. They run
 pythonw, so no window opens; a run missed while the computer was off or asleep starts when
-it is back (StartWhenAvailable); a task doesn't start again while it still runs
+it is back (StartWhenAvailable); the daily task doesn't start again while it still runs
 (IgnoreNew); they all stop by themselves after DAYS days (EndBoundary). The first daily run
-starts at once, the next ones at AT on the days after; a live task looks every EVERY
-minutes. With --pull, a daily run first pulls the newest code of the folder's branch (git
-pull --ff-only) and runs that, so a fix pushed during the days is used from the next run.
+starts at once, the next ones at AT on the days after. A live task looks every EVERY
+minutes, also while an earlier look still runs (Parallel): a run that recorded a room
+finds, judges and looks up what it recorded while the next one already records the room,
+so a match isn't missed meanwhile, and a room whose recording's .json changed in the last
+FRESH_MINUTES minutes is left to the run recording it (_being_recorded()). extend makes the
+tasks again with a later end, without starting a daily run. With --pull, a daily run first
+pulls the newest code of the folder's branch (git pull --ff-only) and runs that, so a fix
+pushed during the days is used from the next run.
 
 Runs take turns finding, judging and looking up, as they share candidates.json (_turn(), a
 lock file); a live run records without waiting for its turn. What a run prints goes to
 surf/auto/log.txt (a look at rooms that aren't live only to surf/auto/rooms.json, so the
-log doesn't fill up with them), ending with a summary line: what it read and found, the
+log doesn't fill up with them; a live run's lines start with [直播 ROOM], as they come
+between a daily run's while it records), ending with a summary line: what it read and found, the
 memes nothing explains, and the problems it ran into (PROBLEMS: Bilibili's rate limit or a
 captcha, DeepSeek without balance or key so that qwen3:14b stood in, no model at all, sites
 that refused the bot, an error).
@@ -36,6 +43,8 @@ that refused the bot, an error).
 
 import contextlib
 import datetime
+import glob
+import math
 import os
 import re
 import subprocess
@@ -47,8 +56,10 @@ from . import bilibili, explainers, judging, live, review, surf
 
 DAYS = 3  # days the tasks run
 AT = "12:00"  # when the daily run starts, this computer's time
-EVERY = 30  # minutes between two looks at the live rooms
+EVERY = 10  # minutes between two looks at the live rooms
 LIVE_HOURS = 6  # a recording stops after this, if the room is still live
+LIVE_STATUS_MINUTES = 30  # minutes between two of a recording's status lines in the log
+FRESH_MINUTES = 5  # a recording whose .json changed this lately is still being recorded
 GAMES = ("lol", "valorant")  # whose videos a daily run reads
 ROOMS = ("6:lol",)  # the live rooms watched, as room:game
 LIVE_TOP, LIVE_KNOWN_TOP = 40, 10  # phrases kept of a recording, as live-phrases keeps
@@ -210,17 +221,46 @@ class _Seen:
         return getattr(self.stream, name)
 
 
+class _Tagged:
+    """A stream that starts each line with tag: a live run's lines in the log, which come
+    between a daily run's while it records."""
+
+    def __init__(self, stream, tag):
+        self.stream, self.tag, self.fresh = stream, tag, True
+
+    def write(self, text):
+        if self.stream is None:
+            return len(text)
+        out = []
+        for line in text.splitlines(keepends=True):
+            if self.fresh and line != "\n":
+                out.append(self.tag)
+            out.append(line)
+            self.fresh = line.endswith("\n")
+        self.stream.write("".join(out))
+        return len(text)
+
+    def flush(self):
+        if self.stream is not None:
+            self.stream.flush()
+
+    def __getattr__(self, name):
+        return getattr(self.stream, name)
+
+
 @contextlib.contextmanager
-def _running(kind):
+def _running(kind, tag=""):
     """A run of the pool: {"n", "kind", "started", "ended", "read", "found", "memes",
     "explained", "unexplained": [phrase, ...], "problems": {problem: times}, "error",
     "summary"}. Whatever goes wrong inside is logged with its traceback, and the run is
-    kept as far as it got; its summary line ends the log."""
+    kept as far as it got; its summary line ends the log. What it prints starts with tag
+    (each line of it, in the log)."""
     run = {"n": _number(), "kind": kind, "started": time.strftime("%Y-%m-%d %H:%M"),
            "ended": "", "read": "", "found": 0, "memes": 0, "explained": 0, "unexplained": [],
            "problems": {}, "error": ""}
     kept, out, err = [], sys.stdout, sys.stderr
-    sys.stdout, sys.stderr = _Seen(out, kept), _Seen(err, kept)
+    tagged = (lambda stream: _Tagged(stream, tag)) if tag else (lambda stream: stream)
+    sys.stdout, sys.stderr = _Seen(tagged(out), kept), _Seen(tagged(err), kept)
     print(f"== Run {run['n']} ({'live' if kind == 'live' else 'daily'}), "
           f"{run['started']}")
     try:
@@ -370,14 +410,27 @@ class _Offline:
             return False  # can't tell: go on
 
 
+def _being_recorded(name):
+    """Whether a room (its number as recordings are named: the short one, 6) is being
+    recorded now, by another live run or the live command: the .json of a recording of it,
+    which the recorder rewrites every minute (live.STATUS_EVERY), changed in the last
+    FRESH_MINUTES minutes."""
+    newest = 0
+    for path in glob.glob(os.path.join(glob.escape(live.live_dir()), f"{name}-*.json")):
+        with contextlib.suppress(OSError):
+            newest = max(newest, os.path.getmtime(path))
+    return time.time() - newest < FRESH_MINUTES * 60
+
+
 def watch(model=None, log=None, rooms=None):
     """One look at some live rooms (rooms: ROOM[:GAME]s, by default the ones in settings()),
-    what a live task runs: record the first one that is live, until it goes offline (or for
+    what a live task runs: record the first one that is live and not being recorded already
+    (_being_recorded(): by the run an earlier look started), until it goes offline (or for
     "hours"), then find its phrases and _process() them. Returns the recording's path, or
-    None when no room is live. Each room's last look is kept in surf/auto/rooms.json; log()
-    is called first when a room is live (cli.py starts the log then, so the log has the
-    recordings but not every look at a room that isn't live)."""
-    found, looked = settings(), {}
+    None when no room is to be recorded. Each room's last look is kept in
+    surf/auto/rooms.json; log() is called first when a room is to be recorded (cli.py starts
+    the log then, so the log has the recordings but not every look at a room)."""
+    found, looked, chosen = settings(), {}, None
     for spec in found["rooms"] if rooms is None else rooms:
         try:
             room, game = _room(spec)
@@ -386,21 +439,27 @@ def watch(model=None, log=None, rooms=None):
                 TypeError) as error:
             looked[str(spec).partition(":")[0]] = f"看不了：{error}"
             continue
-        looked[str(room)] = "开播了" if info["live"] else "没开播"
-        if info["live"]:
+        if not info["live"]:
+            looked[str(room)] = "没开播"
+        elif _being_recorded(info.get("short_id") or info.get("room_id") or room):
+            looked[str(room)] = "开播了，正在录"
+        else:
+            looked[str(room)] = "开播了"
+            chosen = room, game
             break
     when = time.strftime("%Y-%m-%d %H:%M")
     seen = surf._load_json(_file("rooms.json"), {})
     seen.update({room: {"looked": when, "how": how} for room, how in looked.items()})
     surf._save_json(_file("rooms.json"), seen)
-    if "开播了" not in looked.values():
+    if chosen is None:
         return None
+    room, game = chosen
     if log:
         log()
     path = None
-    with _running("live") as run:
+    with _running("live", f"[直播 {room}] ") as run:
         path = live.record(room, until=time.time() + found["hours"] * 3600, game=game,
-                           stop=_Offline(room))
+                           stop=_Offline(room), status_every=LIVE_STATUS_MINUTES * 60)
         with _turn():
             try:
                 phrases, counts, compared = live.find([path])
@@ -439,8 +498,10 @@ def _pythonw():
     return windowless if os.path.exists(windowless) else sys.executable
 
 
-def _xml(description, trigger, action, folder, hours):
-    """A task's XML for schtasks /Create /XML: run as this user while logged on."""
+def _xml(description, trigger, action, folder, hours, instances="IgnoreNew"):
+    """A task's XML for schtasks /Create /XML: run as this user while logged on; instances
+    is what happens when it is due while it still runs (IgnoreNew: nothing; Parallel: it
+    starts again beside it)."""
     escape = lambda text: (str(text).replace("&", "&amp;").replace("<", "&lt;")
                            .replace(">", "&gt;").replace('"', "&quot;"))
     user = "\\".join(part for part in (os.environ.get("USERDOMAIN"), os.environ.get("USERNAME"))
@@ -463,7 +524,7 @@ def _xml(description, trigger, action, folder, hours):
     </Principal>
   </Principals>
   <Settings>
-    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <MultipleInstancesPolicy>{instances}</MultipleInstancesPolicy>
     <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
     <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
     <StartWhenAvailable>true</StartWhenAvailable>
@@ -498,39 +559,25 @@ def task_names(rooms):
     return [DAILY_TASK] + [LIVE_TASK.format(room=str(spec).partition(":")[0]) for spec in rooms]
 
 
-def start(at=AT, days=DAYS, every=EVERY, rooms=ROOMS, games=GAMES, hours=LIVE_HOURS,
-          pull=False):
-    """Register the daily task and a live task for each room (see the top of this file),
-    start the first daily run now, and write settings.json. Returns True when all the tasks
-    were made. ValueError for a time, a room or a game it doesn't know."""
-    clock = re.fullmatch(r"(\d{1,2})[:：](\d{2})", at)
-    if not clock or int(clock.group(1)) > 23 or int(clock.group(2)) > 59:
-        raise ValueError(f"--at wants a time like 12:00, not {at}")
-    rooms = [f"{room}:{game}" for room, game in map(_room, rooms)]  # ValueError: no room
-    known = surf.sources()
-    unknown = [game for game in list(games) + [spec.partition(":")[2] for spec in rooms]
-               if game not in known]
-    if unknown:
-        raise ValueError(f"Unknown game {', '.join(unknown)}; data/surf_sources.json has: "
-                         f"{', '.join(known)}")
-    now = datetime.datetime.now().replace(second=0, microsecond=0)
-    until = now + datetime.timedelta(days=days)
+def _tasks(found, now, first_daily):
+    """The scheduled tasks for some settings (settings()'s, ending at found["until"]), made
+    now: [(name, file, description, trigger, action, hours, instances)], the daily run's
+    first time on the day first_daily, the live rooms' first look a few minutes from now."""
+    until = datetime.datetime.strptime(found["until"], "%Y-%m-%d %H:%M")
     end = until.strftime("%Y-%m-%dT%H:%M:%S")
-    folder = code_folder()
-    os.makedirs(auto_dir(), exist_ok=True)
-    for name in set(task_names(settings()["rooms"])) - set(task_names(rooms)):
-        _schtasks("/Delete", "/TN", name, "/F")  # a room the last start watched, not this one
+    days = max(1, math.ceil((until - now).total_seconds() / 86400))  # the live looks' repeating
+    games, every, rooms = found["games"], found["every"], found["rooms"]
     daily, *recording = task_names(rooms)
     tasks = [(daily, "daily", f"MemeLearnerBot: reads the newest {', '.join(games)} videos' "
               f"danmu once a day, judges the memes and looks them up, until {end}.",
               f"""    <CalendarTrigger>
-      <StartBoundary>{_at(now.date() + datetime.timedelta(days=1), at)}</StartBoundary>
+      <StartBoundary>{_at(first_daily, found["at"])}</StartBoundary>
       <EndBoundary>{end}</EndBoundary>
       <Enabled>true</Enabled>
       <ScheduleByDay>
         <DaysInterval>1</DaysInterval>
       </ScheduleByDay>
-    </CalendarTrigger>""", "-m memelearner auto daily", 8)]
+    </CalendarTrigger>""", "-m memelearner auto daily", 8, "IgnoreNew")]
     for n, (name, spec) in enumerate(zip(recording, rooms)):
         first = now + datetime.timedelta(minutes=2 + n)  # one after the other
         tasks.append((name, f"live-{spec.partition(':')[0]}",
@@ -545,23 +592,56 @@ def start(at=AT, days=DAYS, every=EVERY, rooms=ROOMS, games=GAMES, hours=LIVE_HO
       <StartBoundary>{first.strftime("%Y-%m-%dT%H:%M:%S")}</StartBoundary>
       <EndBoundary>{end}</EndBoundary>
       <Enabled>true</Enabled>
-    </TimeTrigger>""", f"-m memelearner auto live --rooms {spec}", hours + 3))
+    </TimeTrigger>""", f"-m memelearner auto live --rooms {spec}", found["hours"] + 3,
+                      "Parallel"))
+    return tasks
+
+
+def _make(tasks, folder):
+    """Register some tasks (_tasks()) from their XML files; True when all of them were made."""
+    os.makedirs(auto_dir(), exist_ok=True)
     made = True
-    for name, file, description, trigger, action, limit in tasks:
+    for name, file, description, trigger, action, limit, instances in tasks:
         path = _file(f"{file}.xml")
         with open(path, "w", encoding="utf-16") as f:
-            f.write(_xml(description, trigger, action, folder, limit))
+            f.write(_xml(description, trigger, action, folder, limit, instances))
         code, said = _schtasks("/Create", "/TN", name, "/XML", path, "/F")
         if code:
             print(f"Couldn't make the task {name}: {said.strip()}")
             made = False
-    if not made:
+    return made
+
+
+def start(at=AT, days=DAYS, every=EVERY, rooms=ROOMS, games=GAMES, hours=LIVE_HOURS,
+          pull=False):
+    """Register the daily task and a live task for each room (see the top of this file),
+    start the first daily run now, and write settings.json. Returns True when all the tasks
+    were made. ValueError for a time, a room or a game it doesn't know."""
+    clock = re.fullmatch(r"(\d{1,2})[:：](\d{2})", at)
+    if not clock or int(clock.group(1)) > 23 or int(clock.group(2)) > 59:
+        raise ValueError(f"--at wants a time like 12:00, not {at}")
+    if days < 1 or every < 1 or hours < 1:
+        raise ValueError("--days, --every and --hours want 1 or more")
+    rooms = [f"{room}:{game}" for room, game in map(_room, rooms)]  # ValueError: no room
+    known = surf.sources()
+    unknown = [game for game in list(games) + [spec.partition(":")[2] for spec in rooms]
+               if game not in known]
+    if unknown:
+        raise ValueError(f"Unknown game {', '.join(unknown)}; data/surf_sources.json has: "
+                         f"{', '.join(known)}")
+    now = datetime.datetime.now().replace(second=0, microsecond=0)
+    until = now + datetime.timedelta(days=days)
+    found = {"days": days, "at": at, "every": every, "hours": hours, "games": list(games),
+             "rooms": rooms, "pull": pull, "folder": code_folder(),
+             "started": now.strftime("%Y-%m-%d %H:%M"), "until": until.strftime("%Y-%m-%d %H:%M")}
+    os.makedirs(auto_dir(), exist_ok=True)
+    for name in set(task_names(settings()["rooms"])) - set(task_names(rooms)):
+        _schtasks("/Delete", "/TN", name, "/F")  # a room the last start watched, not this one
+    tasks = _tasks(found, now, now.date() + datetime.timedelta(days=1))
+    if not _make(tasks, found["folder"]):
         return False
-    surf._save_json(_file("settings.json"), {
-        "days": days, "at": at, "every": every, "hours": hours, "games": list(games),
-        "rooms": rooms, "pull": pull, "folder": folder,
-        "started": now.strftime("%Y-%m-%d %H:%M"), "until": until.strftime("%Y-%m-%d %H:%M")})
-    code, said = _schtasks("/Run", "/TN", daily)
+    surf._save_json(_file("settings.json"), found)
+    code, said = _schtasks("/Run", "/TN", DAILY_TASK)
     print(f"开始了：{len(tasks)} 个计划任务（任务计划程序里叫"
           + "、".join(f"「{name}」" for name, *_ in tasks)
           + f"），跑到 {until.strftime('%m-%d %H:%M')}，然后自己停。")
@@ -570,10 +650,43 @@ def start(at=AT, days=DAYS, every=EVERY, rooms=ROOMS, games=GAMES, hours=LIVE_HO
           + "，找梗、judge、查解释。" + ("每次先拉一下这个分支的新代码。" if pull else ""))
     if rooms:
         print(f"- 每 {every} 分钟看一次直播间 {'、'.join(rooms)}，开播就录（下播或录满 {hours} "
-              "小时停），录完同样找梗、judge、查解释。")
+              "小时停），录完同样找梗、judge、查解释，这时下一段已经接着录了。")
     print("- 在后台跑，不弹窗口；电脑关着或睡着时错过的那次，开机后补跑。")
     print(f"- 日志：{log_file()}（看看进度.bat 显示最后几十行）")
     print(f"- 停：停止自动跑.bat。{days} 天后：打开报告.bat。")
+    return True
+
+
+def extend(days, every=None):
+    """Have the auto run last days from when it started (settings.json): its tasks are made
+    again with the new end (and every minutes between two looks at the live rooms, when
+    given), from this code (so a live task that came before Parallel gets it). No daily run
+    starts now: the next one is at AT, today when that is still to come. Returns True when
+    all the tasks were made. ValueError when it never started, or would end by now."""
+    found = settings()
+    if not found["started"]:
+        raise ValueError("自动跑还没开始过：先双击 开始自动跑.bat")
+    if days < 1 or every is not None and every < 1:
+        raise ValueError("--days and --every want 1 or more")
+    now = datetime.datetime.now().replace(second=0, microsecond=0)
+    until = datetime.datetime.strptime(found["started"], "%Y-%m-%d %H:%M") + \
+        datetime.timedelta(days=days)
+    if until <= now:
+        raise ValueError(f"从 {found['started']} 算 {days} 天，现在已经过了")
+    found.update(days=days, until=until.strftime("%Y-%m-%d %H:%M"), folder=code_folder(),
+                 every=every or found["every"])
+    hour, minute = (int(part) for part in re.fullmatch(r"(\d{1,2})[:：](\d{2})",
+                                                      found["at"]).groups())
+    first = now.date() if (now.hour, now.minute) < (hour, minute) else \
+        now.date() + datetime.timedelta(days=1)
+    if not _make(_tasks(found, now, first), found["folder"]):
+        return False
+    surf._save_json(_file("settings.json"), found)
+    print(f"延长了：从 {found['started']} 跑到 {until.strftime('%m-%d %H:%M')}，然后自己停。")
+    print(f"- 下一次每天的运行：{first.strftime('%m-%d')} {found['at']}。")
+    if found["rooms"]:
+        print(f"- 每 {found['every']} 分钟看一次直播间 {'、'.join(found['rooms'])}；录满 "
+              f"{found['hours']} 小时的一段在找梗、judge、查解释时，下一段已经接着录了。")
     return True
 
 

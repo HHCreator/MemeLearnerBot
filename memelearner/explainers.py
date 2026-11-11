@@ -15,8 +15,9 @@ TOP a run):
                   bot has seen beside other videos (related videos, which a visitor gets
                   without a captcha: the lists the collector reads, and those beside every
                   explainer it reads), the Bilibili videos a search engine finds for
-                  "阿一古是什么梗" (web.py: Bing, else DuckDuckGo, else Baidu; once per phrase
-                  in AGAIN_DAYS days, its results kept for step 4), and Bilibili's own search
+                  "阿一古是什么梗" (web.py: Bing, else DuckDuckGo, else Baidu, the first whose
+                  results name the phrase; once per phrase in AGAIN_DAYS days, its results
+                  kept for step 4, but again when they named nothing), and Bilibili's own search
                   for it, which is tried until it asks for a captcha once in a run (the bot
                   never solves captchas), and for each phrase once in AGAIN_DAYS days. When
                   none names it, the same for where it may come from, as the judge says (its
@@ -49,7 +50,8 @@ TOP a run):
                   the meaning of the meme itself.
 
 What it read goes to explainers.json and explainers/ in the cache folder, so a video is read
-once. A phrase no video or page explained is looked up again after AGAIN_DAYS days. It only
+once. A phrase no video or page explained is looked up again after AGAIN_DAYS days (at once
+when the search engine's results named nothing, see _junk()). It only
 reads, as a visitor who isn't logged in, waits a few seconds between two requests to the same
 site, and leaves a site that wants a captcha alone for the rest of the run.
 
@@ -494,8 +496,10 @@ def _wanted(phrases, games, top, again, data):
         entry = data["phrases"].get(f"{candidate['game']}:{candidate['phrase']}") or {}
         if need is None or candidate["phrase"] in done:
             continue
-        if not again and (told(entry) or _recent(entry.get("looked"))):
-            continue  # explained already, or looked up lately
+        names = [candidate["phrase"]] + [v["phrase"] for v in candidate.get("variants") or []]
+        if not again and (told(entry) or _recent(entry.get("looked"))
+                          and not _junk(entry.get("web"), names)):
+            continue  # explained already, or looked up lately (with a search that worked)
         ranked.append((need, -(candidate.get("score") or 0), candidate))
     return [c for _, _, c in sorted(ranked, key=lambda item: item[:2])][:top]
 
@@ -538,15 +542,24 @@ def _search(query, search, names, how="search"):
 def _web(phrase, names, entry, field, again):
     """The Bilibili videos a search engine finds for phrase是什么梗 whose titles name one of
     names: [{"bvid", "title", "how": "web"}]. The search runs once per AGAIN_DAYS days, its
-    results kept in entry[field] ({"searched", "results"}) for the web pages (read_pages())."""
+    results kept in entry[field] ({"searched", "results"}) for the web pages (read_pages()),
+    and again when the kept results name none of names (_junk())."""
     kept = entry.get(field) or {}
-    if again or not _recent(kept.get("searched")):
+    if again or not _recent(kept.get("searched")) or _junk(kept, names):
         results = web.search(f"{phrase}是什么梗", names)
         if results is not None:  # None: no search engine answered, so try again next run
             kept = entry[field] = {"searched": time.strftime("%Y-%m-%d %H:%M"),
                                    "results": results}
     return [video for video in web.videos(kept.get("results") or [], names)
             if any(mentions(video["title"], name) for name in names)]
+
+
+def _junk(kept, names):
+    """Whether a kept web search ({"searched", "results"}) found results none of which names
+    the phrase: what Bing sometimes answers a bot with (pages about something else entirely).
+    Such a search is done again, and the phrase looked up again, whenever it comes up."""
+    results = (kept or {}).get("results") or []
+    return bool(results) and not web.named(results, names)
 
 
 def _blocked(search, error):
@@ -634,7 +647,8 @@ def read_pages(phrase, names, results, wikis=WIKIS, pages=PAGES):
         try:
             entry = web.WIKIS[site](phrase)
         except web.Refused as error:
-            print(f"    {error}")
+            if not error.again:  # the sites left alone are listed at the end of the run
+                print(f"    {error}")
             continue
         except (web.Error, urllib.error.URLError, OSError, ValueError) as error:
             print(f"    {site}: couldn't ask it ({getattr(error, 'reason', error)})")
@@ -653,7 +667,8 @@ def read_pages(phrase, names, results, wikis=WIKIS, pages=PAGES):
             try:
                 text = web.page(result["url"], phrase)["text"]
             except web.Refused as error:
-                print(f"    {error}")
+                if not error.again:
+                    print(f"    {error}")
             except (web.Error, urllib.error.URLError, OSError, ValueError) as error:
                 print(f"    couldn't read {result['site']} ({getattr(error, 'reason', error)})")
         if text:

@@ -5,13 +5,16 @@ Bilibili asks a visitor's search for a captcha more often than not, so the bot's
 for 阿一古是什么梗 rarely works (it found no video in the first two real runs). Search
 engines find the same videos, and the web pages that explain memes too:
 
-    search(query)           a search engine's results: [{"title", "url", "snippet", "site",
-                            "engine"}], from the first engine in ENGINES that answers
+    search(query, names)    a search engine's results: [{"title", "url", "snippet", "site",
+                            "engine"}], from the first engine in ENGINES whose results name
+                            the phrase (Bing sometimes answers a bot with pages about
+                            something else entirely: then DuckDuckGo is asked)
     videos(results, names)  the Bilibili videos among them whose titles name a phrase
     pages(results, names)   the other results that name it, the likeliest explainers first
     page(url, phrase)       what a web page says around a phrase, for the model
     baike(phrase)           百度百科's entry for it, if it has one
-    moegirl(phrase)         萌娘百科's, through the public API of its mobile site
+    moegirl(phrase)         萌娘百科's, from its mobile site's search, which goes straight
+                            to the entry of that name (its API wants a login since 2026-11)
     jikipedia(phrase)       小鸡词典's public search page
 
 It only reads, like a visitor who isn't logged in, and it never solves a captcha: a site
@@ -29,7 +32,6 @@ import gzip
 import html
 import http.client
 import http.cookiejar
-import json
 import os
 import random
 import re
@@ -95,7 +97,11 @@ _saved = 0
 
 class Refused(Exception):
     """A site wants a captcha solved, or refuses the bot: it is left alone for the rest of
-    the run (refused)."""
+    the run (refused). again is True when it was refused earlier in the run (old news)."""
+
+    def __init__(self, message, again=False):
+        super().__init__(message)
+        self.again = again
 
 
 class Error(Exception):
@@ -127,16 +133,22 @@ def _fetch(url, data=None, headers=None):
     status. Tests replace this."""
     request = urllib.request.Request(url, data=data, headers=dict(HEADERS, **(headers or {})))
     with _opener.open(request, timeout=TIMEOUT) as response:
-        body = response.read(MAX_BYTES + 1)[:MAX_BYTES]
-        if "gzip" in (response.headers.get("Content-Encoding") or "") or body[:2] == b"\x1f\x8b":
-            body = gzip.decompress(body)
-        elif "deflate" in (response.headers.get("Content-Encoding") or ""):
-            try:
-                body = zlib.decompress(body, -zlib.MAX_WBITS)
-            except zlib.error:
-                body = zlib.decompress(body)
+        body = _unzip(response.read(MAX_BYTES + 1)[:MAX_BYTES],
+                      response.headers.get("Content-Encoding") or "")
         return (response.status, response.geturl(), body,
                 response.headers.get("Content-Type") or "")
+
+
+def _unzip(body, encoding=""):
+    """A body as it was before the site compressed it (gzip or deflate)."""
+    if "gzip" in encoding or body[:2] == b"\x1f\x8b":
+        return gzip.decompress(body)
+    if "deflate" in encoding:
+        try:
+            return zlib.decompress(body, -zlib.MAX_WBITS)
+        except zlib.error:
+            return zlib.decompress(body)
+    return body
 
 
 def _wait(site):
@@ -186,12 +198,17 @@ def get(url, site=None, data=None, headers=None, challenge=CHALLENGE):
     alone too: a site this computer can't reach, like a blocked one, costs a timeout once)."""
     site = site or site_of(url)
     if site in refused:
-        raise Refused(f"{site} refused the bot earlier in this run ({refused[site]})")
+        raise Refused(f"{site} refused the bot earlier in this run ({refused[site]})", again=True)
     _wait(site)
     try:
         status, final, body, kind = _fetch(url, data, headers)
     except urllib.error.HTTPError as error:
-        _keep(site, url, error.code, url, error.read()[:MAX_BYTES] if error.fp else b"")
+        body = error.read()[:MAX_BYTES] if error.fp else b""
+        try:  # the error page, as the site sent it (Baike's 403 comes gzipped)
+            body = _unzip(body, (error.headers or {}).get("Content-Encoding") or "")
+        except (OSError, EOFError, zlib.error):
+            pass
+        _keep(site, url, error.code, url, body)
         if error.code in (403, 429, 503):
             refused[site] = f"HTTP {error.code}"
             raise Refused(f"{site} refused the bot (HTTP {error.code})") from None
@@ -378,11 +395,14 @@ def _internal(url):
 
 
 def search(query, names=(), engines=ENGINES):
-    """The results of the first search engine (in engines) that finds something for a
-    query: [{"title", "url", "snippet", "site", "engine"}]; [] when the ones that answered
-    found nothing, None when none answered. An engine that wants a captcha, or that this
-    computer can't reach, is left alone for the rest of the run, and the next one is asked."""
-    answered = False
+    """The results of the first search engine (in engines) whose results name one of names
+    (the query, when none are given): [{"title", "url", "snippet", "site", "engine"}]; []
+    when the ones that answered found nothing that names it, None when none answered.
+    Results that name none of them are passed over, and the next engine is asked: Bing
+    sometimes answers a bot with pages about something else entirely (the ARP protocol for
+    龙颜大悦, Spotify for 滔一下, on 2026-11-11). An engine that wants a captcha, or that this
+    computer can't reach, is left alone for the rest of the run."""
+    answered, wanted = False, list(names) or [query]
     for engine in engines:
         if engine in refused:
             continue
@@ -395,9 +415,15 @@ def search(query, names=(), engines=ENGINES):
             print(f"    {engine} couldn't search: {getattr(error, 'reason', error)}")
             continue
         answered = True
-        if results:
+        if named(results, wanted):
             return results
     return [] if answered else None
+
+
+def named(results, names):
+    """Whether any of some search results names one of names (in its title or snippet)."""
+    return any(_names(f"{result.get('title', '')} {result.get('snippet', '')}", name)
+               for result in results or [] for name in names)
 
 
 # -- what the results say -----------------------------------------------------------------
@@ -490,46 +516,34 @@ def baike(phrase):
     return {"url": final, "site": "baike.baidu.com", "title": title[:120], "text": text[:TEXT]}
 
 
-MOEGIRL_API = "https://mzh.moegirl.org.cn/api.php"
-
-
-def _moegirl(**query):
-    """萌娘百科's API answering a query, as JSON. Raises Error when it answers something else."""
-    query = urllib.parse.urlencode(dict(query, format="json", utf8=1))
-    found, _ = get(f"{MOEGIRL_API}?{query}", site="moegirl.org.cn", challenge=None)
-    try:
-        answer = json.loads(found)
-    except ValueError:
-        raise Error(f"萌娘百科's API answered something else: {plain(found)[:80]!r}") from None
-    if not isinstance(answer, dict):
-        raise Error(f"萌娘百科's API answered something else: {found[:80]!r}")
-    return answer
+MOEGIRL_SEARCH = "https://mzh.moegirl.org.cn/index.php?search={q}&title=Special:Search&go=Go"
 
 
 def moegirl(phrase):
-    """萌娘百科's entry for a phrase, through the public API of its mobile site: search,
-    then the entry's opening as plain text (or, when the API doesn't give that, the start of
-    the entry's page as the API makes it): {"url", "site", "title", "text"}, or None."""
-    hits = ((_moegirl(action="query", list="search", srsearch=phrase, srlimit=5)
-             .get("query") or {}).get("search") or [])
-    titles = [hit.get("title", "") for hit in hits if isinstance(hit, dict)]
-    title = next((t for t in titles if _names(t, phrase) and _names(phrase, t)), None) or \
-        next((t for t in titles if _names(t, phrase)), None)
-    if not title:
+    """萌娘百科's entry for a phrase, from its mobile site's search, which goes straight to the
+    entry of that name, as MediaWiki's search does ("go"): the entry's lines around the
+    phrase, {"url", "site", "title", "text"}, or None when it has no entry of that name (the
+    search stays on its results page). Its API answers a visitor who isn't logged in with
+    "Unauthorized API call" since 2026-11, so the bot reads the page anyone sees. Raises
+    Refused when what comes back isn't a wiki page (a check for bots, say)."""
+    markup, final = get(MOEGIRL_SEARCH.format(q=urllib.parse.quote(phrase)), site="moegirl.org.cn")
+    parts = urllib.parse.urlsplit(final)
+    where = urllib.parse.unquote(f"{parts.path}?{parts.query}")
+    if "search=" in where or "Special:" in where or "特殊:" in where:
+        return None  # no entry of that name: the search's own results
+    content = markup.rfind("<", 0, markup.find('id="mw-content-text"'))
+    if 'id="mw-content-text"' not in markup or content < 0:
+        refused["moegirl.org.cn"] = "an answer that isn't a wiki page"
+        raise Refused("moegirl.org.cn answered with something that isn't a wiki page "
+                      "(a check for bots?)")
+    title = re.search(r'<h1\b[^>]*\bid="firstHeading"[^>]*>(.*?)</h1>', markup, re.S) or \
+        re.search(r"<title\b[^>]*>(.*?)</title>", markup, re.S | re.I)
+    title = re.sub(r"\s+-\s+萌娘百科.*$", "", _inline(title.group(1))) if title else ""
+    text = around(plain(markup[content:]), phrase)
+    if not text:
         return None
-    entries = ((_moegirl(action="query", prop="extracts", exintro=1, explaintext=1,
-                         redirects=1, titles=title).get("query") or {}).get("pages") or {})
-    text = next((entry.get("extract") for entry in entries.values()
-                 if isinstance(entry, dict) and entry.get("extract")), "")
-    if not text.strip():  # no extracts on this wiki: the entry's page, up to its first part
-        made = (_moegirl(action="parse", page=title, prop="text", section=0, redirects=1)
-                .get("parse") or {}).get("text") or {}
-        made = made.get("*", "") if isinstance(made, dict) else str(made)
-        text = around(plain(made), phrase) or plain(made)
-    if not text.strip():
-        return None
-    return {"url": f"https://zh.moegirl.org.cn/{urllib.parse.quote(title)}",
-            "site": "moegirl.org.cn", "title": title, "text": text.strip()[:TEXT]}
+    return {"url": final.replace("://mzh.", "://zh.", 1),  # the address people open
+            "site": "moegirl.org.cn", "title": title[:120] or phrase, "text": text}
 
 
 def jikipedia(phrase):

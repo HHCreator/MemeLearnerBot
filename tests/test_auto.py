@@ -167,6 +167,9 @@ class AutoTest(Folder):
         self.assertEqual(at(recording, "Actions/Exec/Arguments").text,
                          "-m memelearner auto live --rooms 21144080:valorant")
         self.assertEqual(at(recording, "Settings/ExecutionTimeLimit").text, "PT8H")  # 5 + 3
+        # A look starts on time while an earlier one still runs: the next part of a match is
+        # recorded while the last part is looked up
+        self.assertEqual(at(recording, "Settings/MultipleInstancesPolicy").text, "Parallel")
         first = lambda kind: at(at(self.task(kind), "Triggers/TimeTrigger"), "StartBoundary").text
         self.assertLess(first("live-6"), first("live-21144080"))  # one after the other
         found = auto.settings()
@@ -209,6 +212,45 @@ class AutoTest(Folder):
                                       ("/Delete", "/TN", "MemeLearnerBot live 6", "/F")])
         self.assertFalse(os.path.exists(os.path.join(auto.auto_dir(), "lock")))
         self.assertIn("没删掉（可能本来就没有）", printed)
+
+    def test_extend_makes_the_tasks_again_with_a_later_end_and_starts_no_run(self):
+        with self.assertRaises(ValueError):  # never started
+            auto.extend(4)
+        self.run_quietly(auto.start, "12:00", 3, 30, ["6"], ["lol"], 6, True)
+        started = datetime.datetime.strptime(auto.settings()["started"], "%Y-%m-%d %H:%M")
+        self.tasks.clear()
+        made, printed = self.run_quietly(auto.extend, 4, 10)
+        self.assertTrue(made)
+        self.assertEqual([args[:3] for args in self.tasks],
+                         [("/Create", "/TN", "MemeLearnerBot daily"),
+                          ("/Create", "/TN", "MemeLearnerBot live 6")])  # no /Run
+        found = auto.settings()
+        until = started + datetime.timedelta(days=4)
+        self.assertEqual((found["days"], found["every"], found["until"], found["pull"]),
+                         (4, 10, until.strftime("%Y-%m-%d %H:%M"), True))
+        daily, recording = self.task("daily"), self.task("live-6")
+        end = until.strftime("%Y-%m-%dT%H:%M:%S")
+        self.assertEqual(at(at(daily, "Triggers/CalendarTrigger"), "EndBoundary").text, end)
+        trigger = at(recording, "Triggers/TimeTrigger")
+        self.assertEqual(at(trigger, "EndBoundary").text, end)
+        self.assertEqual(at(trigger, "Repetition/Interval").text, "PT10M")
+        self.assertEqual(at(recording, "Settings/MultipleInstancesPolicy").text, "Parallel")
+        # The next daily run: at 12:00 today when that is still to come, else tomorrow
+        now = datetime.datetime.now()
+        day = now.date() if now.hour < 12 else now.date() + datetime.timedelta(days=1)
+        self.assertEqual(at(at(daily, "Triggers/CalendarTrigger"), "StartBoundary").text,
+                         f"{day}T12:00:00")
+        self.assertIn(f"延长了：从 {found['started']} 跑到 {until.strftime('%m-%d %H:%M')}", printed)
+        # Without --every it stays as it was; a day count that ended already won't do
+        self.run_quietly(auto.extend, 5)
+        self.assertEqual(auto.settings()["every"], 10)
+        for wrong in ((0,), (4, 0)):
+            with self.assertRaises(ValueError):
+                auto.extend(*wrong)
+        surf._save_json(os.path.join(auto.auto_dir(), "settings.json"),
+                        dict(auto.settings(), started="2026-01-01 00:00"))
+        with self.assertRaises(ValueError):
+            auto.extend(4)
 
     def test_status_shows_the_tasks_the_runs_the_rooms_and_the_end_of_the_log(self):
         self.run_quietly(auto.start)
@@ -379,8 +421,11 @@ class AutoTest(Folder):
                 raise bilibili.Blocked("Bilibili keeps refusing requests (HTTP 412)")
             return {"room_id": room, "short_id": 0, "live": room in live_now, "title": "VCT"}
 
-        def record(link, until=None, path=None, game="lol", out=None, stop=None):
+        def record(link, until=None, path=None, game="lol", out=None, stop=None,
+                   status_every=None):
             recorded.append((link, game, until, stop))
+            self.assertEqual(status_every, 30 * 60)  # a status line every half hour
+            print("Recording to 21144080-20261110-1900.jsonl")
             return os.path.join(live.live_dir(), "21144080-20261110-1900.jsonl")
 
         phrases = ([candidate(p, game="valorant") for p in ("懂你意思", "未识别到人脸", "噢噢噢")]
@@ -409,6 +454,9 @@ class AutoTest(Folder):
                                              ["21144080:valorant"])
         self.assertEqual(logged, [1])
         self.assertTrue(path.endswith("21144080-20261110-1900.jsonl"))
+        # Each of its lines says it is the live run's: a daily run's may come between them
+        self.assertIn("[直播 21144080] == Run 1 (live)", printed)
+        self.assertIn("[直播 21144080] Recording to 21144080-20261110-1900.jsonl\n", printed)
         [(room, game, until, stop)] = recorded
         self.assertEqual((room, game), (21144080, "valorant"))
         self.assertLess(abs(until - (before + 4 * 3600)), 60)
@@ -422,6 +470,31 @@ class AutoTest(Folder):
                          ("live", "2400 条直播弹幕（800 个人，21144080-20261110-1900.jsonl）", 2, 1,
                           ["未识别到人脸"]))
         self.assertIn("== 总结：第 1 次（直播）", run["summary"])
+
+    def test_a_room_being_recorded_is_left_to_the_run_that_records_it(self):
+        os.makedirs(live.live_dir())
+        info = os.path.join(live.live_dir(), "6-20261111-0038.json")
+        surf._save_json(info, {"danmu": 5})  # the recorder rewrites it every minute
+        room_info = lambda room: {"room_id": 7734200, "short_id": 6, "live": True}
+        with mock.patch.object(live, "room_info", room_info), \
+                mock.patch.object(live, "record") as record:
+            path, printed = self.run_quietly(auto.watch)
+        self.assertIsNone(path)
+        record.assert_not_called()
+        self.assertEqual(printed, "")
+        looked = surf._load_json(os.path.join(auto.auto_dir(), "rooms.json"), {})
+        self.assertEqual(looked["6"]["how"], "开播了，正在录")
+        # Not rewritten for a while: that run ended (or died), so this one records the room
+        old = time.time() - (auto.FRESH_MINUTES + 1) * 60
+        os.utime(info, (old, old))
+        with mock.patch.object(live, "room_info", room_info), \
+                mock.patch.object(live, "record", return_value="6-20261111-0640.jsonl") as record, \
+                mock.patch.object(live, "find", side_effect=ValueError("No danmu")):
+            path, printed = self.run_quietly(auto.watch)
+        self.assertEqual(path, "6-20261111-0640.jsonl")
+        self.assertEqual(record.call_args[0][0], 6)
+        self.assertIn("[直播 6] No danmu: nothing to look for.", printed)
+        self.assertIn("\n== 总结：第 1 次（直播）", printed)  # the summary line stands alone
 
     def test_a_recording_without_danmu_has_nothing_to_look_for(self):
         with mock.patch.object(live, "room_info", lambda room: {"live": True}), \
@@ -532,6 +605,12 @@ class AutoTest(Folder):
         with mock.patch.object(auto, "start", return_value=False):
             with self.assertRaises(SystemExit):
                 self.run_cli("start")
+        with mock.patch.object(auto, "extend", return_value=True) as extend:
+            self.run_cli("extend", "--days", "4", "--every", "10")
+            self.run_cli("extend", "--days", "4")
+        self.assertEqual(extend.call_args_list, [mock.call(4, 10), mock.call(4, None)])
+        with self.assertRaises(SystemExit):
+            self.run_cli("extend")  # how many days?
 
     def test_the_tasks_run_python_without_a_window(self):
         folder = os.path.join(self.folder, "Python312")

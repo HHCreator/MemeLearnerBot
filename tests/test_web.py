@@ -9,16 +9,18 @@ and what they find, only a real run shows (py -m memelearner sources 阿一古 -
 
 import base64
 import contextlib
+import gzip
 import io
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.parse
 from unittest import mock
 
 import memelearner
-from memelearner import cli, explainers, judging, store, web
+from memelearner import cli, explainers, judging, store, surf, web
 
 from .test_explainers import Folder, video
 
@@ -63,6 +65,26 @@ BAIDU = """<html><body>
 </body></html>"""
 
 CAPTCHA = "<html><head><title>百度安全验证</title></head><body>请输入验证码</body></html>"
+
+# What Bing sent the bot for 龙颜大悦 on 2026-11-11: pages about something else entirely
+OFF_TOPIC = """<ol id="b_results"><li class="b_algo"><h2><a href="https://www.zhihu.com/question/9">
+为什么主机隔一段时间向网关发送ARP请求？ - 知乎</a></h2><p>ARP 协议把 IP 地址解析成 MAC 地址</p></li>
+<li class="b_algo"><h2><a href="https://www.spotify.com/download">Spotify – Download</a></h2>
+<p>Listen to music</p></li></ol>"""
+
+
+def duckduckgo(title, url, snippet=""):
+    """DuckDuckGo's page without scripts with one result."""
+    return (f'<div class="result results_links web-result"><div class="links_main result__body">'
+            f'<h2 class="result__title"><a rel="nofollow" class="result__a" href="{url}">{title}'
+            f'</a></h2><a class="result__snippet" href="x">{snippet}</a></div></div>')
+
+# 萌娘百科's mobile site, where its search goes when it has an entry of that name
+MOEGIRL = ("https://mzh.moegirl.org.cn/%E6%AD%A3%E4%B9%89%E5%BF%85%E8%83%9C", """<html><head>
+<title>正义必胜 - 萌娘百科 万物皆可萌的百科全书</title></head><body><div id="mw-navigation">正义必胜
+菜单</div><h1 id="firstHeading" class="firstHeading" lang="zh-CN">正义必胜</h1>
+<div id="mw-content-text" class="mw-body-content"><div class="mw-parser-output"><p>别的</p>
+<p><b>正义必胜</b>是一句口号。</p><p>完。</p></div></div></body></html>""")
 
 ZHIHU = """<html><head><title>正义必胜是什么梗？ - 知乎</title></head><body>
 <div>别的回答</div><p>这句口号是观众一起刷的。</p>
@@ -163,6 +185,34 @@ class SearchTest(WebTest):
         with self.assertRaises(web.Refused):
             web.get("https://example.com/b")
 
+    def test_results_that_name_the_phrase_nowhere_are_passed_over(self):
+        fake = self.web(("cn.bing.com", OFF_TOPIC), ("duckduckgo.com", DUCKDUCKGO))
+        found, printed = self.quietly(web.search, "阿一古是什么梗", ["阿一古"])
+        self.assertEqual([r["engine"] for r in found], ["duckduckgo"])
+        self.assertEqual(printed, "")
+        self.assertNotIn("bing", web.refused)  # it may answer properly the next time
+        self.assertEqual(len(fake.calls), 2)
+        # Named nowhere by any of them: [] (nothing found), not the pages about something else
+        self.web(("cn.bing.com", OFF_TOPIC), ("duckduckgo.com", ""), ("baidu.com", ""))
+        self.assertEqual(self.quietly(web.search, "阿一古是什么梗", ["阿一古"])[0], [])
+        self.assertFalse(web.named(web.parse_bing(OFF_TOPIC), ["龙颜大悦"]))
+        self.assertTrue(web.named(web.parse_bing(BING), ["正义必胜"]))
+
+    def test_an_error_page_is_kept_as_the_site_sent_it(self):
+        web.raw = os.path.join(self.folder, "raw")
+        self.addCleanup(setattr, web, "raw", None)
+        page = gzip.compress("<title>百度安全验证</title>".encode("utf-8"))  # Baike's 403
+
+        def refuse(url, data=None, headers=None):
+            raise urllib.error.HTTPError(url, 403, "Forbidden", {"Content-Encoding": "gzip"},
+                                         io.BytesIO(page))
+
+        with mock.patch.object(web, "_fetch", refuse), self.assertRaises(web.Refused):
+            web.get("https://baike.baidu.com/item/阿一古")
+        [kept] = [name for name in os.listdir(web.raw) if name.endswith(".html")]
+        with open(os.path.join(web.raw, kept), encoding="utf-8") as f:
+            self.assertEqual(f.read(), "<title>百度安全验证</title>")
+
     def test_a_site_that_cant_be_reached_twice_is_left_alone(self):
         fake = self.web(("duckduckgo.com", urllib.error.URLError("timed out")))
         for _ in range(web.FAILS):
@@ -203,26 +253,27 @@ class WikiTest(WebTest):
         with self.assertRaises(web.Refused):
             web.baike("阿一古")
 
-    def test_moegirl_is_searched_then_its_entrys_opening_read(self):
-        fake = self.web(
-            ("list=search", {"query": {"search": [{"title": "正义必胜（别的东西）"},
-                                                  {"title": "正义必胜"}]}}),
-            ("prop=extracts", {"query": {"pages": {"1": {"title": "正义必胜",
-                                                         "extract": "正义必胜是一句口号。"}}}}))
+    def test_moegirl_gives_the_entry_its_search_goes_to(self):
+        fake = self.web(("search=正义必胜", MOEGIRL))
+        # The lines of the entry around the phrase (not its menus), at the address people open
         self.assertEqual(web.moegirl("正义必胜"), {
             "url": "https://zh.moegirl.org.cn/%E6%AD%A3%E4%B9%89%E5%BF%85%E8%83%9C",
-            "site": "moegirl.org.cn", "title": "正义必胜", "text": "正义必胜是一句口号。"})
-        self.assertIn("titles=正义必胜&", fake.calls[1])  # the entry named just that
-        # No extracts on the wiki: the start of the entry's page instead
-        self.web(("list=search", {"query": {"search": [{"title": "阿一古"}]}}),
-                 ("prop=extracts", {"warnings": {"main": "Unrecognized value"}}),
-                 ("action=parse", {"parse": {"text": {"*": "<p>别的</p><p>阿一古是韩语。</p>"}}}))
-        self.assertEqual(web.moegirl("阿一古")["text"], "别的\n阿一古是韩语。")
-        self.web(("list=search", {"query": {"search": []}}))
+            "site": "moegirl.org.cn", "title": "正义必胜", "text": "别的\n正义必胜是一句口号。\n完。"})
+        self.assertIn("mzh.moegirl.org.cn/index.php?search=正义必胜&", fake.calls[0])
+        self.assertIn("&go=Go", fake.calls[0])  # straight to the entry of that name
+        # No entry of that name: the search stays on its own results
+        self.web(("moegirl", ("https://mzh.moegirl.org.cn/index.php?search=阿一古&title=Special:"
+                              "%E6%90%9C%E7%B4%A2&go=Go", '<div id="mw-content-text">阿一古</div>')))
         self.assertIsNone(web.moegirl("阿一古"))
-        self.web(("moegirl", "<html>请稍候</html>"))
-        with self.assertRaises(web.Error):
+        # What its API says to a visitor now, or a check for bots: no wiki page, so it is left
+        # alone for the rest of the run
+        self.web(("moegirl", ("https://mzh.moegirl.org.cn/阿一古", '{"error": {"code": '
+                              '"action-notallowed", "info": "Unauthorized API call"}}')))
+        with self.assertRaises(web.Refused):
             web.moegirl("阿一古")
+        with self.assertRaises(web.Refused) as refused:
+            web.moegirl("正义必胜")
+        self.assertTrue(refused.exception.again)  # old news: explain doesn't print it again
 
     def test_jikipedia_gives_what_its_page_shows_about_it(self):
         self.web(("jikipedia.com", "<div>搜索 阿一古</div><div>阿一古</div>"
@@ -235,15 +286,14 @@ class WikiTest(WebTest):
         folder = os.path.join(self.folder, "sources")
         self.web(("cn.bing.com", BING), ("duckduckgo.com", 403), ("baidu.com/s", CAPTCHA),
                  ("baike.baidu.com", ("https://baike.baidu.com/search/none", "")),
-                 ("list=search", {"query": {"search": [{"title": "正义必胜"}]}}),
-                 ("prop=extracts", {"query": {"pages": {"1": {"extract": "正义必胜是口号。"}}}}))
+                 ("search=正义必胜", MOEGIRL))
         report, _ = self.quietly(web.check, ["正义必胜", "阿一古"], folder=folder)
         self.assertEqual(report["places"]["bing"], {"asked": 2, "answered": 2, "found": 1,
                                                     "refused": ""})
         self.assertEqual(report["places"]["duckduckgo"]["answered"], 0)
         self.assertIn("HTTP 403", report["places"]["duckduckgo"]["refused"])
         self.assertEqual(report["places"]["baidu"]["answered"], 0)
-        self.assertEqual(report["places"]["moegirl"]["found"], 1)  # its search names no 阿一古
+        self.assertEqual(report["places"]["moegirl"]["found"], 1)  # no entry named 阿一古
         found = report["phrases"]["正义必胜"]["bing"]
         self.assertEqual([v["bvid"] for v in found["videos"]], ["BV1web000001"])
         # Every answer kept as it came, to fix a parser with
@@ -307,9 +357,7 @@ class LookUpTest(WebTest):
         explainers.bilibili.search_videos.assert_not_called()
 
     def test_with_no_video_explaining_it_the_web_pages_are_read_and_judged(self):
-        self.web(("cn.bing.com", BING), ("zhihu.com", ZHIHU),
-                 ("list=search", {"query": {"search": [{"title": "正义必胜"}]}}),
-                 ("prop=extracts", {"query": {"pages": {"1": {"extract": "正义必胜是口号。"}}}}))
+        self.web(("cn.bing.com", BING), ("zhihu.com", ZHIHU), ("search=正义必胜", MOEGIRL))
         found, printed = self.quietly(memelearner.explain, ["正义必胜"])
         summary = found["lol:正义必胜"][-1]
         # The model went by page 2 (知乎: 萌娘百科's entry comes first), and quoted it
@@ -340,6 +388,37 @@ class LookUpTest(WebTest):
             {"url": "u1", "site": "a", "title": "t", "text": "x"},
             {"url": "u2", "site": "b", "title": "t", "text": "正义必胜是口号"}], "m")
         self.assertEqual((summary["url"], summary["quote"]), ("u2", "正义必胜是口号"))
+
+    def test_a_phrase_whose_search_named_it_nowhere_is_looked_up_again(self):
+        # Run 1 on 2026-11-11 kept Bing's pages about something else for 龙颜大悦, and marked
+        # the phrase looked up: it is wanted again, and searched again
+        now = time.strftime("%Y-%m-%d %H:%M")
+        surf._save_json(surf.CANDIDATES_FILE, {"candidates": [
+            {"phrase": phrase, "game": "lol", "score": 1, "variants": [],
+             "judge": {"verdict": "untested", "meaning": "m", "guess": True}}
+            for phrase in ("龙颜大悦", "滔一下")]})
+        data = explainers.load()
+        data["phrases"]["lol:龙颜大悦"] = {"looked": now, "web": {
+            "searched": now, "results": web.parse_bing(OFF_TOPIC)}}
+        data["phrases"]["lol:滔一下"] = {"looked": now, "web": {"searched": now, "results": []}}
+        wanted = explainers._wanted(None, None, 10, False, data)
+        self.assertEqual([c["phrase"] for c in wanted], ["龙颜大悦"])  # 滔一下: nothing found
+        fake = self.web(("cn.bing.com", OFF_TOPIC), ("duckduckgo.com", duckduckgo(
+            "龙颜大悦是什么梗_哔哩哔哩_bilibili", "https://www.bilibili.com/video/BV1web000009")))
+        entry = data["phrases"]["lol:龙颜大悦"]
+        found = explainers._web("龙颜大悦", ["龙颜大悦"], entry, "web", False)
+        self.assertEqual([v["bvid"] for v in found], ["BV1web000009"])
+        self.assertEqual({r["engine"] for r in entry["web"]["results"]}, {"duckduckgo"})
+        asked = len(fake.calls)
+        explainers._web("龙颜大悦", ["龙颜大悦"], entry, "web", False)
+        self.assertEqual(len(fake.calls), asked)  # this time it named it: kept for a week
+
+    def test_a_site_that_refused_the_bot_is_named_once_in_a_run(self):
+        self.web(("baike.baidu.com", 403), ("cn.bing.com", BING), ("zhihu.com", ZHIHU))
+        _, printed = self.quietly(memelearner.explain, ["正义必胜", "阿一古"])
+        self.assertEqual(printed.count("baike.baidu.com refused the bot (HTTP 403)"), 1)
+        self.assertNotIn("earlier in this run", printed)
+        self.assertIn("Left alone for the rest of the run: baike.baidu.com (HTTP 403)", printed)
 
     def test_the_judge_is_shown_what_the_web_pages_say(self):
         page = {"kind": "page", "url": "https://www.zhihu.com/question/1", "site": "zhihu.com",
