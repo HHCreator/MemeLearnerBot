@@ -1,0 +1,12 @@
+# 10 memes the bot learned, for try-lookup.bat (MemeLearnerBot PR #9, step 2): which
+# search engines and wikis explain them. py -m memelearner sources --file tests/lookup-test.txt
+阿一古
+正义必胜
+超威同意了
+中华有尺
+春风若有怜花意
+汽车人
+脖子捂汗
+我的麦很炸吗
+未识别到人脸
+马桶赛区

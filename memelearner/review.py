@@ -4,7 +4,7 @@ the bot learns when you click 完成.
 
     py -m memelearner report        open it for the last run's phrases
     py -m memelearner live-report   find the phrases of the last live recording, judge them,
-                                    read the videos that explain them, then open it
+                                    read the videos and pages that explain them, then open it
 
 One row per meme, the likeliest memes first: its pattern and the way most people write it
 (「XX同意了」, 超威同意了), how many people sent that on its own, two lines that use it, the
@@ -14,8 +14,12 @@ it, its variants (chovy同意了, 三叔不同意: variants.py) with how many se
 names in them are (超威 = Chovy, by data/nicknames.txt); click a variant that isn't this
 meme to keep it out. A meme that is a new variant of a learned one (ruler同意了, once
 超威同意了 is learned) says which, and one made from another meme says where it comes from
-(我们是路边: 我们是冠军), and whether a video, a line or a learned meme says so or the model
-only guessed. Every change is saved at once, in surf/review.json, so
+(我们是路边: 我们是冠军), and whether a video, a web page, a line or a learned meme says so or
+the model only guessed. Under the meaning, where it comes from (解释来源): the video or web
+page that explains it (with a link), a line explaining it, the learned meme it is, or the
+model (a guess, or one that passed its blind test); and 没查到解释 when the bot looked it up
+(explainers.py) and found nothing that explains it. Every change is saved at once, in
+surf/review.json, so
 closing the page loses nothing: report opens it again as you left it. A Mark goes with the
 answer it is on: when the model answers something else for the phrase later, its Mark is
 empty again.
@@ -53,7 +57,7 @@ import time
 import urllib.parse
 import webbrowser
 
-from . import judging, meanings, store, surf
+from . import explainers, judging, meanings, store, surf
 
 MARKS = ("Correct", "Half correct", "Correct, no meaning", "No point", "Wrong", "I don't know")
 POINTS = {"Correct": 1, "Half correct": 0.5, "Correct, no meaning": 0.5, "No point": 0,
@@ -65,7 +69,7 @@ LINE = 60  # longest line used as an example
 NOTE_LENGTH = 1000  # characters kept of My meaning
 SHARED = ("【", "http", "哔哩哔哩", "bilibili")  # a shared video's title, not a danmu line
 VERSION = 1  # review.json's format; choices in an older one are dropped
-ORDER = ("顺序：盲测通过的梗，有句子或视频解释的梗，别的梗（意思是猜的、没有意思，或者没通过盲测），"
+ORDER = ("顺序：盲测通过的梗，有句子、视频或网页解释的梗，别的梗（意思是猜的、没有意思，或者没通过盲测），"
          "看不出是什么的，最后是名字、游戏术语和普通的话；同一类里单独发的人多的在前。People = "
          "单独发它的不同的人数，变体后面的数字也是。Mark 的分数和第一次评分一样：Correct 1，"
          "Half correct 0.5，Correct, no meaning 0.5，No point 0，Wrong −1；I don't know 不算。")
@@ -83,7 +87,7 @@ def _answer(verdict):
 
 def _group(verdict):
     """Where a phrase goes in the report: 0 memes whose meaning passed its blind test, 1
-    memes whose meaning lines or videos explain, 2 the other memes (a guessed meaning, none,
+    memes whose meaning lines, videos or web pages explain, 2 the other memes (a guessed meaning, none,
     or one that failed its test), 3 what the model couldn't tell, 4 names, game words and
     everyday words, 5 phrases not judged yet."""
     said = verdict.get("verdict")
@@ -95,6 +99,37 @@ def _group(verdict):
         sure = said == "untested" and verdict.get("meaning") and not verdict.get("guess")
         return 1 if sure else 2
     return 3 if said == "watching" else 4
+
+
+def _told(verdict, learned):
+    """Where a meme's meaning comes from, for the report: [{"how", ...}], one of each kind
+    that backs it: {"how": "video", "title", "url"}, {"how": "page", "site", "title", "url"}
+    (what the judge was shown of them, not those about where it may come from),
+    {"how": "explanation", "line"} (a line explaining it), {"how": "learned", "phrase"} (the
+    learned meme it is), or else the model's own: {"how": "tested"} when its meaning passed
+    the blind test, {"how": "guess"}. Empty for a phrase that isn't a meme or has no
+    meaning."""
+    if verdict.get("kind") != "meme" or not verdict.get("meaning"):
+        return []
+    told = []
+    video = next((v for v in verdict.get("videos") or [] if not v.get("for")), None)
+    if video:
+        told.append({"how": "video", "title": video.get("title", ""), "url": video.get("url", "")})
+    page = next((p for p in verdict.get("pages") or [] if not p.get("for")), None)
+    if page:
+        told.append({"how": "page", "site": page.get("site", ""), "title": page.get("title", ""),
+                     "url": page.get("url", "")})
+    if verdict.get("explanations"):
+        told.append({"how": "explanation", "line": verdict["explanations"][0]})
+    if not told and learned:
+        told.append({"how": "learned", "phrase": learned})
+    return told or [{"how": "tested" if verdict.get("verdict") == "meme" else "guess"}]
+
+
+def _unexplained(verdict, entry):
+    """Whether explain looked a meme up and found no video or web page that explains it."""
+    return verdict.get("kind") == "meme" and bool(entry.get("looked")) and \
+        not explainers.told(entry)
 
 
 def _examples(lines, phrase):
@@ -115,8 +150,9 @@ def _examples(lines, phrase):
     return picked
 
 
-def rows():
-    """The report's rows, one for each meme: the last run's candidates not learned or turned
+def rows(last=None):
+    """The report's rows, one for each meme: the last run's candidates (or last's, in the
+    shape of candidates.json, like auto.py's pool of several runs) not learned or turned
     down yet, the likeliest memes first (_group()), and the most people first within a
     group. A row is {"key": "game:phrase", "phrase": the way most people write it, "pattern":
     the meme's, a name in it as XX (XX同意了), "game", "people", "variants": [{"phrase",
@@ -127,8 +163,10 @@ def rows():
     their videos, "verdict", "kind", "meaning", "english", "why", "guess", "source" (where
     it comes from: {"phrase", "how"} or None): the judge's (judging.judge()), "test": the
     blind test it failed, or None, "model": which model judged it ("" when none did yet),
-    "answer": which answer a Mark is on, "group"}."""
-    last = surf._load_json(surf.CANDIDATES_FILE, {})
+    "answer": which answer a Mark is on, "group", "told": where its meaning comes from
+    (_told()), "unexplained": True when explain looked it up and found nothing that explains
+    it}."""
+    last = surf._load_json(surf.CANDIDATES_FILE, {}) if last is None else last
     done = store.phrases()
     found = [c for c in last.get("candidates") or [] if store.normal(c["phrase"]) not in done]
     memes = store.load()["memes"]
@@ -137,6 +175,7 @@ def rows():
     used = judging.uses(wanted) if wanted else {}
     shown = judging.usage_lines(wanted, found=used)  # the lines the judge saw, in its order
     urls = {video: entry.get("url") for video, entry in (last.get("videos") or {}).items()}
+    looked = explainers.load()["phrases"]
     made = []
     for c in found:
         where = (c["game"], c["phrase"])
@@ -169,7 +208,8 @@ def rows():
             "guess": bool(verdict.get("guess")),
             "test": verdict.get("test") if verdict.get("verdict") == "watching" else None,
             "model": verdict.get("model", ""), "answer": _answer(verdict) if verdict else "",
-            "group": _group(verdict)})
+            "group": _group(verdict), "told": _told(verdict, learned),
+            "unexplained": _unexplained(verdict, looked.get(key) or {})})
     made.sort(key=lambda row: (row["group"], -row["people"]))
     return made
 
@@ -436,7 +476,7 @@ def page(rows, picked, token, line=""):
             "rows": [{k: row.get(k) for k in ("key", "phrase", "pattern", "people", "variants",
                                               "names", "learned", "examples", "kind",
                                               "meaning", "why", "guess", "source", "test",
-                                              "model")}
+                                              "model", "told", "unexplained")}
                      for row in rows]}
     text = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")  # never ends the tag
     return PAGE.replace("__DATA__", text)
@@ -586,7 +626,8 @@ button.variant { font: inherit; font-weight: 400; color: var(--text); background
 button.variant .n { color: var(--muted); margin-left: 5px; font-variant-numeric: tabular-nums; }
 button.variant[aria-pressed="true"] { color: var(--no); border-color: var(--no); text-decoration: line-through; }
 tr.variants .names { margin-top: 3px; }
-td.answer .source { margin-top: 4px; }
+td.answer .source, td.answer .told { margin-top: 4px; }
+td.answer .told a { color: inherit; }
 td.people { text-align: right; font-variant-numeric: tabular-nums; }
 td.lines { color: var(--muted); min-width: 13em; }
 td.lines div + div { margin-top: 4px; }
@@ -639,9 +680,11 @@ button:disabled { opacity: .5; cursor: default; }
 const DATA = JSON.parse(document.getElementById("data").textContent);
 const KINDS = {meme: "meme", name: "a name", term: "a game word", everyday: "everyday words",
                unclear: "unclear"};
-const HOW = {video: "查到的：视频里说的", explanation: "查到的：弹幕里有人说",
+const HOW = {video: "查到的：视频里说的", page: "查到的：网页里说的", explanation: "查到的：弹幕里有人说",
              learned: "查到的：已学的梗里写着", note: "查到的：你的补充里写着",
              guess: "猜的"};  // how the source is known
+const TOLD = {explanation: "观众弹幕里的解释", learned: "已学的梗", tested: "模型猜的，盲测通过",
+              guess: "模型猜的"};  // where a meaning comes from, besides videos and pages
 const WHOSE = {merged: "和你的补充合成的", note: "你的原话", judge: "模型的意思",
                learned: "原来学的意思",
                "": "还没有意思：之后用 py -m memelearner accept 它 --note \"...\" 补上"};
@@ -711,7 +754,27 @@ function said(row) {
     text.append(el("div", {class: "source"}, "来源：「" + row.source.phrase + "」",
                    el("span", {class: "flag"}, "（" + (HOW[row.source.how] || HOW.guess) + "）")));
   }
+  if ((row.told || []).length || row.unexplained) text.append(told(row));
   return text;
+}
+
+function link(url, text) {  // only web addresses become links
+  return /^https?:\/\//.test(url || "") ? el("a", {href: url, target: "_blank", rel: "noopener"}, text)
+                                         : text;
+}
+
+function told(row) {  // where the meaning comes from: a video, a web page, a line, or the model
+  const line = el("div", {class: "told"}, "解释来源：");
+  (row.told || []).forEach((item, n) => {
+    if (n) line.append("；");
+    if (item.how === "video") line.append("视频", link(item.url, "「" + item.title + "」"));
+    else if (item.how === "page") line.append("网页 " + item.site, link(item.url, "「" + item.title + "」"));
+    else if (item.how === "explanation") line.append(TOLD.explanation + "「" + item.line + "」");
+    else if (item.how === "learned") line.append(TOLD.learned + "「" + item.phrase + "」");
+    else line.append(TOLD[item.how] || TOLD.guess);
+  });
+  if (row.unexplained) line.append((row.told || []).length ? " · " : "", el("span", {class: "flag"}, "没查到解释"));
+  return line;
 }
 
 function noteBox(row) {

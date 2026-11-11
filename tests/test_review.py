@@ -262,6 +262,45 @@ class ReviewTest(unittest.TestCase):
         self.assertIsNone(review._source(dict(row, source={"phrase": "x", "how": "video"}),
                                          "Wrong"))
 
+    def test_each_meme_says_where_its_meaning_comes_from(self):
+        rows = {row["phrase"]: row for row in review.rows()}
+        # 阿一古's meaning passed its blind test, 正义必胜's is only the model's guess; names
+        # and phrases the model couldn't tell have none
+        self.assertEqual(rows["阿一古"]["told"], [{"how": "tested"}])
+        self.assertEqual(rows["正义必胜"]["told"], [{"how": "guess"}])
+        self.assertEqual((rows["fpx"]["told"], rows["神中神"]["told"]), ([], []))
+        self.assertFalse(rows["正义必胜"]["unexplained"])  # not looked up yet
+        # Looked up, and nothing explains it: marked so
+        data = explainers.load()
+        data["phrases"]["lol:正义必胜"] = {"looked": "2026-11-10 09:00", "videos": [
+            {"bvid": "BV1explain08", "about": True, "meaning": "x", "for": "别的说法"}]}
+        explainers._save(data)
+        rows = {row["phrase"]: row for row in review.rows()}
+        self.assertTrue(rows["正义必胜"]["unexplained"])  # a video about its source doesn't
+        self.assertFalse(rows["fpx"]["unexplained"])
+        # One of each kind that backs a meaning: a video, a web page, a line explaining it
+        verdict = {"kind": "meme", "verdict": "untested", "meaning": "给受欢迎的一方加油",
+                   "videos": [{"url": "u0", "title": "别的", "says": "x", "for": "别的说法"},
+                              {"url": "u1", "title": "正义必胜是什么梗", "says": "y"},
+                              {"url": "u2", "title": "第二个", "says": "y"}],
+                   "pages": [{"url": "u3", "site": "zhihu.com", "title": "正义必胜？", "says": "y"}],
+                   "explanations": ["正义必胜的意思是给受欢迎的一方加油"]}
+        self.assertEqual(review._told(verdict, None), [
+            {"how": "video", "title": "正义必胜是什么梗", "url": "u1"},
+            {"how": "page", "site": "zhihu.com", "title": "正义必胜？", "url": "u3"},
+            {"how": "explanation", "line": "正义必胜的意思是给受欢迎的一方加油"}])
+        # ... else the learned meme it is, else the model's own
+        bare = dict(verdict, videos=[], pages=[], explanations=[])
+        self.assertEqual(review._told(bare, "正义必胜"), [{"how": "learned", "phrase": "正义必胜"}])
+        self.assertEqual(review._told(dict(bare, verdict="meme"), None), [{"how": "tested"}])
+        self.assertEqual(review._told(dict(bare, meaning=""), None), [])
+        html = review.page(list(rows.values()), {}, "token", "")
+        start = html.index('<script type="application/json" id="data">') + 42
+        shown = {row["phrase"]: row for row in
+                 json.loads(html[start:html.index("</script>", start)])["rows"]}
+        self.assertEqual((shown["正义必胜"]["told"], shown["正义必胜"]["unexplained"]),
+                         ([{"how": "guess"}], True))
+
     def test_your_note_says_where_a_meme_comes_from(self):
         self.choose(review.rows(), [
             ("lol:正义必胜", "Correct", "Add", "来源于“正义永不缺席”，常常在比赛前刷"),

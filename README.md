@@ -414,11 +414,12 @@ run 萌娘百科 refused programs that aren't logged in, and 维基百科's sear
 pages (奥拉夫 led to Olaf Scholz), which misled the model more than they helped. Videos made
 to explain a meme work better: see the next part.
 
-## Videos that explain memes
+## Videos and web pages that explain memes
 
-Bilibili is full of videos made to explain new memes (阿一古是什么梗？). They say what a meme
-means and where it comes from, which the danmu rarely do: most memes are sent on their own.
-So the bot reads them for the memes the judge found, and the judge goes by what they say:
+Bilibili is full of videos made to explain new memes (阿一古是什么梗？), and wikis and Q&A
+sites have pages that do. They say what a meme means and where it comes from, which the
+danmu rarely do: most memes are sent on their own. So the bot reads them for the memes the
+judge found, and the judge goes by what they say:
 
 ```
 py -m memelearner explain                    # the 10 memes whose meaning is least sure
@@ -432,10 +433,11 @@ For each phrase it:
 1. **Finds** videos whose titles name the phrase (or a variant) and look made to explain
    something (是什么梗, 什么意思, 出处, 由来). They come from the links you give, from the
    explainer videos the bot saw in related-video lists (the collector's and those beside
-   every explainer it reads, which a visitor gets without a captcha), and from Bilibili's
-   search for "阿一古是什么梗". The search is tried until Bilibili asks for a captcha once in
-   a run, then skipped (the bot never solves captchas), and for each phrase at most once a
-   week. When no video names a meme the judge says comes from another one (see Where a meme
+   every explainer it reads, which a visitor gets without a captcha), from a search engine's
+   results for "阿一古是什么梗" (Bing, or DuckDuckGo or Baidu when Bing doesn't answer:
+   `memelearner/web.py`), and from Bilibili's own search for it. Bilibili's search is tried
+   until it asks for a captcha once in a run, then skipped (the bot never solves captchas);
+   both searches happen for each phrase at most once a week. When no video names a meme the judge says comes from another one (see Where a meme
    comes from), it looks the same way for videos about that one: 千言万语感谢现役是什么梗
    for 千言万语感谢多兰, 超威同意了 for the pattern XX同意了.
 2. **Reads** up to 2 of them per phrase, each video once, as any visitor who isn't logged in
@@ -449,14 +451,37 @@ For each phrase it:
    reached, as for the judge): does it explain the phrase, what does it say the phrase
    means and where it comes from, and a line quoted from it (a quote that isn't in the
    video is dropped). The model is told to write only what the video says.
-5. **Judges again** the phrases a video explains: the model gets the videos' summaries
-   beside the danmu, and a meaning a video backs isn't only a guess any more, so `accept`
-   takes it. `candidates` shows which video it came from. A video about where a meme comes
-   from shows the model that source, marked as such, but doesn't back the meme's own
-   meaning.
+5. **Reads the web** when no video explains the phrase: 萌娘百科's entry for it (the page
+   its mobile site's search goes to; its API wants a login since November 2026), 百度百科's
+   and what 小鸡词典's search page shows, and up
+   to 3 of the other pages the search engine found that name it, explainer sites first
+   (萌娘百科, 百度百科, 知乎, 贴吧 ...); for the rest, the search results' snippets. Only the
+   lines around the phrase go to the model, which sums them up as it does a video, names
+   the page it went by and quotes it (a quote that page doesn't contain is dropped). A page
+   may be about something else of the same name, so the model is told which game the phrase
+   is from. 小鸡词典's own API wants an encrypted header that only its page makes; the bot
+   doesn't make one, so it only reads what anyone sees there.
+6. **Judges again** the phrases a video or a page explains: the model gets their summaries
+   beside the danmu, and a meaning a video or a page backs isn't only a guess any more, so
+   `accept` takes it. `candidates` shows which video or page it came from. A video about
+   where a meme comes from shows the model that source, marked as such, but doesn't back
+   the meme's own meaning.
 
 What it read stays in `memelearner/.cache/surf/explainers.json` and `explainers/`. A phrase
-no video explains is looked up again after a week; `--again` looks up everything again.
+nothing explains is looked up again after a week; `--again` looks up everything again. A
+site that wants a captcha, refuses the bot (HTTP 403, 429) or can't be reached twice is left
+alone for the rest of the run; there are a few seconds between two requests to the same site.
+
+Which search engines and wikis answer depends on where your computer is, so you can try them:
+
+```
+py -m memelearner sources 阿一古 正义必胜 --explain   # ask each one, then look them up as explain does
+py -m memelearner sources --file phrases.txt --raw   # phrases one a line; keep every page as it came
+```
+
+It writes what each place found to `.cache/surf/sources/` (`--out` for another folder):
+`sources.md` to read, beside what `memes.json` says the learned ones mean, `sources.json`,
+and `links.json`, the Bilibili videos found for each phrase.
 
 **Hearing the videos (optional).** Most explainer videos are spoken, and Bilibili only gives
 its AI subtitles to logged-in viewers, which the bot never is. To hear them, install Whisper:
@@ -489,7 +514,7 @@ py -m memelearner live-report     # the last live recording: live-phrases, judge
 ```
 
 One row per meme, the likeliest memes first (a meaning that passed its blind test, then
-one that lines or videos explain, the other memes, what the model couldn't tell, and last
+one that lines, videos or web pages explain, the other memes, what the model couldn't tell, and last
 names, game words and everyday words): its pattern and the way most people write it
 (「XX同意了」, 超威同意了), how many people sent that on its own, two lines that use it, and
 the model's answer (its kind and meaning, marked when it is only a guess or failed its
@@ -497,8 +522,12 @@ test). Under it are its variants, with how many people sent each, and who the na
 them are (Chovy = 超威、chovy、大超); click a variant that isn't this meme to keep it out
 of it (click again to take that back). A row that is a new variant of a learned meme says
 which one, and a meme made from another one says where it comes from (来源：「我们是冠军」),
-found (a video, a line or a learned meme says so) or only guessed. You fill in, once for
-the whole meme:
+found (a video, a web page, a line or a learned meme says so) or only guessed. Under each
+meme's meaning, 解释来源 says where it comes from: the video or web page that explains it
+(with its link), a line explaining it (观众弹幕里的解释), the learned meme it is, or else the
+model (模型猜的, or 模型猜的，盲测通过 when it passed its blind test); 没查到解释 marks a
+meme the bot looked up and found nothing that explains. You fill in, once for the whole
+meme:
 
 - **Mark**: how right the answer is: Correct, Half correct, Correct, no meaning, No point,
   Wrong, or I don't know.
@@ -541,6 +570,61 @@ that need it most (`--explain-top`, `--no-explain`, `--no-audio`) and then `repo
 is the model for all of it (deepseek-flash, with qwen3:14b standing in when it can't be
 reached).
 
+## Running by itself for days
+
+On Windows, the bot can run by itself for some days with Task Scheduler while you're away,
+and you look at what it found at the end. Double-click, in the bot's folder:
+
+| | |
+|---|---|
+| `开始自动跑.bat` | `py -m memelearner auto start`: makes the scheduled tasks that run it for 3 days |
+| `看看进度.bat` | `py -m memelearner auto status`: the tasks, each run's summary line and the end of the log |
+| `打开报告.bat` | `py -m memelearner auto report`: what every run found, as the report |
+| `停止自动跑.bat` | `py -m memelearner auto stop`: ends and deletes the tasks (what was found stays) |
+
+To have it run longer, `py -m memelearner auto extend --days 4` makes the tasks again so that
+they stop 4 days after the start instead (no extra run starts: the next daily run is at the
+usual time, never a second one on the day it started; `--every 10` changes how often the
+live rooms are looked at).
+
+`auto start` makes these tasks for you, which run while you're logged on (the screen may be
+locked), in the background without a window:
+
+- **MemeLearnerBot daily** reads the newest LoL and Valorant videos once a day, as `learn`
+  does: at 12:00 (`--at 09:30`), the first time at once (`--games` picks the games).
+- **MemeLearnerBot live 6**, one for each live room, looks at its room every 10 minutes
+  (`--every`). When it's live, it records its danmu until it goes offline, or for 6 hours
+  (`--hours`), as `live` does, then finds its phrases as `live-phrases` does. The rooms are
+  given as `--rooms 6 21144080:valorant`: a room's number or link, and the game after a
+  colon (lol when there's none); room 6, the LPL's, by default. Two rooms live at the same
+  time are both recorded. A look starts on time even while the last one still runs, and a
+  run whose recording stopped after 6 hours (the room still live) has its task look again at
+  once, so while it looks up what it recorded, the next part is already being recorded,
+  seconds later (a room whose recording is still being written is left to the run writing
+  it): a long match isn't missed in between.
+
+After reading, each run judges the phrases, looks up every meme found (`explain`: the videos
+and web pages that explain it, then it is judged again) and keeps them in the pool,
+`memelearner/.cache/surf/auto/pool.json`, so the report has what every run found, each
+phrase with its newest verdict. A run missed while the computer was off or asleep runs as
+soon as it's back; two runs take turns judging and looking up; and the tasks stop by
+themselves after 3 days (`--days`). With `--pull`, each daily run first pulls the newest code
+of the folder's branch (`git pull --ff-only`), so a fix pushed meanwhile is used from then on.
+
+What the runs print goes to `memelearner/.cache/surf/auto/log.txt`. Each run ends there with
+a summary line, `== 总结：…`: what it read and found, how many memes it found explained,
+the ones nothing explains, and the problems it ran into: Bilibili's rate limit (412) or
+captcha, Bilibili out of reach, the online model out of reach (DeepSeek with no key or no
+balance) so that qwen3:14b stood in, no model at all, sites that refused the bot, or an
+error (logged with its traceback; the next run goes on). A look at rooms that aren't live
+isn't logged, only kept in `rooms.json`, which `auto status` shows. A live run's lines start
+with `[直播 6]`, as they come between a daily run's while it records, and its status line
+comes every half hour.
+
+`auto report` opens [the report](#the-report) with every phrase the runs found that isn't
+learned or turned down yet; its first line sums the days up: the runs, the phrases and memes
+found, how many memes were explained, and the problems.
+
 ## Files
 
 | File | What it is |
@@ -549,7 +633,10 @@ reached).
 | `memelearner/cli.py` | the command line (`py -m memelearner`) |
 | `memelearner/surf.py` | the bot: find videos, read them, find the phrases people send on their own |
 | `memelearner/judging.py` | the judge: a model tells memes from names and explains them; compare |
-| `memelearner/explainers.py` | finds, reads and sums up the videos that explain memes |
+| `memelearner/explainers.py` | finds, reads and sums up the videos and web pages that explain memes |
+| `memelearner/web.py` | search engines and wikis, for what explains a meme (read only) |
+| `memelearner/live.py` | records a live room's danmu, and finds its phrases |
+| `memelearner/auto.py` | runs by itself for days with Windows Task Scheduler (`auto`) |
 | `memelearner/meanings.py` | merges your notes with the model's meanings |
 | `memelearner/review.py` | the report in your browser: your marks and decisions, and what 完成 learns |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
@@ -559,6 +646,7 @@ reached).
 | `memelearner/data/nicknames.txt` | players' nicknames, which you edit (`nicknames.py` reads it) |
 | `memelearner/variants.py` | tells the variants of one meme (XX同意了) |
 | `surf.py` | `py surf.py`, short for `py -m memelearner learn` |
+| `开始自动跑.bat` and the three beside it | `auto start`, `stop`, `status` and `report`, to double-click |
 
 The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs/DESIGN.md).
 

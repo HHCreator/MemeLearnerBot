@@ -19,9 +19,15 @@ import urllib.parse
 from unittest import mock
 
 import memelearner
-from memelearner import bilibili, cli, explainers, judging, store, surf
+from memelearner import bilibili, cli, explainers, judging, store, surf, web
 
 DAY = 86400
+NOTHING = b"<html><body></body></html>"  # what the web says in these tests: test_web.py has more
+
+
+def nothing_on_the_web(url, data=None, headers=None):
+    """Stands in for web._fetch: every search finds nothing, no wiki has an entry."""
+    return 200, url, NOTHING, "text/html; charset=utf-8"
 FROM_VIDEO = "比赛里观众一起刷的口号，支持被看好的一方"
 GUESS = "模型自己猜的意思"
 QUOTE = "这句话的意思是观众一起给喜欢的队伍打气"
@@ -35,7 +41,8 @@ def video(bvid, title, plays=100, pubdate=1_700_000_000):
 
 
 class Folder(unittest.TestCase):
-    """A test with an empty cache folder of its own, and no waiting between requests."""
+    """A test with an empty cache folder of its own, no waiting between requests, and a web
+    where nothing is found."""
 
     def setUp(self):
         folder = tempfile.TemporaryDirectory()
@@ -44,6 +51,7 @@ class Folder(unittest.TestCase):
         surf_dir = os.path.join(folder.name, "surf")
         bilibili._cookies = None
         bilibili._wbi = None
+        web.reset()
         for patcher in (
                 mock.patch.object(store, "MEMES_FILE", os.path.join(folder.name, "memes.json")),
                 mock.patch.object(surf, "SURF_DIR", surf_dir),
@@ -56,7 +64,10 @@ class Folder(unittest.TestCase):
                 mock.patch.object(bilibili, "_fetch", side_effect=AssertionError(
                     "a test asked Bilibili for real")),
                 mock.patch.object(bilibili, "_fetch_file", side_effect=AssertionError(
-                    "a test downloaded for real"))):
+                    "a test downloaded for real")),
+                mock.patch.object(web, "_fetch", side_effect=nothing_on_the_web),
+                mock.patch.object(web, "DELAY", 0),
+                mock.patch.object(web, "JITTER", 0)):
             patcher.start()
             self.addCleanup(patcher.stop)
 
