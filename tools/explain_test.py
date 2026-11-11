@@ -1,36 +1,49 @@
 """Try the explain step on memes the bot has already learned (Hao's ask, 2026-11-10): do the
-videos that explain a meme make the model understand it?
+videos and web pages that explain a meme make the model understand it?
 
     explain-test.bat runs it on Hao's PC:   py tools\\explain_test.py [PHRASE ...]
 
 It never changes memes.json, the bot's own cache or its working copy: everything it writes
-goes to the folder MEMELEARNER_HOME names (the .bat sets it to .cache\\explain-test).
+goes to the folder MEMELEARNER_HOME names (the .bat sets it to .cache\\explain-test). It runs
+on the code of the "Run the meme bot for days" branch, whose lookup on the web (web.py) it
+uses as it is.
 
     1. Find     Bilibili's search asks a visitor for a captcha, so explain found no video in
-                the two real runs. This tries the ways a visitor has, a request every 5 to 7
-                seconds, and writes down what each one answers:
-                  related   the lists beside the game videos the bot read, then beside the
-                            explainer videos found there, and their collections (合集)
+                the first real runs. This tries the ways a visitor has, a request every 5 to
+                7 seconds, and writes down what each one answers:
+                  links     the videos the lookup test found (lookup-test\\links.json beside
+                            this test's folder), and the ones in links.txt (a phrase, a
+                            space, a video link on each line)
+                  related   the lists beside those explainer videos, beside a few game
+                            videos the bot read, and beside the explainer videos found
+                            there, and their collections (合集)
+                  web       the Bilibili videos a search engine finds (the bot's lookup)
                   api-type  the search the bot uses now
                   api-old   the same search at its old address, without the signature
                   api-all   the "all results" search
                   page      the search page itself (search.bilibili.com), as a browser opens it
                   api-page  the bot's search again, with the cookies and the Referer the
                             search page gives a browser
-                The first PROBES phrases try them all; the others use the ones that worked.
-                It never logs in and never solves a captcha: a way that is refused is dropped.
+                The first PROBES phrases try the five searches; the others use the ones that
+                worked. It never logs in and never solves a captcha: a way that is refused
+                is dropped.
     2. Read     Up to VIDEOS videos for each phrase, as explain does (explainers.read()),
-                hearing them when Whisper is installed. Links in links.txt (a phrase, a
-                space, a video link on each line) are read first.
-    3. Sum up   explainers.summarize(), with the judge's model.
-    4. Judge    judging.judge_one() twice for each phrase, with the same danmu lines: once
-                with no videos and once with what the videos say. The learned memes are not
-                shown to the model in either, so what it writes comes from the danmu and
-                the videos alone.
+                and heard on the processor when Whisper is installed (the .bat offers to
+                put it in the test's own folder). The web pages about each phrase, as the
+                bot reads them (explainers.read_pages()). What the lookup test and the
+                bot's own runs read already isn't asked for again.
+    3. Sum up   explainers.summarize() for a video: once from what its page shows (title,
+                description, comments, danmu), and once more with what was heard.
+                explainers.summarize_pages() for the web pages.
+    4. Judge    judging.judge_one() up to four times for each phrase, with the same danmu
+                lines: with nothing else, with what the web pages say, with what the videos
+                say as read, and with what they say as heard. The learned memes are not
+                shown to the model in any of them, so what it writes comes from the danmu
+                and the summaries alone.
 
 It writes result.json, result.md and log.txt, and keeps state.json so that a second run only
 does what the first one didn't. Each phrase's meaning in memes.json (Hao's) is beside the
-model's two answers; nobody is marked here.
+model's answers; nobody is marked here.
 """
 
 import html
@@ -44,7 +57,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from memelearner import bilibili, explainers, judging, store, surf
+from memelearner import bilibili, explainers, judging, store, surf, web
 
 # Memes Hao corrected or added to: the model alone didn't get them right. The first PROBES
 # are old, well-known ones, where a video is most likely to exist.
@@ -54,8 +67,12 @@ PHRASES = ["阿一古", "汽车人", "正义必胜", "别吃", "神像尽显", "
            "涅槃打野", "春风若有怜花意", "蝴蝶飞不过沧海", "皮肤局", "我的麦很炸吗"]
 PROBES = 3  # phrases that try every way to search
 VIDEOS = explainers.VIDEOS  # videos read for each phrase
-SEEDS = 10  # game videos whose related lists are read
-HOPS = 12  # explainer videos found there whose related lists and collections are read
+GIVEN = 8  # explainer videos given as links whose related lists and collections are read
+SEEDS = 4  # game videos the bot read whose related lists are read
+HOPS = 14  # explainer videos found there whose related lists and collections are read
+SLOW = (11, 8)  # seconds between requests to Bilibili and to a web site while the bot's own
+#                 daily run is likely going on this computer
+LOOKUP = "lookup-test"  # the lookup test's folder, beside this test's
 DROP_AFTER = 3  # times in a row a way to search may fail before it is dropped
 RAW = 400_000  # characters kept of an answer saved as it came
 PAGE = "https://search.bilibili.com/video?keyword={}"
@@ -66,6 +83,7 @@ HOME = os.environ.get("MEMELEARNER_HOME") or ""
 STATE = os.path.join(HOME, "state.json")
 _log = None
 _requests = []  # every request made here: {"to", "status", "outcome"}
+_hearing = {"tried": False, "ready": False}  # Whisper: loaded when the first video needs it
 
 
 class Tee:
@@ -93,6 +111,40 @@ def say(text=""):
 
 def save_state(state):
     surf._save_json(STATE, state)
+
+
+def beside(*parts):
+    """A path in the bot's cache folder, which this test's folder is in."""
+    return os.path.join(os.path.dirname(HOME.rstrip("\\/")), *parts)
+
+
+def earlier():
+    """What the bot's own runs and the lookup test found on this computer (their
+    explainers.json): ({"game:phrase": entry}, {bvid: an explainer video they saw})."""
+    phrases, seen = {}, {}
+    for folder in ("surf", os.path.join(LOOKUP, "surf")):
+        data = surf._load_json(beside(folder, "explainers.json"), {})
+        for key, entry in (data.get("phrases") or {}).items():
+            if isinstance(entry, dict) and (key not in phrases or entry.get("pages")
+                                            or not phrases[key].get("pages")):
+                phrases[key] = entry
+        seen.update({bvid: video for bvid, video in (data.get("seen") or {}).items()
+                     if isinstance(video, dict)})
+    return phrases, seen
+
+
+def daily_run_near():
+    """Whether the bot's own daily run (py -m memelearner auto) is likely going now: from 5
+    minutes before its time of day to 2 hours after, while its days last."""
+    settings = surf._load_json(beside("surf", "auto", "settings.json"), {})
+    try:
+        hour, minute = (int(part) for part in str(settings["at"]).split(":"))
+        until = time.mktime(time.strptime(settings["until"], "%Y-%m-%d %H:%M"))
+    except (KeyError, ValueError, TypeError, OverflowError):
+        return False
+    now = time.localtime()
+    since = (now.tm_hour * 60 + now.tm_min - hour * 60 - minute) % (24 * 60)
+    return time.time() < until and (since < 120 or since >= 24 * 60 - 5)
 
 
 # -- asking Bilibili ----------------------------------------------------------------------
@@ -417,41 +469,73 @@ def note_detail(state, bvid, data):
     for how, videos in (("related", related), ("collection", episodes)):
         for video in videos:
             pool.setdefault(video["bvid"], {"title": video["title"],
-                                            "plays": video.get("plays") or 0, "how": how,
+                                            "plays": video.get("plays") or 0,
+                                            "author": video.get("author") or "", "how": how,
                                             "beside": bvid})
     explainers.remember(episodes, "collection")
     looks = lambda videos: sum(1 for v in videos if explainers.looks_like_explainer(v["title"]))
     state.setdefault("pages", {})[bvid] = {
-        "title": view.get("title", ""), "related": len(related), "explainers": looks(related),
+        "title": view.get("title", ""), "author": (view.get("owner") or {}).get("name", ""),
+        "related": len(related), "explainers": looks(related),
         "collection": season.get("title", "") if season else "", "episodes": len(episodes),
         "collection_explainers": looks(episodes)}
 
 
-def crawl(state):
-    """The related lists beside the game videos the bot read, then beside the explainer
-    videos found there: how many explainer videos does that give?"""
+def crawl(state, links, seen, memes):
+    """The related lists and collections of the explainer videos given as links, of a few
+    game videos the bot read, and then of the explainer videos seen there: how many
+    explainer videos does that give, and how many of the learned memes do they name?"""
     done = state.setdefault("crawled", [])
     pool = state.setdefault("pool", {})
+    for bvid, video in seen.items():  # what the bot's own runs saw beside the videos they read
+        if bilibili.BVID.fullmatch(bvid) and video.get("title"):
+            pool.setdefault(bvid, {"title": video["title"], "plays": video.get("plays") or 0,
+                                   "author": video.get("author") or "", "how": "seen",
+                                   "beside": ""})
     if state.get("crawl_done"):
-        say("1a. The lists beside the game videos were read in an earlier run.")
+        say("1a. The lists beside the videos were read in an earlier run.")
         return
-    seeds = [bvid for bvid in surf._load_json(surf.VIDEOS_FILE, {})
-             if bilibili.BVID.fullmatch(bvid)][:SEEDS]
+    given = []
+    for link in (link for found in links.values() for link in found):
+        match = bilibili.BVID.search(link)
+        if match and match.group() not in given:
+            given.append(match.group())
+    given = given[:GIVEN]
+    seeds = given + [bvid for bvid in surf._load_json(surf.VIDEOS_FILE, {})
+                     if bilibili.BVID.fullmatch(bvid)][:SEEDS]
     todo = [bvid for bvid in seeds if bvid not in done]
-    say(f"1a. The lists beside {len(todo)} game videos the bot read ...")
+    say(f"1a. The lists beside {len(todo)} videos: the explainer videos given as links, and "
+        "a few game videos the bot read ...")
     for bvid in todo:
         read_page(state, bvid, done)
-    looks = [bvid for bvid, video in pool.items() if bvid not in done
-             and explainers.looks_like_explainer(video["title"])]
-    looks.sort(key=lambda bvid: (not explainers.MADE_TO_EXPLAIN.search(pool[bvid]["title"]),
-                                 -pool[bvid]["plays"]))
-    hops = looks[:max(0, HOPS - sum(1 for bvid in done if bvid not in seeds))]
-    say(f"1b. ... and beside {len(hops)} explainer videos found there ...")
-    for bvid in hops:
+    hopped = sum(1 for bvid in done if bvid not in seeds)
+    say(f"1b. ... and beside up to {max(0, HOPS - hopped)} explainer videos seen there ...")
+    while hopped < HOPS:
+        bvid = next_hop(state, memes, given, done)
+        if not bvid:
+            break
         read_page(state, bvid, done)
+        hopped += 1
     state["crawl_done"] = True
     found = sum(1 for video in pool.values() if explainers.looks_like_explainer(video["title"]))
     say(f"    {len(pool)} videos seen beside {len(done)}, {found} of them look like explainers")
+
+
+def next_hop(state, memes, given, done):
+    """The explainer video in the pool whose lists to read next: first the ones by people who
+    explain this game's memes (who made a video given as a link, or one that names a learned
+    meme), then the ones made to explain something (XX是什么梗), the most played first."""
+    pool, pages = state.get("pool") or {}, state.get("pages") or {}
+    named = {hit["bvid"] for hits in pool_matches(state, memes).values() for hit in hits}
+    authors = {pool[bvid].get("author") for bvid in named} | \
+        {(pages.get(bvid) or {}).get("author") for bvid in given}
+    authors -= {"", None}
+    looks = [bvid for bvid, video in pool.items() if bvid not in done
+             and explainers.looks_like_explainer(video["title"])]
+    looks.sort(key=lambda bvid: (pool[bvid].get("author") not in authors,
+                                 not explainers.MADE_TO_EXPLAIN.search(pool[bvid]["title"]),
+                                 -pool[bvid]["plays"]))
+    return looks[0] if looks else None
 
 
 def read_page(state, bvid, done):
@@ -495,36 +579,45 @@ def pool_matches(state, memes):
 # -- the phrases --------------------------------------------------------------------------
 
 def read_links():
-    """{phrase: [link]} from links.txt beside the results: a phrase, a space, a link."""
+    """{phrase: [link]}: the videos the lookup test found (its links.json), and the ones in
+    links.txt beside the results: a phrase, a space, a link on each line."""
     links = {}
+    given = surf._load_json(beside(LOOKUP, "links.json"), {})
+    for phrase, found in (given.items() if isinstance(given, dict) else ()):
+        links.setdefault(store.normal(phrase), []).extend(
+            link for link in (found if isinstance(found, list) else []) if isinstance(link, str))
     try:
         with open(os.path.join(HOME, "links.txt"), encoding="utf-8-sig") as f:
             for line in f:
                 words = line.split()
                 if len(words) >= 2 and not line.lstrip().startswith("#"):
-                    links.setdefault(store.normal(words[0]), []).extend(words[1:])
+                    links.setdefault(store.normal(words[0]), []).extend(
+                        link for link in words[1:] if link not in links.get(
+                            store.normal(words[0]), ()))
     except OSError:
         pass
     return links
 
 
-def find_videos(state, wanted, memes, links, hearing, materials):
+def find_videos(state, wanted, memes, links, hearing, materials, known):
     """Steps 1 and 2 for the phrases, one after the other, so that what was read is kept
-    when Bilibili refuses later: state["found"][phrase] = {"searches", "videos"}, and
-    materials[phrase] = what explain reads of up to VIDEOS of them."""
+    when Bilibili refuses later: state["found"][phrase] = {"searches", "videos"},
+    state["web"][phrase] = what the web gave (look_up()), and materials[phrase] = what
+    explain reads of up to VIDEOS of the videos (read_videos())."""
     found = state.setdefault("found", {})
     searcher = Searcher(state)
-    say(f"1c. Searching for \"X是什么梗\" (the first {PROBES} phrases every way, the rest "
-        f"the ways that worked), and reading up to {VIDEOS} videos for each phrase"
-        + ("" if hearing else "; not hearing them, Whisper isn't installed") + " ...")
+    say(f"1c. Searching for \"X是什么梗\" on Bilibili (the first {PROBES} phrases every way, "
+        f"the rest the ways that worked) and on the web, and reading up to {VIDEOS} videos "
+        "and the web pages for each phrase"
+        + ("" if hearing else "; not hearing the videos, Whisper isn't installed") + " ...")
     try:
-        _find_videos(state, wanted, memes, links, hearing, materials, found, searcher)
+        _find_videos(state, wanted, memes, links, hearing, materials, found, searcher, known)
     finally:
         state["search_requests"] = state.get("search_requests", 0) + searcher.count
         save_state(state)
 
 
-def _find_videos(state, wanted, memes, links, hearing, materials, found, searcher):
+def _find_videos(state, wanted, memes, links, hearing, materials, found, searcher, known):
     for number, phrase in enumerate(wanted):
         entry = found.setdefault(phrase, {"searches": [], "videos": []})
         names = names_of(phrase, memes[phrase])
@@ -565,6 +658,8 @@ def _find_videos(state, wanted, memes, links, hearing, materials, found, searche
                 if not searcher.working():
                     say("      no way to search works: not searched")
             searcher.drop_failing()
+        game = (memes[phrase].get("games") or ["lol"])[0]
+        look_up(state, phrase, names, known.get(f"{game}:{phrase}") or {}, entry)
         # What the related lists and collections gave, and the links, which are read first
         seen = [dict(video, bvid=bvid) for bvid, video in (state.get("pool") or {}).items()
                 if explainers.looks_like_explainer(video["title"])]
@@ -579,7 +674,7 @@ def _find_videos(state, wanted, memes, links, hearing, materials, found, searche
                 + "; ".join(f"{v['title'][:28] or v['bvid']} [{v['how']}]"
                             for v in entry["videos"][:3]))
         save_state(state)
-        read_videos(phrase, entry, hearing, materials)
+        read_videos(state, phrase, entry, hearing, materials)
         save_state(state)
 
 
@@ -590,11 +685,71 @@ def add_matches(entry, videos, names, route):
                                     "how": route, "plays": video.get("plays") or 0})
 
 
-def read_videos(phrase, entry, hearing, materials):
-    """Step 2 for a phrase: read up to VIDEOS of its videos, as explain does."""
+def look_up(state, phrase, names, known, entry):
+    """The bot's own lookup on the web for a phrase, as it is (explainers._web(),
+    read_pages()): the Bilibili videos a search engine finds go to entry["videos"], and
+    state["web"][phrase] keeps {"web": the search results, "texts": the pages read, or
+    "pages": what they say when an earlier run summed them up}. What an earlier run on this
+    computer found (known: the phrase's entry in its explainers.json) isn't asked for again."""
+    kept = state.setdefault("web", {}).setdefault(phrase, {})
+    if "web" not in kept and (known.get("web") or {}).get("results"):
+        kept.update(web=known["web"], searched_by="an earlier run")
+    try:
+        videos = explainers._web(phrase, names, kept, "web", False)
+    except Exception as error:  # the lookup is the other thread's: write it down, go on
+        say(f"      the web search failed: {error!r}")
+        videos = []
+    for video in videos:
+        if video["bvid"] not in [v["bvid"] for v in entry["videos"]]:
+            entry["videos"].append({"bvid": video["bvid"], "title": video["title"],
+                                    "how": "web", "plays": 0})
+    results = (kept.get("web") or {}).get("results") or []
+    if "pages" not in kept and "texts" not in kept:
+        told = [page for page in known.get("pages") or [] if isinstance(page, dict)]
+        if told:
+            kept.update(pages=told, pages_by="an earlier run")
+        else:
+            try:
+                kept["texts"] = explainers.read_pages(phrase, names, results)
+            except Exception as error:
+                say(f"      reading the web pages failed: {error!r}")
+    engines = sorted({str(result.get("engine") or "?") for result in results})
+    say(f"      the web: {len(results)} results"
+        + (f" ({', '.join(engines)})" if results else "")
+        + f", {len(videos)} Bilibili videos that name it, "
+        + (f"its pages summed up {'by an earlier run' if kept.get('pages_by') else 'before'}"
+           if kept.get("pages") else f"{len(kept.get('texts') or [])} pages read"))
+
+
+def whisper_ready(state):
+    """Load Whisper on the processor, once (the first time it downloads the model). The bot
+    itself tries the graphics card first; when only some of the card's files are installed
+    that can end the whole program, so this test doesn't."""
+    if not _hearing["tried"]:
+        _hearing["tried"] = True
+        started = time.time()
+        try:
+            explainers._whisper = (explainers._load_whisper("cpu"), "cpu")
+        except Exception as error:  # no download, no room on the disk, a broken install
+            state["whisper"] = {"problem": f"{error!r}"[:300]}
+            say(f"      Whisper couldn't be loaded ({error!r}): not hearing the videos in "
+                "this run")
+        else:
+            _hearing["ready"] = True
+            state["whisper"] = {"model": explainers.WHISPER, "on": "processor",
+                                "threads": os.environ.get("OMP_NUM_THREADS", ""),
+                                "load_seconds": round(time.time() - started)}
+    return _hearing["ready"]
+
+
+def read_videos(state, phrase, entry, hearing, materials):
+    """Step 2 for a phrase: read up to VIDEOS of its videos, as explain does, and hear the
+    ones without subtitles when Whisper is there. materials[phrase] = [{"how", "read": the
+    video as its page shows it, "heard": the same with what was heard, or None}]."""
     for video in (entry.get("videos") or [])[:VIDEOS]:
         try:
-            material = explainers.read(video["bvid"], phrase, hearing)
+            material = explainers.read(video["bvid"], phrase,
+                                       hearing and whisper_ready(state))
         except bilibili.Captcha as error:
             say(f"      skipped {video['bvid']}: {error}")
             continue
@@ -607,7 +762,10 @@ def read_videos(phrase, entry, hearing, materials):
         except (KeyError, TypeError, ValueError) as error:
             say(f"      skipped {video['bvid']} (an unexpected answer: {error!r})")
             continue
-        materials.setdefault(phrase, []).append(dict(material, how=video["how"]))
+        heard = dict(material) if material.get("heard") == "audio" else None
+        plain = dict(material, said="", heard="") if heard else dict(material)
+        materials.setdefault(phrase, []).append({"how": video["how"], "read": plain,
+                                                 "heard": heard})
         say(f"      read {video['bvid']} {material.get('title', '')[:30]} | said "
             f"{len(material.get('said') or '')} characters"
             f"{' (' + material['heard'] + ')' if material.get('heard') else ''}, "
@@ -643,18 +801,41 @@ def candidates_of_tests():
     """{(game, phrase): candidate} from the last two real runs' folders beside this one."""
     found = {}
     for test in ("report-test", "variants-test"):  # the newer one's wins
-        path = os.path.join(os.path.dirname(HOME.rstrip("\\/")), test, "surf", "candidates.json")
+        path = beside(test, "surf", "candidates.json")
         for candidate in surf._load_json(path, {}).get("candidates") or []:
             if isinstance(candidate, dict) and candidate.get("phrase"):
                 found[(candidate.get("game"), candidate["phrase"])] = candidate
     return found
 
 
+def quote_from(quote, video):
+    """Where in what a video gave the model's quote is: "title", "description", "said",
+    "comments" or "danmu" (the first that has it), "" for none."""
+    wanted = explainers._plain(quote or "")
+    parts = (("title", video.get("title")), ("description", video.get("desc")),
+             ("said", video.get("said")),
+             ("comments", " ".join(comment["text"] for comment in video.get("comments") or [])),
+             ("danmu", " ".join(video.get("danmu") or [])))
+    return next((name for name, text in parts
+                 if wanted and wanted in explainers._plain(text or "")), "")
+
+
+def backs(summary):
+    """Whether a summary (of a video, or of web pages) says what the phrase means."""
+    return bool(summary and summary.get("about") and summary.get("meaning"))
+
+
+ARMS = (("pages", "with the web pages"), ("read", "with the videos, as read"),
+        ("heard", "with the videos, as heard"))
+
+
 def judge_phrases(state, wanted, memes, materials, model):
-    """Steps 3 and 4: sum the videos up, and judge each phrase without and with them."""
+    """Steps 3 and 4: sum up the web pages and the videos, and judge each phrase with the
+    danmu alone, then with each kind of summary (ARMS)."""
     known = candidates_of_tests()
     summaries = state.setdefault("summaries", {})
     judged = state.setdefault("judged", {})
+    looked = state.setdefault("web", {})
     game_of = {phrase: (memes[phrase].get("games") or ["lol"])[0] for phrase in wanted}
     say("3. Finding the danmu lines that use the phrases ...")
     asked = {(game_of[phrase], phrase) for phrase in wanted}
@@ -665,20 +846,38 @@ def judge_phrases(state, wanted, memes, materials, model):
         say(f"   couldn't read the danmu ({error!r}): using the memes' example lines")
         uses, lines = {}, {}
     titles = surf._load_json(surf.VIDEOS_FILE, {})
-    say(f"4. Summing the videos up and judging with {model.name} ...")
+    say(f"4. Summing the pages and videos up and judging with {model.name} ...")
     for phrase in wanted:
         game, entry = game_of[phrase], memes[phrase]
+        kept = looked.setdefault(phrase, {})
+        if kept.get("texts") and "pages" not in kept:
+            kept["pages"] = [model.ask(lambda name: explainers.summarize_pages(
+                phrase, game, kept["texts"], name))]
+            save_state(state)
         told = []
         for material in materials.get(phrase, []):
-            key = f"{phrase}|{material['bvid']}|{material.get('heard') or ''}"
-            if key not in summaries or summaries[key].get("model") != model.name:
-                summaries[key] = model.ask(lambda name: explainers.summarize(
-                    phrase, game, material, name))
-                save_state(state)
-            told.append(dict(summaries[key], how=material["how"],
-                             said=len(material.get("said") or ""),
-                             comments=len(material.get("comments") or []),
-                             danmu=len(material.get("danmu") or [])))
+            row = {"how": material["how"]}
+            for arm in ("read", "heard"):
+                video = material[arm]
+                if not video:
+                    row[arm] = None
+                    continue
+                key = f"{phrase}|{video['bvid']}|{arm}"
+                if key not in summaries or summaries[key].get("model") != model.name:
+                    summaries[key] = model.ask(lambda name: explainers.summarize(
+                        phrase, game, video, name))
+                    save_state(state)
+                row[arm] = dict(summaries[key], said=len(video.get("said") or ""),
+                                comments=len(video.get("comments") or []),
+                                danmu=len(video.get("danmu") or []),
+                                seconds=video.get("duration") or 0,
+                                quote_from=quote_from(summaries[key].get("quote"), video))
+            told.append(row)
+        says = {"pages": [page for page in kept.get("pages") or [] if backs(page)],
+                "read": [row["read"] for row in told if backs(row["read"])],
+                "heard": [row["heard"] or row["read"] for row in told
+                          if backs(row["heard"] or row["read"])]
+                if any(row["heard"] for row in told) else []}
         candidate = dict(known.get((game, phrase)) or {
             "phrase": phrase, "game": game,
             "variants": [{"phrase": v, "people": 0} for v in entry.get("variants") or []]})
@@ -688,33 +887,45 @@ def judge_phrases(state, wanted, memes, materials, model):
                                     for e in (candidate.get("examples") or [])
                                     + list(entry.get("examples") or [])]
         shown = judging._titles(uses.get(where) or [], titles)
-        backing = [summary for summary in told if summary.get("about") and summary.get("meaning")]
-        marks = sorted(f"{s['bvid']}:{s['meaning']}" for s in backing)
         old = judged.get(phrase) or {}
         if old.get("model") != model.name or old.get("lines") != len(used):
             old = {}
-        result = {"model": model.name, "lines": len(used), "videos": marks,
-                  "without": old.get("without"), "with": old.get("with")}
+        result = {"model": model.name, "lines": len(used), "marks": {},
+                  "without": old.get("without"), "told": told,
+                  "web_says": kept.get("pages") or []}
         if not result["without"]:
             result["without"] = model.ask(lambda name: judging.judge_one(
                 candidate, used, shown, name))
-        if backing and (not result["with"] or old.get("videos") != marks):
-            result["with"] = model.ask(lambda name: judging.judge_one(
-                candidate, used, shown, name, backing))
-        elif not backing:
-            result["with"] = None
-        result["told"] = told
+        for arm, _ in ARMS:
+            marks = sorted(f"{s.get('bvid') or s.get('url')}:{s['meaning']}" for s in says[arm])
+            result["marks"][arm] = marks
+            if not marks:
+                result[arm] = None
+            elif old.get(arm) and (old.get("marks") or {}).get(arm) == marks:
+                result[arm] = old[arm]
+            else:
+                result[arm] = model.ask(lambda name: judging.judge_one(
+                    candidate, used, shown, name, says[arm]))
+            judged[phrase] = result
+            save_state(state)
         judged[phrase] = result
         save_state(state)
         short = lambda verdict: "-" if not verdict else \
             f"{verdict['kind']}: {verdict['meaning'] or '(no meaning)'}"
         say(f"   {phrase}")
-        say(f"     without videos   {short(result['without'])}")
-        for summary in told:
-            say(f"     {summary['bvid']} says   " + (summary["meaning"] if summary["about"]
-                                                    else "(it doesn't explain this phrase)"))
-        if result["with"]:
-            say(f"     with videos      {short(result['with'])}")
+        say(f"     danmu only: {short(result['without'])}")
+        for page in result["web_says"]:
+            say(f"     {page.get('site', 'the web')} says: "
+                + (page["meaning"] if backs(page) else "(nothing about this phrase)"))
+        for row in told:
+            for arm in ("read", "heard"):
+                if row[arm]:
+                    say(f"     {row[arm]['bvid']} as {arm} says: " + (
+                        row[arm]["meaning"] if backs(row[arm])
+                        else "(it doesn't explain this phrase)"))
+        for arm, label in ARMS:
+            if result[arm]:
+                say(f"     {label}: {short(result[arm])}")
 
 
 # -- what came out ------------------------------------------------------------------------
@@ -723,40 +934,65 @@ def _cell(text):
     return " ".join(str(text or "").split()).replace("|", "/")
 
 
+QUOTE = {"title": "its title", "description": "its description", "said": "what is said in it",
+         "comments": "a comment", "danmu": "a danmu"}
+
+
 def write_results(state, wanted, memes, started, model, hearing, problem):
     pool = state.get("pool") or {}
     matches = pool_matches(state, memes)
     found, judged = state.get("found") or {}, state.get("judged") or {}
+    looked, heard = state.get("web") or {}, state.get("heard") or []
+    whisper = state.get("whisper") or {}
     rows = []
     for phrase in wanted:
-        entry, verdicts = memes[phrase], judged.get(phrase) or {}
+        entry, verdicts, kept = memes[phrase], judged.get(phrase) or {}, looked.get(phrase) or {}
         rows.append({"phrase": phrase, "games": entry.get("games") or [],
                      "meaning": entry.get("meaning", ""), "notes": entry.get("notes") or [],
                      "found": (found.get(phrase) or {}).get("videos") or [],
                      "searches": (found.get(phrase) or {}).get("searches") or [],
+                     "web": {"results": (kept.get("web") or {}).get("results") or [],
+                             "searched_by": kept.get("searched_by") or "this test",
+                             "summed_up_by": kept.get("pages_by") or "this test",
+                             "read": [{"site": page.get("site"), "url": page.get("url"),
+                                       "title": page.get("title"),
+                                       "characters": len(page.get("text") or ""),
+                                       "snippet": bool(page.get("snippet"))}
+                                      for page in kept.get("texts") or []]},
+                     "web_says": kept.get("pages") or [],
                      "videos": verdicts.get("told") or [], "lines": verdicts.get("lines"),
-                     "without": verdicts.get("without"), "with": verdicts.get("with")})
+                     "without": verdicts.get("without"), "with_pages": verdicts.get("pages"),
+                     "with_read": verdicts.get("read"), "with_heard": verdicts.get("heard")})
     result = {
         "made": time.strftime("%Y-%m-%d %H:%M"), "seconds": round(time.time() - started),
         "code": os.path.dirname(os.path.abspath(explainers.__file__)),
-        "model": model, "hearing": hearing, "problem": problem,
+        "model": model, "hearing": hearing, "whisper": whisper, "heard": heard,
+        "problem": problem, "slow": bool(state.get("slow")),
         "routes": state.get("routes") or {}, "dropped": state.get("dropped") or [],
         "requests": len(_requests), "search_requests": state.get("search_requests", 0),
+        "web_refused": dict(web.refused),
         "pages": state.get("pages") or {},
         "pool": {"videos": len(pool),
                  "explainers": sum(1 for video in pool.values()
                                    if explainers.looks_like_explainer(video["title"])),
                  "collection": sum(1 for video in pool.values() if video["how"] == "collection"),
-                 "titles": [video["title"] for video in pool.values()
-                            if explainers.looks_like_explainer(video["title"])][:300]},
+                 "titles": [f"{video['title']} | {video.get('author') or ''}"
+                            for video in pool.values()
+                            if explainers.looks_like_explainer(video["title"])][:400]},
         "pool_matches": matches,
         "usage": {name: dict(counts) for name, counts in judging.usage.items()},
         "phrases": rows}
     surf._save_json(os.path.join(HOME, "result.json"), result)
 
-    out = ["# Explainer videos on the memes we have: first run", "",
-           f"Made {result['made']} in {result['seconds']} s with {model or 'no model'}; "
-           f"{'hearing the videos (Whisper)' if hearing else 'not hearing the videos'}."
+    if whisper.get("model"):
+        hears = (f"hearing the videos with Whisper {whisper['model']} on the processor "
+                 f"({len(heard)} heard in {sum(h['seconds'] for h in heard):.0f} s)")
+    elif whisper.get("problem"):
+        hears = f"not hearing the videos (Whisper couldn't be loaded: {whisper['problem']})"
+    else:
+        hears = "not hearing the videos" + ("" if hearing else ": Whisper isn't installed")
+    out = ["# Do explainer videos and web pages make the model understand our memes?", "",
+           f"Made {result['made']} in {result['seconds']} s with {model or 'no model'}; {hears}."
            + (f" Stopped early: {problem}" if problem else ""), "",
            "## Ways to find the videos", "",
            "| Way | Found videos | Nothing found | Captcha | Refused | Error |", "|---|---|---|---|---|---|"]
@@ -765,25 +1001,64 @@ def write_results(state, wanted, memes, started, model, hearing, problem):
         out.append(f"| {route}{' (dropped)' if route in result['dropped'] else ''} | "
                    + " | ".join(str(tally.get(k, 0)) for k in
                                 ("videos", "empty", "captcha", "refused", "error")) + " |")
-    out += ["", f"Related lists and collections: {result['pool']['videos']} videos seen beside "
+    hows = {}
+    for row in rows:
+        for how in {video["how"] for video in row["found"]}:
+            hows[how] = hows.get(how, 0) + 1
+    out += ["", "Phrases with a video that names them, by how it was found: "
+            + (", ".join(f"{how} {count}" for how, count in sorted(hows.items())) or "none")
+            + f" (of {len(rows)} phrases).", "",
+            f"Related lists and collections: {result['pool']['videos']} videos seen beside "
             f"{len(result['pages'])} pages, {result['pool']['explainers']} look like explainers; "
             f"their titles name {len(matches)} of the {len(memes)} learned memes"
             + (": " + ", ".join(list(matches)[:30]) if matches else "") + ".", "",
-            "## Phrases", "",
-            "| Phrase | Meaning we have | Model, danmu only | What the videos say | Model, with the videos |",
-            "|---|---|---|---|---|"]
+            f"The web (the bot's lookup): results for "
+            f"{sum(1 for row in rows if row['web']['results'])} of {len(rows)} phrases, pages "
+            f"that explain {sum(1 for row in rows if any(backs(p) for p in row['web_says']))}"
+            + (f"; left alone in this run: {', '.join(web.refused)}" if web.refused else "")
+            + ".", "", "## Phrases", ""]
     short = lambda v: "-" if not v else _cell(
         f"**{v['kind']}** ({v['verdict']}{', guess' if v.get('guess') else ''}): "
         f"{v['meaning'] or '(no meaning)'}")
+    says = lambda summary: "doesn't explain it" if not backs(summary) else _cell(
+        summary["meaning"] + (f" (出自 {summary['origin']})" if summary.get("origin") else ""))
+    quoted = lambda summary: f" [its quote is from {QUOTE[summary['quote_from']]}]" \
+        if summary.get("quote_from") in QUOTE else ""
     for row in rows:
-        says = "<br>".join(_cell(
-            f"[{video['bvid']}]({video.get('url', '')}) {video.get('title', '')[:30]} "
-            f"[{video['how']}; {video.get('heard') or 'page only'}]: "
-            + ((video["meaning"] + (f" (出自 {video['origin']})" if video.get("origin") else ""))
-               if video["about"] else "doesn't explain it"))
-            for video in row["videos"]) or ("no video found" if not row["found"] else "not read")
-        out.append(f"| {row['phrase']} | {_cell(row['meaning'])} | {short(row['without'])} | "
-                   f"{says} | {short(row['with'])} |")
+        out += [f"### {row['phrase']} ({', '.join(row['games'])})", "",
+                f"- Meaning we have: {_cell(row['meaning'])}"]
+        out += [f"- Note: {_cell(note if isinstance(note, str) else json.dumps(note, ensure_ascii=False))}"
+                for note in row["notes"]]
+        out.append(f"- Danmu only ({row['lines'] if row['lines'] is not None else '?'} lines): "
+                   f"{short(row['without'])}")
+        for page in row["web_says"]:
+            out.append(f"- Web page [{_cell(page.get('site'))}: {_cell(page.get('title'))[:40]}]"
+                       f"({page.get('url', '')}), of {page.get('pages', '?')} shown"
+                       + (", only its snippet in the search results" if page.get("snippet") else "")
+                       + f": {says(page)}")
+        if not row["web_says"]:
+            out.append("- Web pages: " + (f"{len(row['web']['read'])} read, not summed up"
+                                          if row["web"]["read"] else "none found"))
+        if row["with_pages"]:
+            out.append(f"- With the web pages: {short(row['with_pages'])}")
+        if not row["videos"]:
+            out.append("- Videos: " + (f"{len(row['found'])} found, not read" if row["found"]
+                                       else "none found"))
+        for video in row["videos"]:
+            read, heard_ = video["read"], video["heard"]
+            out.append(f"- Video [{read['bvid']}]({read.get('url', '')}) "
+                       f"{_cell(read.get('title'))[:40]} [{video['how']}], as read "
+                       f"({read['comments']} comments, {read['danmu']} danmu"
+                       f"{', subtitles' if read.get('heard') == 'subtitles' else ''}): "
+                       f"{says(read)}{quoted(read)}")
+            if heard_:
+                out.append(f"  - as heard ({heard_['said']} characters of {heard_['seconds']} s): "
+                           f"{says(heard_)}{quoted(heard_)}")
+        if row["with_read"]:
+            out.append(f"- With the videos, as read: {short(row['with_read'])}")
+        if row["with_heard"]:
+            out.append(f"- With the videos, as heard: {short(row['with_heard'])}")
+        out.append("")
     with open(os.path.join(HOME, "result.md"), "w", encoding="utf-8") as f:
         f.write("\n".join(out) + "\n")
 
@@ -798,6 +1073,8 @@ def main(argv=None):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(encoding="utf-8", errors="replace")
     os.makedirs(HOME, exist_ok=True)
+    # Whisper on the processor uses 4 threads unless it is told otherwise
+    os.environ.setdefault("OMP_NUM_THREADS", str(min(os.cpu_count() or 4, 8)))
     _log = open(os.path.join(HOME, "log.txt"), "a", encoding="utf-8")
     sys.stdout = Tee(sys.stdout, _log)
     started = time.time()
@@ -813,11 +1090,32 @@ def main(argv=None):
     wanted += [phrase for phrase in links if phrase in memes]  # the ones you gave links for
     wanted = [phrase for phrase in dict.fromkeys(wanted) if phrase in memes]
     state = surf._load_json(STATE, {})
-    if state.get("version") != 1:
-        state = {"version": 1}
+    if state.get("version") != 2:
+        state = {"version": 2}
+    known, seen = earlier()
     hearing = explainers.can_hear()
-    say(f"{len(wanted)} learned memes, a request to Bilibili every 5 to 7 seconds: "
-        "about 15 to 30 minutes. Closing the window stops it; a second run carries on.")
+    web.reset()
+    say(f"{len(wanted)} learned memes, a request to Bilibili every 5 to 7 seconds: about half "
+        "an hour, and up to an hour when it hears the videos. Closing the window stops it; "
+        "a second run carries on.")
+    if daily_run_near():
+        bilibili.REQUEST_DELAY, web.DELAY = SLOW
+        state["slow"] = True
+        say("The bot's own daily run is likely going now, so this asks more slowly (a request "
+            f"to Bilibili every {SLOW[0]} to {SLOW[0] + bilibili.REQUEST_JITTER} seconds).")
+
+    # How long hearing takes, video by video
+    hear = explainers.hear
+
+    def timed(path, phrase=""):
+        size, began = os.path.getsize(path), time.time()
+        said = hear(path, phrase)
+        state.setdefault("heard", []).append({
+            "file": os.path.basename(path), "bytes": size, "characters": len(said),
+            "seconds": round(time.time() - began, 1)})
+        return said
+
+    explainers.hear = timed
 
     # Keep what every video page shows of other videos, whoever asks for it
     ask_bilibili = bilibili._request
@@ -847,8 +1145,8 @@ def main(argv=None):
     try:
         with judging.awake():
             try:
-                crawl(state)
-                find_videos(state, wanted, memes, links, hearing, materials)
+                crawl(state, links, seen, memes)
+                find_videos(state, wanted, memes, links, hearing, materials, known)
             except bilibili.Blocked as error:
                 problem = f"Bilibili refuses this computer for now ({error})"
                 say(f"\n{problem}\nStopped reading Bilibili; going on with what was read.")
