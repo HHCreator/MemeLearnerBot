@@ -808,7 +808,8 @@ def report(model=None, port=0, browser=True):
         print("Nothing to report: no run found anything yet, or every phrase found is learned "
               "or turned down.")
         return None
-    page = review.Report(rows, model or judging.MODEL, port, overview(pool))
+    page = review.Report(rows, model or judging.MODEL, port, overview(pool),
+                         "打开报告.bat (py -m memelearner auto report)")
     result = page.run(browser)
     if result:
         print("\n".join(review.summary(result)))

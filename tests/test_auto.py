@@ -607,8 +607,8 @@ class AutoTest(Folder):
         made = []
 
         class Report:
-            def __init__(self, rows, model, port, line):
-                made.append((rows, model, port, line))
+            def __init__(self, rows, model, port, line, again):
+                made.append((rows, model, port, line, again))
 
             def run(self, browser):
                 made.append(browser)
@@ -625,7 +625,8 @@ class AutoTest(Folder):
             self.bot.said["learn"] = "Bilibili wants a captcha for its search now."
             self.run_quietly(auto.daily)
             self.run_quietly(auto.report, "qwen3:14b", 8765, False)
-        rows, model, port, line = made[0]
+        rows, model, port, line, again = made[0]
+        self.assertIn("打开报告.bat", again)  # not py -m memelearner report: that isn't the pool
         self.assertEqual([row["phrase"] for row in rows][:3], ["阿一古", "正义必胜", "老霸道了"])
         self.assertEqual({row["phrase"] for row in rows}, {"阿一古", "正义必胜", "老霸道了", "fpx"})
         ayigu = next(row for row in rows if row["phrase"] == "阿一古")
