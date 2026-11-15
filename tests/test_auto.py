@@ -8,6 +8,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import time
 import unittest
 import xml.etree.ElementTree as ElementTree
@@ -259,6 +260,26 @@ class AutoTest(Folder):
                         dict(auto.settings(), started="2026-01-01 00:00"))
         with self.assertRaises(ValueError):
             auto.extend(4)
+        # On the last day, after the daily time: no daily run is left before the new end,
+        # so the daily task's trigger is off (one that starts after it ends can't be made)
+        now = datetime.datetime.now()
+        started = now - datetime.timedelta(days=4, hours=-2)
+        surf._save_json(os.path.join(auto.auto_dir(), "settings.json"), dict(
+            auto.settings(), started=started.strftime("%Y-%m-%d %H:%M"),
+            at=(now - datetime.timedelta(minutes=1)).strftime("%H:%M")))
+        self.tasks.clear()
+        made, printed = self.run_quietly(auto.extend, 4)
+        self.assertTrue(made)
+        self.assertEqual(len(self.tasks), 2)
+        trigger = at(self.task("daily"), "Triggers/CalendarTrigger")
+        self.assertEqual(at(trigger, "Enabled").text, "false")
+        self.assertLess(at(trigger, "StartBoundary").text, at(trigger, "EndBoundary").text)
+        self.assertEqual(at(trigger, "EndBoundary").text,
+                         (started + datetime.timedelta(days=4)).strftime("%Y-%m-%dT%H:%M:00"))
+        self.assertEqual(at(at(self.task("live-6"), "Triggers/TimeTrigger"), "Enabled").text,
+                         "true")
+        self.assertIn("每天的运行：停之前没有了", printed)
+        self.assertEqual(auto.settings()["days"], 4)  # saved, as every task was made
 
     def test_status_shows_the_tasks_the_runs_the_rooms_and_the_end_of_the_log(self):
         self.run_quietly(auto.start)
@@ -685,6 +706,37 @@ class AutoTest(Folder):
         self.assertEqual(at(self.task("daily"), "Actions/Exec/Command").text, f'"{spaced}"')
         self.assertEqual(at(self.task("daily"), "Actions/Exec/WorkingDirectory").text,
                          auto.code_folder())  # never quoted
+
+
+@unittest.skipUnless(sys.platform == "win32", "Task Scheduler is on Windows")
+class TaskSchedulerTest(unittest.TestCase):
+    """The tasks' XML is what the real Task Scheduler takes: each is made with schtasks.exe
+    under a name of its own, then deleted (nothing runs: their first times are later)."""
+
+    def make(self, found, now, first_daily):
+        with tempfile.TemporaryDirectory() as folder:
+            for name, file, description, trigger, action, limit, instances in auto._tasks(
+                    found, now, first_daily):
+                path = os.path.join(folder, f"{file}.xml")
+                with open(path, "w", encoding="utf-16") as f:
+                    f.write(auto._xml(description, trigger, action, folder, limit, instances))
+                name = f"MemeLearnerBot test {os.getpid()} {file}"
+                code, said = auto._schtasks("/Create", "/TN", name, "/XML", path, "/F")
+                if code and "denied" in said.lower():
+                    self.skipTest(f"this account can't make tasks: {said.strip()}")
+                self.addCleanup(auto._schtasks, "/Delete", "/TN", name, "/F")
+                self.assertEqual(code, 0, f"{file}: {said}")
+
+    def test_the_tasks_are_taken_with_daily_runs_left_and_on_the_last_day(self):
+        now = datetime.datetime.now().replace(second=0, microsecond=0)
+        clock = lambda when: when.strftime("%Y-%m-%d %H:%M")
+        found = {"games": ["lol", "valorant"], "every": 10, "hours": 6, "rooms": ["6:lol"],
+                 "at": "12:00", "until": clock(now + datetime.timedelta(days=3))}
+        self.make(found, now, now.date() + datetime.timedelta(days=1))
+        # The last day, after the daily time: the daily task's trigger is off
+        found.update(at=(now - datetime.timedelta(minutes=1)).strftime("%H:%M"),
+                     until=clock(now + datetime.timedelta(hours=2)))
+        self.make(found, now, now.date() + datetime.timedelta(days=1))
 
 
 if __name__ == "__main__":

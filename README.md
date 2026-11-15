@@ -584,8 +584,8 @@ and you look at what it found at the end. Double-click, in the bot's folder:
 
 To have it run longer, `py -m memelearner auto extend --days 4` makes the tasks again so that
 they stop 4 days after the start instead (no extra run starts: the next daily run is at the
-usual time, never a second one on the day it started; `--every 10` changes how often the
-live rooms are looked at).
+usual time, never a second one on the day it started, and none when the end comes first;
+`--every 10` changes how often the live rooms are looked at).
 
 `auto start` makes these tasks for you, which run while you're logged on (the screen may be
 locked), in the background without a window:

@@ -592,18 +592,25 @@ def task_names(rooms):
 def _tasks(found, now, first_daily):
     """The scheduled tasks for some settings (settings()'s, ending at found["until"]), made
     now: [(name, file, description, trigger, action, hours, instances)], the daily run's
-    first time on the day first_daily, the live rooms' first look a few minutes from now."""
+    first time on the day first_daily, the live rooms' first look a few minutes from now.
+    When that first daily time isn't before the end (extend on the last day), the daily
+    task's trigger is switched off (Task Scheduler refuses a trigger that starts after it
+    ends), so it never runs by itself but is still there to start by hand (/Run)."""
     until = datetime.datetime.strptime(found["until"], "%Y-%m-%d %H:%M")
     end = until.strftime("%Y-%m-%dT%H:%M:%S")
     days = max(1, math.ceil((until - now).total_seconds() / 86400))  # the live looks' repeating
     games, every, rooms = found["games"], found["every"], found["rooms"]
     daily, *recording = task_names(rooms)
+    first = _at(first_daily, found["at"])
+    left = first < end  # a daily run before the end (the times are written alike)
+    if not left:
+        first = (until - datetime.timedelta(days=1)).strftime("%Y-%m-%dT%H:%M:%S")
     tasks = [(daily, "daily", f"MemeLearnerBot: reads the newest {', '.join(games)} videos' "
               f"danmu once a day, judges the memes and looks them up, until {end}.",
               f"""    <CalendarTrigger>
-      <StartBoundary>{_at(first_daily, found["at"])}</StartBoundary>
+      <StartBoundary>{first}</StartBoundary>
       <EndBoundary>{end}</EndBoundary>
-      <Enabled>true</Enabled>
+      <Enabled>{"true" if left else "false"}</Enabled>
       <ScheduleByDay>
         <DaysInterval>1</DaysInterval>
       </ScheduleByDay>
@@ -692,7 +699,8 @@ def extend(days, every=None):
     again with the new end (and every minutes between two looks at the live rooms, when
     given), from this code (so a live task that came before Parallel gets it). No daily run
     starts now: the next one is at AT, today when that is still to come, but not on the day
-    it started (start ran that day's run then). Returns True when all the tasks were made.
+    it started (start ran that day's run then), and none when that is after the end (the
+    daily task's trigger is then off, _tasks()). Returns True when all the tasks were made.
     ValueError when it never started, or would end by now."""
     found = settings()
     if not found["started"]:
@@ -715,7 +723,10 @@ def extend(days, every=None):
         return False
     surf._save_json(_file("settings.json"), found)
     print(f"延长了：从 {found['started']} 跑到 {until.strftime('%m-%d %H:%M')}，然后自己停。")
-    print(f"- 下一次每天的运行：{first.strftime('%m-%d')} {found['at']}。")
+    if _at(first, found["at"]) < until.strftime("%Y-%m-%dT%H:%M:%S"):
+        print(f"- 下一次每天的运行：{first.strftime('%m-%d')} {found['at']}。")
+    else:
+        print("- 每天的运行：停之前没有了（只录直播）。")
     if found["rooms"]:
         print(f"- 每 {found['every']} 分钟看一次直播间 {'、'.join(found['rooms'])}；录满 "
               f"{found['hours']} 小时的一段在找梗、judge、查解释时，下一段马上接着录。")
