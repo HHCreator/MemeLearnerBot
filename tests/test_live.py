@@ -245,6 +245,7 @@ class RecordTest(unittest.TestCase):
             info = json.load(f)
         self.assertEqual((info["danmu"], info["senders"], info["auto"], info["combos"],
                           info["joins"]), (2, 2, 1, 1, 2))
+        self.assertGreaterEqual(info["ended"], info["started"])  # it says it stopped
         self.assertEqual(info["room"]["room_id"], 7734200)
         self.assertEqual(len(info["samples"]["DANMU_MSG"]), 3)
         self.assertNotIn(CRC, json.dumps(info["samples"]))  # samples don't say who sent them

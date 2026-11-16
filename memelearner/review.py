@@ -485,8 +485,9 @@ def page(rows, picked, token, line=""):
 class Report:
     """The page, served on this computer until 完成 is clicked: report.url is its link."""
 
-    def __init__(self, rows, model=None, port=0, line=""):
-        self.rows, self.model, self.line = rows, model, line
+    def __init__(self, rows, model=None, port=0, line="", again="py -m memelearner report"):
+        """again: what to run to open the report again later (it says so when it starts)."""
+        self.rows, self.model, self.line, self.again = rows, model, line, again
         self.token, self.result, self.lock = secrets.token_urlsafe(16), None, threading.Lock()
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", port), self._handler())
         self.server.daemon_threads = True
@@ -501,7 +502,7 @@ class Report:
         print(("The report is open in your browser: " if opened else
                "Open the report in your browser: ") + self.url)
         print("Every choice is saved as you make it. Click 完成 at the bottom when you're "
-              "done; or close this window and run py -m memelearner report to go on later.")
+              f"done; or close this window and run {self.again} to go on later.")
         try:
             self.server.serve_forever(poll_interval=0.2)
         except KeyboardInterrupt:

@@ -19,6 +19,7 @@
     py -m memelearner live-report              live-phrases, judge and explain, then the report
     py -m memelearner sources 阿一古 --explain   which search engines and wikis explain some memes
     py -m memelearner auto start               run by itself for days (Windows Task Scheduler)
+    py -m memelearner auto extend --days 4     ... for 4 days from its start instead
     py -m memelearner auto status | stop | report   how it's going, stop it, what it found
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
@@ -437,13 +438,19 @@ def _sources_text(report):
 
 
 def _auto(args):
-    """auto start, stop, status, report, daily or live (auto.py)."""
+    """auto start, extend, stop, status, report, daily or live (auto.py)."""
     logging = not os.environ.get("MEMELEARNER_LOG")  # else main() logs there already
     log = lambda: _log_to(auto.log_file(), ["auto", args.action]) if logging else None
     try:
         if args.action == "start":
-            if not auto.start(args.at, args.days, args.every, args.rooms or list(auto.ROOMS),
+            if not auto.start(args.at, auto.DAYS if args.days is None else args.days,
+                              args.every or auto.EVERY, args.rooms or list(auto.ROOMS),
                               args.games or list(auto.GAMES), args.hours, bool(args.pull)):
+                sys.exit(1)
+        elif args.action == "extend":
+            if args.days is None:
+                sys.exit("auto extend wants --days N: how many days from when it started")
+            if not auto.extend(args.days, args.every):
                 sys.exit(1)
         elif args.action == "stop":
             auto.stop()
@@ -667,15 +674,17 @@ def parser():
     look.set_defaults(run=_sources)
 
     by_itself = sub.add_parser(
-        "auto", help="run by itself for days with Windows Task Scheduler: start, stop, status, "
-        "report (what the runs found), or one daily or live run (what the tasks run)")
-    by_itself.add_argument("action", choices=("start", "stop", "status", "report", "daily",
-                                              "live"))
+        "auto", help="run by itself for days with Windows Task Scheduler: start, extend (a "
+        "later end), stop, status, report (what the runs found), or one daily or live run "
+        "(what the tasks run)")
+    by_itself.add_argument("action", choices=("start", "extend", "stop", "status", "report",
+                                              "daily", "live"))
     by_itself.add_argument("--at", default=auto.AT, metavar="HH:MM",
                            help="start: when the daily run starts (default %(default)s; the "
                            "first one starts at once)")
-    by_itself.add_argument("--days", type=int, default=auto.DAYS, metavar="N",
-                           help="start: days to run, then the tasks stop (default %(default)s)")
+    by_itself.add_argument("--days", type=int, metavar="N",
+                           help=f"start: days to run, then the tasks stop (default {auto.DAYS}); "
+                           "extend: days from when it started")
     by_itself.add_argument("--games", nargs="+", metavar="GAME",
                            help="start: whose videos the daily run reads (default: "
                            f"{' '.join(auto.GAMES)})")
@@ -684,9 +693,9 @@ def parser():
                            "room's number or link, :valorant after it for a Valorant room "
                            f"(default: {' '.join(auto.ROOMS)}); live: the rooms to look at "
                            "(default: start's)")
-    by_itself.add_argument("--every", type=int, default=auto.EVERY, metavar="MINUTES",
-                           help="start: minutes between two looks at the live rooms (default "
-                           "%(default)s)")
+    by_itself.add_argument("--every", type=int, metavar="MINUTES",
+                           help="start, extend: minutes between two looks at the live rooms "
+                           f"(default {auto.EVERY}; extend: as it was)")
     by_itself.add_argument("--hours", type=int, default=auto.LIVE_HOURS, metavar="N",
                            help="start: a recording stops after this many hours, if the room is "
                            "still live (default %(default)s)")
