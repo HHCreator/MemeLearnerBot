@@ -1,5 +1,8 @@
-# 10 memes the bot learned, for try-lookup.bat (MemeLearnerBot PR #9, step 2): which
-# search engines and wikis explain them. py -m memelearner sources --file tests/lookup-test.txt
+# Memes the bot learned, for the lookup tests: which search engines and wikis explain them,
+# and what explain finds. py -m memelearner sources --file tests/lookup-test.txt --explain
+#
+# The first 10 are try-lookup.bat's (MemeLearnerBot PR #9, step 2). On 2026-11-11 the web
+# explained 汽车人 with the manga 刃牙, not LoL.
 阿一古
 正义必胜
 超威同意了
@@ -10,3 +13,15 @@
 我的麦很炸吗
 未识别到人脸
 马桶赛区
+# PR #10, step 3b (bilibili-lookup-test.bat): explain now reads only Bilibili and skips
+# what isn't about games. These come from a film or a song: is their explanation skipped?
+时间差不多咯
+唯有责任
+滚回山中去
+# ... and these the auto run explained from other sites on 2026-11-15 (百度百科, 百度知道,
+# a novel's page, a shopping site): what does Bilibili say?
+护国神牛
+41上
+虎三件
+丹神
+我培养了一个神
