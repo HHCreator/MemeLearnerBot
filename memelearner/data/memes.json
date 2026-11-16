@@ -2,6 +2,42 @@
  "_comment": "Memes learned by MemeLearnerBot (https://github.com/HHCreator/MemeLearnerBot). Change them with py -m memelearner accept, reject or forget; the format is in memelearner/store.py and the README.",
  "version": 2,
  "memes": {
+  "41上": {
+   "meaning": "「世一上」（世界第一上单）的谐音，弹幕里用来称呼或戏称顶尖上单选手（如BIN、TheShy）。",
+   "english": "Homophone of \"world's best top laner,\" used in bullet comments to praise or mock a top laner.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "果然太阳升起BIN就是41上",
+    "开玩笑，41上你就学吧",
+    "让41上玩坦克 41上不开心就提麦摆烂了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV17XxP6CE7n"
+   ]
+  },
+  "41翻": {
+   "meaning": "41谐音世一，也就是世界第一。 可以有各种变体，41上，就是世界第一上单，41中，就是世界第一中单",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "41中，41上，41教，41翻，41评",
+    "41翻牛41翻牛壁",
+    "41翻硬控blg全队"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "notes": [
+    "41谐音世一，也就是世界第一。 可以有各种变体，41上，就是世界第一上单，41中，就是世界第一中单"
+   ]
+  },
   "bin神": {
    "meaning": "对英雄联盟选手 Bin 的称呼，带夸张吹捧或调侃意味，用来夸他表现神勇。",
    "english": "A nickname for LoL player Bin, used to hype or praise his godlike play.",
@@ -51,6 +87,20 @@
    ],
    "notes": [
     "chovy选手的一个称呼的一个变体"
+   ]
+  },
+  "dnys": {
+   "meaning": "「懂你意思」的拼音首字母缩写，在弹幕里表示「我明白你的意思」，传达心领神会的默契。",
+   "english": "Initialism for \"dong ni yi si\" (\"I get what you mean\"), used in chat to show understanding.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "dnys"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV199h969EbR"
    ]
   },
   "ggg": {
@@ -165,6 +215,42 @@
     "”X博士“的变体梗，有选手打的很差的时候战绩1/十几就会调侃他在研发，就叫他”X博士“， 也可以是正面调侃某个选手经常选出不常规的选角或者战术，也就是”科研“ 这里O博士指代oner，他在第三把的战绩是1/6，调侃他打得差"
    ]
   },
+  "s8shy": {
+   "meaning": "这里可能指的是s8谐音死爸，一种对theshy选手的咒骂",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "三个人指的是肉鸡，妹扣和s8shy",
+    "这下s8shy完咯",
+    "不相关，大大方方S8SHY"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1mRW46XEdS",
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1WMWz6CEko"
+   ],
+   "notes": [
+    "这里可能指的是s8谐音死爸，一种对theshy选手的咒骂"
+   ]
+  },
+  "wdf": {
+   "meaning": "英文脏话 What the fuck 的缩写/谐音，用来表达震惊、无语或吐槽，中文常空耳成「王德发」。",
+   "english": "Abbreviation of \"what the fuck\", used to express shock or exasperation.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "wdf，帅爆了",
+    "wdf"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ]
+  },
   "wei出": {
    "meaning": "这是“X出”梗，其中“出”读作 chu，与“畜生”的“畜”同音，用来咒骂某选手玩得像个畜生，即表现不佳或人品很差；用在 Wei 身上就是骂 Wei 打得差或人品差。",
    "english": "A pun on 'chu' (sounding like 'livestock/beast'), used to curse a player as playing like an animal—i.e., performing terribly or having a bad character; here applied to the player Wei.",
@@ -193,6 +279,23 @@
     "jia出"
    ]
   },
+  "一个人的劣势": {
+   "meaning": "指比赛中某位选手（如多兰）独自拖累全队、成为队伍唯一劣势点的调侃说法。",
+   "english": "One player's disadvantage — blaming a single player for the whole team's losing position.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "又是多兰一个人的劣势",
+    "蓝子一个人的劣势",
+    "多兰一个人的劣势"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1Dd4L6PE21",
+    "https://live.bilibili.com/6"
+   ]
+  },
   "三姆斯": {
    "meaning": "“三姆斯”是打野选手Canyon的外号，来源于篮球选手詹姆斯经常找强力选手抱团，Canyon转会GenG就像詹姆斯一样抱团。它也是Canyon的黑称，“X姆斯”同音“X母死”，咒骂其母亲死掉。",
    "english": "A nickname for the jungler Canyon, from LeBron James often teaming up with strong players, as Canyon did by transferring to GenG.",
@@ -210,6 +313,23 @@
    ],
    "notes": [
     "“三姆斯”仍然是 canyon选手的其中一个外号， 来源于篮球选手詹姆斯经常找强力选手抱团，canyon转会geng就像詹姆斯一样抱团。 同时也是canyon的其中一个黑称，”X姆斯“同音”X母死“，咒骂其母亲死掉"
+   ]
+  },
+  "上海图书馆": {
+   "meaning": "指比赛现场观众安静得鸦雀无声，像图书馆一样；用来嘲讽主场观众被客队打赢后沉默不语。",
+   "english": "A mocking term for a silent home crowd, comparing the venue to a library after the home team loses.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "马上就要上海图书馆了",
+    "上海图书馆 玩不起",
+    "经典上海图书馆了"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1CvaN6iE9t",
+    "https://www.bilibili.com/video/BV199h969EbR"
    ]
   },
   "下雨了": {
@@ -283,6 +403,22 @@
    ],
    "notes": [
     "跟外赛区对战时表现好的中国选手会被冠以这个称呼。这里指代的是xun选手"
+   ]
+  },
+  "丹神": {
+   "meaning": "LOL圈对IG战队教练丹尼（Daeny）的调侃称呼，常用来调侃或称赞他的BP和执教，比如「丹神科研的神」「丹神该发力了」。",
+   "english": "A joking nickname for IG's coach Daeny, used to tease or praise his drafting and coaching.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "丹神，选手实力上来了bp随便拉爆对面",
+    "丹神nb",
+    "丹神就是丹神啊"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
    ]
   },
   "二战转折点": {
@@ -499,6 +635,45 @@
     "”X补“的变体，拼多多广告百亿补贴宣传语买什么都有国家补贴帮你，也就是”国补“，所以”X补“表示某某某帮你，比如让你赢或者让你杀。兰补就是多兰帮对方赢"
    ]
   },
+  "关闭得分通道": {
+   "meaning": "调侃某一方即将或已经拿不到分、得分势头被掐断的说法，常在比赛开局或上半场就刷，用来唱衰或打趣某队。",
+   "english": "A joking way of saying a team is about to stop scoring or has had its scoring run cut off.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "fpx即将关闭得分通道",
+    "暂时关闭得分通道",
+    "还没开打就关闭得分通道是什么意思（狗头）"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV17vxq6NEBi",
+    "https://www.bilibili.com/video/BV1BAng6CEwf",
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ],
+   "source": {
+    "phrase": "得分通道关闭",
+    "how": "guess"
+   }
+  },
+  "初见端倪": {
+   "meaning": "观众化用成语，形容某首背景音乐（小曲）开始显露名堂、自己逐渐了解它，常和「渐入佳境」等一起刷；在弹幕里也用来调侃某事物刚露出苗头。",
+   "english": "A playful use of the idiom \"first signs appear,\" used in danmaku to comment on a background track (or something else) st",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "幽影这什么意思，初见端倪",
+    "纪律初见端倪",
+    "初见端倪"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1CvaN6iE9t",
+    "https://www.bilibili.com/video/BV17Vxi6hEjZ"
+   ]
+  },
   "别吃": {
    "meaning": "TheShy直播时压着对线对手、不让对面吃兵的时候会说“别吃”，所以上单这样压制对手时弹幕就刷这句。",
    "english": "",
@@ -549,6 +724,27 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "前方高能": {
+   "meaning": "提醒接下来要出现精彩、刺激或出人意料的画面，让大家注意看。",
+   "english": "Warning: something exciting or intense is coming up.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "前方高能预警",
+    "前方高能分身bin",
+    "前方高能 出音味来"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1Eas967EY9",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://www.bilibili.com/video/BV1QAW36VEWg"
+   ],
+   "variants": [
+    "前方高能预警"
+   ]
+  },
   "区区区": {
    "meaning": "跟蛆的读音一样，蛆对应龙。 游龙形容选手操作很秀，很carry，像龙在天上游，蛆在地上爬就是这句话的反面，形容一个选手打的很垃圾。",
    "english": "",
@@ -558,11 +754,18 @@
    "added": "2026-11-08",
    "examples": [
     "圈钱赛区，宝宝赛区，区区区区",
-    "区区区区区区区区区"
+    "区区区区区区区区区",
+    "区区区区区",
+    "乐乐区区凑一桌",
+    "我们是区区"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV1ie8t6UEzH",
-    "https://www.bilibili.com/video/BV199h969EbR"
+    "https://www.bilibili.com/video/BV199h969EbR",
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ],
+   "variants": [
+    "区区"
    ]
   },
   "千言万语": {
@@ -584,6 +787,24 @@
    "variants": [
     "千言万语感谢ig"
    ]
+  },
+  "千言万语感谢国补": {
+   "meaning": "套用「千言万语感谢现役」的句式，把感谢对象换成「国补」（国家补贴），用来反讽地调侃 CN 赛区队伍表现差、像被喂了毒一样，表面感谢实则嘲讽。",
+   "english": "A sarcastic twist on \"a thousand words, thanks to the active players,\" replacing the object with \"national subsidy\" to m",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "千言万语 感谢国补"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1ie8t6UEzH"
+   ],
+   "source": {
+    "phrase": "千言万语感谢现役",
+    "how": "learned"
+   }
   },
   "千言万语感谢多兰": {
    "meaning": "套用「千言万语感谢现役」的句式，把感谢对象换成选手多兰，用来调侃式地感谢他（多兰好兄弟），带反讽意味。",
@@ -618,6 +839,60 @@
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
    ]
   },
+  "千言万语感谢退役": {
+   "meaning": "套用「千言万语感谢现役」的句式，把感谢对象换成「退役」，反讽地调侃某位选手退役（或该退役），表面感谢实则玩梗。",
+   "english": "A sarcastic twist on \"a thousand words, thanks to the active players,\" mock-thanking someone for retiring.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "千言万语，感谢退役"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1ie8t6UEzH"
+   ],
+   "source": {
+    "phrase": "千言万语感谢现役",
+    "how": "learned"
+   }
+  },
+  "千言万语菜就退役": {
+   "meaning": "套用「千言万语感谢现役」的句式，把后半句换成「菜就退役」，用来嘲讽打得差的选手，意思是「说再多也没用，打得菜就退役吧」。",
+   "english": "A sarcastic twist on \"a thousand words, thanks to the active players,\" meaning \"if you're bad, just retire.\"",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "千言万语，菜就退役"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1ie8t6UEzH"
+   ],
+   "source": {
+    "phrase": "千言万语感谢现役",
+    "how": "learned"
+   }
+  },
+  "千言万语赶紧退役": {
+   "meaning": "套用「千言万语感谢现役」的句式，把感谢换成催选手退役，用来调侃或反讽选手打得差、该退役了。",
+   "english": "A sarcastic twist on \"a thousand words, thanks to the active players,\" urging a player to retire.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "千言万语 赶紧退役"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1ie8t6UEzH"
+   ],
+   "source": {
+    "phrase": "千言万语感谢现役",
+    "how": "learned"
+   }
+  },
   "卑鄙": {
    "meaning": "和“卑鄙的外乡人”意思一样，只是简称。有时不仅是游戏里使用，这个词可以作为“好贱”的平替词使用",
    "english": "",
@@ -633,6 +908,26 @@
    "sources": [
     "https://live.bilibili.com/6"
    ]
+  },
+  "反击开始": {
+   "meaning": "在比赛或视频中表示反攻、翻盘或精彩对抗的环节即将开始，常用来烘托气氛。",
+   "english": "The counterattack begins.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "哈哈哈哈哈哈，反击开始",
+    "反击开始！"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ",
+    "https://www.bilibili.com/video/BV17Vxi6hEjZ"
+   ],
+   "source": {
+    "phrase": "正片开始",
+    "how": "guess"
+   }
   },
   "发狂了": {
    "meaning": "指选手或队伍打法上头、冲动、失去理智地乱打。",
@@ -675,6 +970,42 @@
    "sources": [
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ]
+  },
+  "可爱捏": {
+   "meaning": "夸人或事物可爱，句尾加“捏”让语气显得软萌、亲近，也可用来调侃或缓和语气。",
+   "english": "A cute, soft way of saying \"so cute\" (with the sentence-final particle \"nie\").",
+   "games": [
+    "valorant",
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "ddy可爱捏",
+    "馍馍可爱捏",
+    "noc嘟着嘴可爱捏",
+    "塔子姐可爱捏",
+    "波比可爱捏",
+    "布噜噜可爱捏"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1jLJ96hEXu",
+    "https://www.bilibili.com/video/BV1CvaN6iE9t",
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ"
+   ],
+   "variants": [
+    "三叔可爱捏",
+    "瞳夕可爱捏",
+    "布噜噜可爱捏",
+    "秀妹可爱捏",
+    "许哥可爱捏",
+    "9妹可爱捏",
+    "敷敷可爱捏",
+    "兰子可爱捏",
+    "提莫可爱捏",
+    "9哥可爱捏",
+    "69可爱捏"
    ]
   },
   "合影": {
@@ -754,6 +1085,104 @@
     "这个也可以指代一种让队友帮自己但是自己不帮队友的行为。"
    ]
   },
+  "咻咻咻": {
+   "meaning": "指英雄妮蔻（Neeko）的表情动作会发出“咻咻咻”的声音，一般在选出妮蔻时刷这个梗。",
+   "english": "Refers to the 'whoosh whoosh' sound of Neeko's emote, usually spammed when Neeko is picked.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "咻咻咻"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV179H36HEgG"
+   ],
+   "notes": [
+    "neeko的表情动作会有“咻咻咻”的声音发出，一般跟选出neeko的时候刷"
+   ]
+  },
+  "哎一古": {
+   "meaning": "韩语感叹词「아이고」的音译，相当于「哎呀」「哎哟」，用来表达惊讶、感叹、无奈或吐槽。",
+   "english": "Korean interjection \"aigo\", like \"oh my\" or \"sigh\", used to express surprise, exasperation, or resignation.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "说家乡话诶，哎一古",
+    "请到哎一古了",
+    "哎一古马头把线带出来了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1ua4W6XEJd"
+   ],
+   "source": {
+    "phrase": "阿一古",
+    "how": "guess"
+   }
+  },
+  "哪条": {
+   "meaning": "用来嘲讽或质疑对方身份/资格的说法，相当于「你算哪根葱」「你是哪条路边（的野狗）」，常带「路边」一起用。",
+   "english": "A mocking way to question who someone is or whether they're worth mentioning, like \"who even are you?\"",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "这是哪条",
+    "还以为是左手 这是哪条路边蹭的",
+    "你是哪条啊？"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1rkWy6REBP"
+   ]
+  },
+  "哪边是好人": {
+   "meaning": "看比赛或对局时刚进来分不清双方阵营，问哪边是自己该支持的一方，把支持的队伍当好人、对手当坏人。",
+   "english": "Which side are the good guys? — asked when joining a match late and not knowing which team to root for.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "刚来 哪边是好人？",
+    "哪边是好人这两个队伍",
+    "第一次来哪边是好人"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV19wnQ6sExk",
+    "https://live.bilibili.com/6"
+   ],
+   "variants": [
+    "刚来哪边是好人",
+    "哪边是好的",
+    "刚来哪边是好的",
+    "刚来哪边好人"
+   ]
+  },
+  "唯有责任": {
+   "meaning": "出自电影《流浪地球2》的台词「危难面前，唯有责任」，在弹幕里用来表达在危难关头要有人站出来承担责任，常用来夸选手或调侃某人扛起责任。",
+   "english": "In times of crisis, only responsibility (a line from The Wandering Earth 2), used to praise someone for stepping up and ",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "危难关头，唯有责任",
+    "危难当前，唯有责任",
+    "唯有责任阿卡丽给我这个blc打出24年走马灯了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1YxWx69Ens"
+   ],
+   "source": {
+    "phrase": "危难面前，唯有责任",
+    "how": "page"
+   }
+  },
   "啃老": {
    "meaning": "指战队过度依赖老将或核心选手carry，像子女靠父母养活一样。",
    "english": "relying heavily on veteran players to carry the team",
@@ -785,6 +1214,50 @@
    "sources": [
     "https://www.bilibili.com/video/BV17XxP6CE7n",
     "https://www.bilibili.com/video/BV1wNHw6PEdQ"
+   ]
+  },
+  "喜欢装": {
+   "meaning": "嘲讽某人（选手或队伍）爱装、爱亮表情或爱秀操作，结果往往翻车或输掉比赛",
+   "english": "A mocking phrase for someone who likes to show off or act cocky, often followed by a loss",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "小短尺喜欢装？",
+    "喜欢装 决赛接着装",
+    "oner喜欢装，今天没人兜底就是猛猛送啊"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://www.bilibili.com/video/BV1j6W46PEMr"
+   ],
+   "variants": [
+    "喜欢玩妖姬",
+    "喜欢选妖姬",
+    "喜欢玩vn",
+    "喜欢合影",
+    "喜欢玩上单vn",
+    "喜欢放龙",
+    "喜欢亮剑",
+    "喜欢回头",
+    "喜欢放发条",
+    "喜欢e脸",
+    "喜欢ez",
+    "喜欢抓多兰",
+    "喜欢放波比",
+    "喜欢vn",
+    "喜欢装杯",
+    "喜欢量表情",
+    "喜欢拿妖姬",
+    "喜欢妖姬",
+    "喜欢装高手",
+    "喜欢发表情",
+    "喜欢省闪现",
+    "喜欢塔子姐",
+    "喜欢玩兰博",
+    "喜欢吃塔皮"
    ]
   },
   "噢噢噢哦哦哦": {
@@ -841,6 +1314,26 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "够巧": {
+   "meaning": "巧克力是viper选手的一个黑称，所以用巧来指代viper选手。一般用来骂他打的很菜，",
+   "english": "",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "够巧又上去接一个技能",
+    "法师下路，够巧",
+    "够巧，蛇女算巧克力头上了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1bhWW6kEH3"
+   ],
+   "notes": [
+    "巧克力是viper选手的一个黑称，所以用巧来指代viper选手。一般用来骂他打的很菜，"
+   ]
+  },
   "大的要来了": {
    "meaning": "用来预告即将发生大事或精彩场面，常带调侃、起哄语气",
    "english": "",
@@ -850,11 +1343,39 @@
    "added": "2026-11-08",
    "examples": [
     "大的要来力",
-    "大的要来了"
+    "大的要来了",
+    "有一就有二哈哈哈哈 等下大的来喽",
+    "最大的来了",
+    "大的来了吗"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV1vcaY6YEQQ",
-    "https://www.bilibili.com/video/BV199h969EbR"
+    "https://www.bilibili.com/video/BV199h969EbR",
+    "https://www.bilibili.com/video/BV1CvaN6iE9t",
+    "https://www.bilibili.com/video/BV1t6x76FEHd"
+   ],
+   "variants": [
+    "大的来了"
+   ]
+  },
+  "大结局了": {
+   "meaning": "指LPL赛区在世界赛上的最终结局，常带调侃或期待地刷，表示赛事到了决定性的收尾时刻。",
+   "english": "The grand finale / final outcome of the LPL's Worlds run.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "LPL完美大结局",
+    "CNLOL,大结局！",
+    "BLG啊 拿下这一冠吧 给青春一个完美大结局吧 驯龙的少年啊"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1mRW46XEdS"
+   ],
+   "variants": [
+    "lpl大结局"
    ]
   },
   "太变态了": {
@@ -884,7 +1405,10 @@
    "added": "2026-11-09",
    "examples": [
     "哈哈好e",
-    "好e"
+    "好e",
+    "塞拉斯好ban",
+    "琪亚娜好ban",
+    "让你BP时不想好BAN位，T1阵容BP总是漏洞很少"
    ],
    "sources": [
     "https://live.bilibili.com/6",
@@ -895,7 +1419,10 @@
    ],
    "variants": [
     "好r",
-    "好k"
+    "好k",
+    "好ban",
+    "好q",
+    "好t"
    ]
   },
   "好兄弟": {
@@ -908,10 +1435,92 @@
    "examples": [
     "多兰LPL好兄弟啊多兰LPL好兄弟啊",
     "但是多兰，好兄弟",
-    "多兰永远好兄弟"
+    "多兰永远好兄弟",
+    "感谢多兰好兄弟",
+    "多肉，多兰，好兄弟",
+    "真是谢谢多兰好兄弟",
+    "兰子好兄弟 就这么打",
+    "兰子好兄弟，不要炸我兄弟",
+    "兰子好兄弟，团建没他不去"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://www.bilibili.com/video/BV1rjW86jEbX",
+    "https://www.bilibili.com/video/BV1j6W46PEMr"
+   ],
+   "variants": [
+    "多兰好兄弟",
+    "多兰真是好兄弟啊",
+    "多兰真好兄弟",
+    "兰子好兄弟"
+   ]
+  },
+  "好多区": {
+   "meaning": "跟区区一样，用区来代替蛆字，说好多蛆，说这场比赛里打的差的人太多了",
+   "english": "",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "好多区好多区好多区好多区好多区好多区好多区好多区",
+    "好多区"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1ie8t6UEzH"
+   ],
+   "notes": [
+    "跟区区一样，用区来代替蛆字，说好多蛆，说这场比赛里打的差的人太多了"
+   ]
+  },
+  "好好好": {
+   "meaning": "连说三个「好」表示无奈、调侃或反讽，常用于对方用奇葩操作或套路得手时，意思是「行行行，你这么玩是吧」。",
+   "english": "an exasperated/ironic \"okay okay okay,\" often said when someone pulls a weird play",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "好好好，出息了",
+    "好好好！稳住稳住",
+    "好好好好好好好好好好好稳！"
    ],
    "sources": [
     "https://live.bilibili.com/6"
+   ]
+  },
+  "好补": {
+   "meaning": "夸赞补刀（补兵）补得好，也常被反讽用来调侃漏刀；在弹幕里多用于评价选手的补刀操作。",
+   "english": "Nice last-hitting / good farming (often used sarcastically when creeps are missed).",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "第一把没起来，正好补",
+    "下路好好补刀就行了",
+    "好补手"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "好送": {
+   "meaning": "嘲讽选手或队伍送人头、白给，意思是「送得好」「真能送」，带反讽语气。",
+   "english": "A sarcastic jab at a player or team for feeding/giving away kills.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "超威好送",
+    "超出好送我好爱",
+    "断手好送！"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1ua4W6XEJd"
    ]
   },
   "家也放了": {
@@ -1079,6 +1688,23 @@
     "杜蕾斯在lpl的广告语里面有一个”开一局“ ，跟XX开一局，指代的是想跟XX进行性行为的下流黄段子"
    ]
   },
+  "开抽": {
+   "meaning": "在游戏里开始抽打、压制或攻击对方，多指上路长手英雄对线时开抽（压制对手），也指团战里被人抽打。",
+   "english": "to start beating/oppressing someone in-game, often top lane ranged vs melee",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "开抽喽",
+    "镜头一转又开抽",
+    "双屏开抽"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ"
+   ]
+  },
   "开门": {
    "meaning": "催比赛开始、催开播或催开场的刷屏用语，常带「T1开门」「开门红」等说法。",
    "english": "Open the door — a chat spam urging the match/stream to start.",
@@ -1121,11 +1747,18 @@
    "examples": [
     "天禄得分通道关闭",
     "上来就得分通道关闭笑死我了哈哈",
-    "得分通道关闭喽"
+    "得分通道关闭喽",
+    "上半场得分通道已关闭",
+    "得分通道已关闭80%",
+    "本张图得分通道已关闭"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV1CvaN6iE9t",
-    "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ",
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ],
+   "variants": [
+    "得分通道已关闭"
    ]
   },
   "怎么翻的": {
@@ -1273,6 +1906,20 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "我们会创造新的历史": {
+   "meaning": "反讽TES战队在国际赛事中表现低迷、频繁爆冷输掉比赛、以尴尬方式刷新纪录，网友用这句话讽刺他们「创造新的历史」。",
+   "english": "An ironic jab at TES for setting new (bad) records in international events.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "我们会创造新的历史"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ]
+  },
   "我们是冠军": {
    "meaning": "在比赛视频里刷的口号，用来庆祝或调侃某队夺冠，常带「金色的雨」等夺冠意象。有时是反讽：被打崩的一方终于拿回一分的时候刷。",
    "english": "",
@@ -1288,6 +1935,30 @@
    "sources": [
     "https://www.bilibili.com/video/BV179H36HEgG",
     "https://www.bilibili.com/video/BV1wNHw6PEdQ"
+   ]
+  },
+  "我们是区": {
+   "meaning": "「我们是冠军」的谐音反串，自嘲或嘲讽队伍水平差、不入流（「区」谐音「蛆」或指垫底区），和「我们是路边」同类。",
+   "english": "A self-mocking/taunting chant meaning \"we're trash\", a pun on \"we are the champions\".",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "因为我们是区",
+    "我们是区区",
+    "太好了我们是区"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ",
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ],
+   "source": {
+    "phrase": "我们是冠军",
+    "how": "learned"
+   },
+   "variants": [
+    "我们是大区"
    ]
   },
   "我们是路边": {
@@ -1306,6 +1977,98 @@
     "https://www.bilibili.com/video/BV1CvaN6iE9t",
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV1ie8t6UEzH"
+   ]
+  },
+  "我们是马桶": {
+   "meaning": "对 VCT CN（中国赛区）的贬称式口号，嘲讽赛区及其队伍水平差，是「我们是冠军」的谐音反串。",
+   "english": "A self-deprecating/derisive chant calling the VCT CN region a \"toilet\" (garbage), a pun on \"we are the champions.\"",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "我们是马桶赛区",
+    "我们是马桶！！！"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1CvaN6iE9t",
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ],
+   "source": {
+    "phrase": "我们是冠军",
+    "how": "learned"
+   }
+  },
+  "我先来怎么翻的": {
+   "meaning": "看比赛时感叹某一方劣势太大、看不出还能怎么翻盘；也常被已经知道结果的人拿来事后调侃，假装刚来不知道局势。",
+   "english": "A sarcastic way of asking how the losing side could possibly come back, often used by people who already know the result",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "人家在玩“我先来 怎么翻的”梗而已，不是真的不知道啦",
+    "我先来，怎么翻得",
+    "我先来，怎么翻的这？"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://www.bilibili.com/video/BV17XxP6CE7n",
+    "https://www.bilibili.com/video/BV1ua4W6XEJd"
+   ],
+   "source": {
+    "phrase": "怎么翻的",
+    "how": "guess"
+   },
+   "variants": [
+    "我先来这怎么翻的",
+    "我先来怎么翻得"
+   ]
+  },
+  "我先翻怎么来的": {
+   "meaning": "在比赛里感叹某一方劣势太大、看不出还能怎么翻盘取胜，常被已经知道结果的人拿来事后调侃。",
+   "english": "How are they supposed to come back from this?",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "我先翻，怎么来",
+    "我先翻怎么来的"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://www.bilibili.com/video/BV179H36HEgG"
+   ],
+   "source": {
+    "phrase": "怎么翻的",
+    "how": "guess"
+   },
+   "variants": [
+    "我先翻这怎么来的"
+   ]
+  },
+  "我培养了一个神": {
+   "meaning": "调侃或嘲讽自夸带出了厉害选手/徒弟的说法，常配「大师」或选手名（如圣枪哥/Flandre）使用，表示「我培养出了一个神」式的吹嘘。",
+   "english": "A mocking way of bragging that one has raised/coached a godlike player.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "枪哥：我培养了一个神",
+    "德赛：我培养了一个神！",
+    "Flandre：我培养了一个神！"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1ua4W6XEJd",
+    "https://www.bilibili.com/video/BV1iLWx6hEzo"
+   ],
+   "variants": [
+    "大师我培养了一个神",
+    "大师培养了一个神",
+    "我培养出了一个神"
    ]
   },
   "我的麦很炸吗": {
@@ -1468,6 +2231,40 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "护国神牛": {
+   "meaning": "指在比赛中发挥出色、立下大功的牛头酋长（阿里斯塔）玩家，是对牛头精彩操作的称赞。",
+   "english": "A nickname praising an Alistar player for a match-winning performance.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "神彬天降和护国神牛",
+    "取名字能不能取好一点，护国神牛我绷不住了[笑哭][捂脸]",
+    "护国神牛，神bin天降！！"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "拉完了": {
+   "meaning": "形容某人或某队表现彻底失败、糟糕透顶，带调侃或自嘲，常用于评价选手、战队或比赛表现。",
+   "english": "completely trash / totally failed",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "暴力区，现在状态拉完了",
+    "感觉拉完了",
+    "cn拉完了"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1yb446HEj8",
+    "https://www.bilibili.com/video/BV1dM4b6CEbc",
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ]
+  },
   "收汁": {
    "meaning": "指比赛进入收尾、一方即将被彻底击败或局势要定下来的阶段，常带调侃意味，像做菜最后大火收汁一样把对手“收掉”。",
    "english": "to wrap it up / finish the opponent off, like reducing a sauce at the end of cooking",
@@ -1482,6 +2279,42 @@
    ],
    "sources": [
     "https://live.bilibili.com/6"
+   ]
+  },
+  "无人在意": {
+   "meaning": "表示没人关心、没人在乎，常用来泼冷水或自嘲，说某人某事根本不重要。",
+   "english": "Nobody cares.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "哈哈，无人在意",
+    "无人在意的路边",
+    "？路边，无人在意"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1rkWy6REBP",
+    "https://www.bilibili.com/video/BV1dM4b6CEbc"
+   ]
+  },
+  "时间差不多咯": {
+   "meaning": "出自电影《周处除三害》，是片中反派林禄和（尊者）的台词，常被用来暗示某人该下场、该结束了，带调侃意味。",
+   "english": "A line from the movie The Pig, the Snake and the Pigeon, used to hint that someone's time is up or they should leave.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "真的还能留在场上吗？时间差不多咯",
+    "时间差不多咯"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ],
+   "variants": [
+    "时间差不多喽",
+    "时间差不多了"
    ]
   },
   "春风若有怜花意": {
@@ -1523,6 +2356,41 @@
     "晚安ig",
     "ig晚安"
    ]
+  },
+  "暗广": {
+   "meaning": "指直播或视频里悄悄植入的广告，观众看到疑似推广内容时刷来调侃。",
+   "english": "a covert or stealth advertisement, often joked about in chat when something looks like an undisclosed promo",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "暗广说是",
+    "刚来 什么暗广",
+    "暗广是吧"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "最变态的来了": {
+   "meaning": "用来预告接下来要出现非常离谱、夸张或出人意料的场面，带调侃、起哄语气。",
+   "english": "Here comes the most outrageous part.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "最变态的来了"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ],
+   "source": {
+    "phrase": "大的要来了",
+    "how": "guess"
+   }
   },
   "最后一舞": {
    "meaning": "指某场比赛或某个阶段是最后一次登场、最后的拼搏，常带告别或放手一搏的意味。",
@@ -1688,6 +2556,27 @@
     "https://www.bilibili.com/video/BV1t4Hu6wEXB"
    ]
   },
+  "正义惜败": {
+   "meaning": "「正义必胜」的反说：观众支持的一方（「正义」的一方）输了比赛，用来嘲讽或自嘲。",
+   "english": "The side of \"justice\" lost — an ironic reversal of \"justice will prevail.\"",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "野狗loud，正义惜败",
+    "正义惜败世界杯狂欢",
+    "正义惜败"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1jLJ96hEXu",
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ],
+   "source": {
+    "phrase": "正义必胜",
+    "how": "guess"
+   }
+  },
   "正片开始": {
    "meaning": "表示精彩或重要的部分即将开始，常用于视频中期待高潮或关键情节",
    "english": "",
@@ -1719,6 +2608,22 @@
    "sources": [
     "https://www.bilibili.com/video/BV1Eas967EY9",
     "https://live.bilibili.com/6"
+   ]
+  },
+  "气笑了": {
+   "meaning": "看到荒谬或搞笑的事忍不住笑出来，带嘲讽、吐槽的意味。",
+   "english": "laughing out of exasperation; a mocking laugh at something absurd",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "气笑了，这不就是爆点",
+    "气笑了"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ",
+    "https://www.bilibili.com/video/BV1ie8t6UEzH"
    ]
   },
   "汽车人": {
@@ -1793,6 +2698,42 @@
     "https://www.bilibili.com/video/BV19wnQ6sExk"
    ]
   },
+  "滔一下": {
+   "meaning": "指像滔搏（TES）那样去偷野怪或打大龙、小龙等资源，常用来调侃或形容这种决策，如「滔大龙」「遇事不决滔一下」。",
+   "english": "to sneak an objective (like Baron/Dragon) in the style of TES",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "滔一下大龙",
+    "滔一下伏笔",
+    "再滔一下"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ]
+  },
+  "滚回山中去": {
+   "meaning": "调侃选手康康（EDG）状态差、发挥失常时喷他的话，意思是让他“滚回山中去”。这个说法对应康康之前很喜欢的一首rap歌词“我从山中来，带着兰花草”。",
+   "english": "A teasing jab at player KangKang (EDG) when he underperforms, telling him to \"roll back into the mountains,\" riffing on a rap lyric he liked: \"I came from the mountains, bringing orchid grass.\"",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "快滚回山中去吧",
+    "又滚回山中去了",
+    "edg又滚回山中去了"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ",
+    "https://www.bilibili.com/video/BV199h969EbR"
+   ],
+   "notes": [
+    "对应康康之前很喜欢的一首rap的歌词“我从山中来，带着兰花草” 再发回差的时候喷他就会说滚回山中去"
+   ]
+  },
   "炸鱼来了": {
    "meaning": "指高水平选手（或队伍）在低水平对局中轻松碾压对手，像在鱼塘里炸鱼一样",
    "english": "",
@@ -1808,6 +2749,23 @@
    "sources": [
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
+   ]
+  },
+  "牛来": {
+   "meaning": "抽象、猎奇的刷屏梗，常和「牛来佛祖」「牛来，牛回速归」等说法一起用，具体含义说不清，多用于起哄或玩抽象。",
+   "english": "An abstract, bizarre spam meme, often paired with phrases like '牛来佛祖' or '牛来，牛回速归'.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "红牛来了",
+    "牟 牛来",
+    "辛德拉：啊，牛来"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ"
    ]
   },
   "皮肤局": {
@@ -1881,10 +2839,14 @@
    "examples": [
     "其实内心早已猜到结局 但是还是会相信ig",
     "相信 IG 进决赛的有福了。",
-    "没人相信ig能赢跟gen，但一堆人迷信chovy进不了决赛"
+    "没人相信ig能赢跟gen，但一堆人迷信chovy进不了决赛",
+    "我相信BlG",
+    "警钟长鸣稳住步步蚕食警钟长鸣稳住步步蚕食警钟长鸣不要毒奶各位相信blg",
+    "BLG三比二GENG，不怕时空警察，相信BLG！BLG加油！"
    ],
    "sources": [
-    "https://live.bilibili.com/6"
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1xcWt6SEhQ"
    ],
    "notes": [
     "相信XX，XX可以泛指任何人或者队伍。"
@@ -1893,7 +2855,17 @@
     "相信jiaqi",
     "相信佳琪",
     "相信wei",
-    "相信嘉琪"
+    "相信嘉琪",
+    "相信blg",
+    "相信多兰",
+    "相信t1",
+    "相信兰子",
+    "相信bin哥",
+    "相信faker",
+    "相信手大哥",
+    "相信篮子",
+    "相信viper",
+    "相信uzi"
    ]
   },
   "真不一样了": {
@@ -2007,6 +2979,23 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "空城计": {
+   "meaning": "在LOL弹幕里指虚张声势、空手套白狼地骗过对手或观众，常用来嘲讽高杠杆、烂尾楼式的操作。",
+   "english": "An empty-city bluff: pretending to have something you don't to fool opponents or viewers.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "空城计都来了大心脏",
+    "空城计牛逼",
+    "这波空城计，真的太自信了"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://www.bilibili.com/video/BV1MgWp6MEV2"
+   ]
+  },
   "空悲切": {
    "meaning": "在输掉比赛或表现不佳时刷的感叹，带点自嘲和无奈，意思是白忙一场、徒留遗憾",
    "english": "",
@@ -2023,6 +3012,43 @@
    "sources": [
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV17vxq6NEBi"
+   ]
+  },
+  "笑嘻了": {
+   "meaning": "看到好笑的事忍不住笑出声，弹幕里常用来表示嘲笑或看乐子。",
+   "english": "laughing out loud; can't help but laugh (often mocking or enjoying the show)",
+   "games": [
+    "lol",
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "无畏契约笑嘻了",
+    "圣枪哥笑嘻了感谢AL",
+    "笑嘻了，不就输了一把比赛吗"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1taWd6wEJe",
+    "https://www.bilibili.com/video/BV1t6x76FEHd"
+   ]
+  },
+  "纳尼": {
+   "meaning": "表示惊讶、疑问或诧异，相当于「什么？」「怎么会？」",
+   "english": "What?! (expression of surprise or confusion)",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "纳尼？情报是假的？",
+    "up是韩国人?纳尼?",
+    "n纳尼是冰粉"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1cSWN6mEYK",
+    "https://www.bilibili.com/video/BV1rjW86jEbX",
+    "https://live.bilibili.com/6"
    ]
   },
   "绝境李相赫": {
@@ -2074,6 +3100,23 @@
    ],
    "sources": [
     "https://www.bilibili.com/video/BV17XxP6CE7n"
+   ]
+  },
+  "老叟戏顽童": {
+   "meaning": "形容一方（老手/强队）像老人逗小孩一样轻松戏耍、碾压对手，比赛毫无悬念。",
+   "english": "An old man toying with a child — a one-sided, effortless beatdown.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "这不老叟戏顽童吗",
+    "还真是老叟戏顽童",
+    "让一分就是老叟戏顽童"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://live.bilibili.com/6"
    ]
   },
   "老霸道了": {
@@ -2216,6 +3259,27 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "虎三件": {
+   "meaning": "指英雄联盟选手小虎（以及被调侃成「超威虎三件」的 Chovy）比赛中常出的三件偏防御保命装备，如中亚沙漏、女妖面纱、水银鞋（也有说大天使），调侃打法保守、不敢输出；现在也泛指法师出保命、有坦度的装备。",
+   "english": "A meme mocking a mid laner for building three defensive/survival items (Zhonya's, Banshee's, Mercury's Treads) instead o",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "以前虎三件是 金身 水银鞋，女妖（也有说大天使）反正就是保命装的意思，现在的虎三件就是暗指法师有保命有坦度的装备",
+    "迅捷步伐+虎三件",
+    "虎三件要来了"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1t4Hu6wEXB",
+    "https://live.bilibili.com/6"
+   ],
+   "variants": [
+    "虎三件是对的",
+    "超威虎三件"
+   ]
+  },
   "蝴蝶飞不过沧海": {
    "meaning": "指队伍或选手在优势局面下被翻盘、功亏一篑，像蝴蝶终究飞不过沧海一样遗憾落败；常用来调侃或感叹关键比赛里差一口气。有时也会作为反讽，表示双方差距实在太大。",
    "english": "A butterfly can't cross the sea — a lament for falling just short or throwing away a lead, sometimes used ironically when the gap is simply too big.",
@@ -2242,6 +3306,54 @@
     "蝴蝶终究飞不过沧海"
    ]
   },
+  "表情对了": {
+   "meaning": "调侃选手神情符合预期，多用于选手表情严肃、凝重或情况不妙时，反讽地说「表情对了」。",
+   "english": "A sarcastic remark that a player's facial expression is \"right\" — usually when they look grim or things are going badly.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "kiin表情对了",
+    "表情对了，打出阴影就好了",
+    "大师表情对了"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "source": {
+    "phrase": "脸色对了",
+    "how": "guess"
+   },
+   "variants": [
+    "表情不对了",
+    "多兰表情对了",
+    "兰子表情不对了"
+   ]
+  },
+  "要来力": {
+   "meaning": "「大的要来了」的谐音/卖萌写法，用来预告或起哄即将发生的大事、精彩场面，带调侃语气。",
+   "english": "Something big is about to happen (cutesy variant of \"大的要来了\").",
+   "games": [
+    "lol",
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "绝境豹女要来力",
+    "要来力（喜）",
+    "这个位置…要来力…"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV17XxP6CE7n",
+    "https://www.bilibili.com/video/BV1MgWp6MEV2"
+   ],
+   "source": {
+    "phrase": "大的要来了",
+    "how": "guess"
+   }
+  },
   "警钟长鸣": {
    "meaning": "提醒自己和队友保持警惕、别松懈、稳住心态的刷屏口号，常和「稳住」「加油」连用。",
    "english": "A rallying cry to stay alert and not get complacent.",
@@ -2252,10 +3364,17 @@
    "examples": [
     "计划有变，继续警钟长鸣",
     "最后一舞，警钟长鸣",
-    "警钟长鸣！！小心蒙多，加里奥！警钟长鸣！！小心蒙多，加里奥！"
+    "警钟长鸣！！小心蒙多，加里奥！警钟长鸣！！小心蒙多，加里奥！",
+    "警钟长鸣，稳住别把奖杯摔了",
+    "警钟长鸣稳住步步蚕食警钟长鸣稳住步步蚕食警钟长鸣不要毒奶各位相信blg",
+    "blg加油稳住步步蚕食啊啊啊加油加油警钟长鸣稳住各位不要毒奶"
    ],
    "sources": [
     "https://live.bilibili.com/6"
+   ],
+   "variants": [
+    "警钟长鸣稳住",
+    "警钟长鸣稳住稳住"
    ]
   },
   "让一把": {
@@ -2334,6 +3453,73 @@
     "how": "guess"
    }
   },
+  "责任": {
+   "meaning": "调侃在队伍里承担最大责任、扛起比赛的人，常用来反讽或戏谑地指某个选手该背锅或该扛责任。",
+   "english": "A meme calling someone the one who bears the most responsibility or takes the blame for the team.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "手责任神",
+    "责任啊手大哥",
+    "责任 都有道理"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6"
+   ],
+   "source": {
+    "phrase": "能力越大责任越大",
+    "how": "video"
+   },
+   "variants": [
+    "责任bin"
+   ]
+  },
+  "走远了": {
+   "meaning": "局势要输了、没戏了；比赛中指这局或这轮要输、冠军拿不到了。",
+   "english": "It's over / things are going downhill; the game or series is lost.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "只有尺子在c，感觉geng走远了",
+    "走远了gen",
+    "想r闪，结果娜美走远了，距离不够"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ"
+   ],
+   "variants": [
+    "t1走远了",
+    "ig走远了",
+    "blg走远了"
+   ]
+  },
+  "赶紧退役": {
+   "meaning": "弹幕里用来骂选手打得差、要求其退出职业赛场的说法，常被刷成口号，也带有反讽调侃的意味。",
+   "english": "A taunt telling a player to retire because they played badly.",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "无人在意，赶紧退役",
+    "赶紧退役，一群沟槽",
+    "千言万语 赶紧退役"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1dM4b6CEbc",
+    "https://www.bilibili.com/video/BV1Nj8t6cEWy",
+    "https://www.bilibili.com/video/BV1ie8t6UEzH"
+   ],
+   "source": {
+    "phrase": "退役",
+    "how": "learned"
+   }
+  },
   "超威同意了": {
    "meaning": "在这个梗里同意是认输的意思。这个梗的全程是YY想要夺冠得问问XX同不同意，但是XX每次都同意了。后续简化为XX同意了",
    "english": "A meme mocking Chovy for allegedly choking in important matches, as if he must 'agree' to lose.",
@@ -2360,10 +3546,15 @@
     "兰子同意，超威同意，齿轮开始转动",
     "大O和兰子同意了",
     "兰子同意无数次了",
-    "超威同意一次吧"
+    "超威同意一次吧",
+    "中单多兰同意",
+    "李哥没同意，是我们好兄弟多兰同意了",
+    "这多兰同意了吧？"
    ],
    "sources": [
-    "https://live.bilibili.com/6"
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
+    "https://www.bilibili.com/video/BV1MgWp6MEV2"
    ],
    "notes": [
     "chovy就是超威，和超威同意了是同一个梗",
@@ -2403,7 +3594,56 @@
     "ruler同意了",
     "我是chovy我同意了",
     "超威要同意了",
-    "ig同意了"
+    "ig同意了",
+    "多兰同意了",
+    "多兰是人啊",
+    "飞同意了",
+    "超威再同意一次吧",
+    "t1同意了",
+    "faker不同意",
+    "多兰亮剑",
+    "篮子同意了",
+    "飞科同意了",
+    "李哥同意了",
+    "多兰mvp",
+    "超威同意了三叔不同意",
+    "多兰生气了",
+    "多兰诗人啊",
+    "多兰发力了",
+    "飞哥同意了",
+    "多兰nb",
+    "oner同意了",
+    "多兰自己人",
+    "超威我不同意",
+    "大o同意了",
+    "多兰突破口",
+    "超威求你了同意吧",
+    "多兰会同意的",
+    "尺帝不同意",
+    "这多兰是人啊",
+    "大超该同意了",
+    "大超快同意",
+    "多兰来就有",
+    "超威给我同意啊",
+    "chovy再同意一次吧"
+   ]
+  },
+  "路边一条": {
+   "meaning": "轻蔑地形容某人或某队毫无价值、不堪一击、处境卑微，像路边随便就能踢开的东西。",
+   "english": "a worthless nobody, trash on the roadside",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "路边一条碰瓷我手大",
+    "已成路边一条",
+    "lpl其实状况也和vct很像，路边一条"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1rkWy6REBP",
+    "https://www.bilibili.com/video/BV1ie8t6UEzH",
+    "https://www.bilibili.com/video/BV199h969EbR"
    ]
   },
   "辛苦了": {
@@ -2471,6 +3711,29 @@
     "https://live.bilibili.com/6"
    ]
   },
+  "还是做不到吗": {
+   "meaning": "表达遗憾、不甘或叹息：面对强敌或难关，终究还是没能做到、没能赢下来。",
+   "english": "Still couldn't do it after all — a sigh of regret or resignation.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "大超 还是做不到吗",
+    "难道chovy还是做不到吗",
+    "当时，所有人心里都是一句话，这样吗，还是做不到吗，"
+   ],
+   "sources": [
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1YxWx69Ens"
+   ],
+   "variants": [
+    "还是做不到么",
+    "果然还是做不到",
+    "唉还是做不到吗",
+    "难道还是做不到吗"
+   ]
+  },
   "这下看懂了": {
    "meaning": "看到某个操作或局面后表示恍然大悟、明白过来了，常带调侃意味。也常被一些已经知道比赛结果但是回来重新看一遍找原因的人发送。",
    "english": "",
@@ -2489,6 +3752,28 @@
     "https://www.bilibili.com/video/BV1t4Hu6wEXB",
     "https://www.bilibili.com/video/BV1wNHw6PEdQ"
    ]
+  },
+  "这怎么输的": {
+   "meaning": "在比赛里感叹某一方局面大好、看起来不可能输；也常被已经知道结果的人拿来事后调侃（明明优势很大却输了）。",
+   "english": "How could they possibly lose this? (said when a team seems certain to win, or ironically after they throw)",
+   "games": [
+    "valorant"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "这怎么输？你告诉我",
+    "这怎么输得",
+    "这怎么输得啊"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1vcaY6YEQQ",
+    "https://www.bilibili.com/video/BV199h969EbR",
+    "https://www.bilibili.com/video/BV1CvaN6iE9t"
+   ],
+   "source": {
+    "phrase": "怎么翻的",
+    "how": "guess"
+   }
   },
   "这能翻": {
    "meaning": "对比赛中出现意外翻盘（或差点翻盘）的感叹，常带反问语气，表示难以置信",
@@ -2741,9 +4026,27 @@
    "sources": [
     "https://live.bilibili.com/6"
    ]
+  },
+  "龙颜大悦": {
+   "meaning": "形容有权势的人（如老板、上级）非常高兴和满意，带有幽默戏谑意味。",
+   "english": "The dragon is greatly pleased — used humorously to say a boss or higher-up is very happy and satisfied.",
+   "games": [
+    "lol"
+   ],
+   "added": "2026-11-15",
+   "examples": [
+    "龙颜大悦"
+   ],
+   "sources": [
+    "https://www.bilibili.com/video/BV1iLWx6hEzo"
+   ]
   }
  },
  "rejected": {
+  "1比1": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "2比0了": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
@@ -2760,6 +4063,14 @@
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
+  "big加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "bin加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "bin哥加油": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
@@ -2768,6 +4079,22 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "blg加油lpl加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "blg加油加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "blg加油加油加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "blg加油稳住": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "chovy加油": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
@@ -2775,6 +4102,10 @@
   "edg加油": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "faker加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "geng加油": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2812,6 +4143,14 @@
    "reason": "not a meme (IG vs GEN live report)",
    "date": "2026-11-08"
   },
+  "lck加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "lgd加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "lg加油": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
@@ -2819,6 +4158,14 @@
   "lpl加油": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "lpl完蛋了": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "l领会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "rng加油": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2832,9 +4179,29 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "t1加油faker加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "t1加油加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "t1加油正义必胜": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "t1必胜": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
+  },
+  "tes加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "theshy加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "uzi加油": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2844,6 +4211,14 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "xxx": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "三星加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "不买": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
@@ -2852,13 +4227,53 @@
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
+  "不恭喜": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "不要狐狸": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "专业": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "中国加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "中国队加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "乌鸦": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
+  },
+  "买大会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "人逢喜事精神爽": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "你们知道吗": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "你我一起改变世界": {
+   "reason": "这句话是游戏角色塞勒芬妮的语音",
+   "date": "2026-11-15"
+  },
+  "信念如初": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "决赛加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "几比几了": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2872,17 +4287,49 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "别拿狐狸": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "别狐狸": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "别玩狐狸": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "剑姬": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "加油bin": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "加油blg": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "加油gen": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "加油geng": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "加油ig": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "加油t1": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "加油加油blg": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "加油加油ig": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2892,9 +4339,21 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "加油啊blg": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "加油啊ig": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "加油啊t1": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "加油板蓝根": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "各位早上好": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2904,9 +4363,37 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "吓人": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "哦对了": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "四面八方": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "在哪里领会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "在哪领会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "大会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "大家早上好": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "大胆": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "天禄加油": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2916,9 +4403,37 @@
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
+  "太阳升起了": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "太阳升起来了": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "太阳已经升起": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "好抬": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "好牛": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "完蛋": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "实时胜率": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "实至名归": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "害怕": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2928,37 +4443,137 @@
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
+  "尺帝加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "尽力就好": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "开大会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "强行顶吗": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "怎么领会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜al": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜blg": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜blg夺冠": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜rng": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "恭喜t1": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
+  "恭喜uzi": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜we": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜三星": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜圣枪哥": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜接广": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜板蓝根": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "恭喜雷鸟": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "扫兴": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "拿下": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
+  },
+  "提前恭喜blg": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "早上好": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "早上好兄弟们": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "早上好各位": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "早兄弟们": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "早啊兄弟们": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "早安": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
+  "早安兄弟们": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "早安各位": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "早干嘛去了": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "明年再见": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "明年见": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
+  },
+  "李哥加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "板蓝根加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "比分": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2971,6 +4586,10 @@
   "漂亮": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
+  },
+  "灭烛见真火忘剑得神兵": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "现在几比几了": {
    "reason": "not a meme (report 2026-11-09)",
@@ -2988,9 +4607,21 @@
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
   },
+  "稳住加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "稳住啊blg": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
+  },
+  "笑哭了": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "精彩": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "红包": {
    "reason": "not a meme (report 2026-11-08)",
@@ -3003,6 +4634,10 @@
   "纽约见": {
    "reason": "日常用语，道别时约好在哪里或者什么时候见",
    "date": "2026-11-08"
+  },
+  "警告一次": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   },
   "让2追3": {
    "reason": "not a meme (report 2026-11-09)",
@@ -3032,6 +4667,10 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "赛事": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "赛程": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
@@ -3044,13 +4683,57 @@
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "还真是": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "这是直播吗": {
    "reason": "not a meme (report 2026-11-09)",
    "date": "2026-11-09"
   },
+  "送会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "送大会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "锁住": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
   "队长": {
    "reason": "not a meme (report 2026-11-08)",
    "date": "2026-11-08"
+  },
+  "零会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "領會員": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "领会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "领取会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "领取大会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "领大会员": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
+  },
+  "飞科加油": {
+   "reason": "not a meme (report 2026-11-15)",
+   "date": "2026-11-15"
   }
  }
 }

@@ -17,12 +17,18 @@
     py -m memelearner live-phrases             the phrases in the last recording, and which are new
     py -m memelearner report                   the report in your browser: mark, decide, then 完成
     py -m memelearner live-report              live-phrases, judge and explain, then the report
+    py -m memelearner sources 阿一古 --explain   which search engines and wikis explain some memes
+    py -m memelearner auto start               run by itself for days (Windows Task Scheduler)
+    py -m memelearner auto extend --days 4     ... for 4 days from its start instead
+    py -m memelearner auto status | stop | report   how it's going, stop it, what it found
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
 learn --judge also judges what it found (learn --explain then also reads videos that explain
 the memes, and judges them again). candidates, watching, memes, lookup and find take
 --json to print JSON for another program (UTF-8) instead of lines for people, in the shapes
-__init__.py describes; lookup exits with 1 when the phrase isn't a learned meme.
+__init__.py describes; lookup exits with 1 when the phrase isn't a learned meme. With
+MEMELEARNER_LOG set to a file, what a command prints goes to that file too (and only there
+when there's no window, as with pythonw).
 """
 
 import argparse
@@ -31,8 +37,8 @@ import os
 import sys
 import time
 
-from . import (ModelUnavailable, accept, candidates, explainers, find, forget, judging, lookup,
-               meanings, memes, nicknames, reject, store, surf, watching)
+from . import (ModelUnavailable, accept, auto, candidates, explainers, find, forget, judging,
+               lookup, meanings, memes, nicknames, reject, store, surf, watching, web)
 
 
 def _print_json(value):
@@ -327,6 +333,143 @@ def _live_report(args):
     _report(args)
 
 
+def _sources(args):
+    """Ask every search engine and wiki about some phrases (web.check()), and with --explain
+    look them up as explain does; write what each found to a folder (sources.md for people,
+    sources.json, links.json: the Bilibili videos found for each), beside what memes.json
+    says the learned ones mean."""
+    phrases = list(args.phrases)
+    if args.file:
+        with open(args.file, encoding="utf-8-sig") as f:
+            phrases += [line.strip() for line in f if line.strip() and not line.startswith("#")]
+    phrases = [p for p in dict.fromkeys(store.normal(p) for p in phrases) if p]
+    if not phrases:
+        sys.exit("Give some phrases, or --file with one a line")
+    folder = args.out or os.path.join(surf.SURF_DIR, "sources")
+    os.makedirs(folder, exist_ok=True)
+    print(f"Asking {len(web.ENGINES)} search engines and {len(web.SITES)} wikis about "
+          f"{len(phrases)} phrases (read only, a few seconds between two requests to the same "
+          f"site) ...")
+    checked = web.check(phrases, folder=folder if args.raw else None)
+    looked = {}
+    if args.explain:
+        print()
+        try:
+            with judging.awake():
+                explainers.explain(phrases, None, None, args.model, args.videos, len(phrases),
+                                   again=True, hearing=not args.no_audio, judge=False)
+        except ModelUnavailable as error:
+            print(f"Couldn't ask the model: {error}. What was read so far is kept.")
+        entries = explainers.load()["phrases"]
+        looked = {phrase: next((e for k, e in entries.items() if k.split(":", 1)[1] == phrase), {})
+                  for phrase in phrases}
+    memes_now = store.load()["memes"]
+    links = {}
+    for phrase in phrases:
+        for answer in checked["phrases"][phrase].values():
+            for video in answer.get("videos") or []:
+                links.setdefault(phrase, []).append(
+                    f"https://www.bilibili.com/video/{video['bvid']}")
+        for video in (looked.get(phrase) or {}).get("videos") or []:
+            links.setdefault(phrase, []).append(f"https://www.bilibili.com/video/{video['bvid']}")
+        if phrase in links:
+            links[phrase] = list(dict.fromkeys(links[phrase]))
+    report = {"made": time.strftime("%Y-%m-%d %H:%M"), "phrases": phrases,
+              "places": checked["places"], "checked": checked["phrases"], "explained": looked,
+              "learned": {p: memes_now[p].get("meaning", "") for p in phrases if p in memes_now}}
+    for name, value in (("sources.json", report), ("links.json", links)):
+        with open(os.path.join(folder, name), "w", encoding="utf-8") as f:
+            json.dump(value, f, ensure_ascii=False, indent=1)
+    with open(os.path.join(folder, "sources.md"), "w", encoding="utf-8") as f:
+        f.write("\n".join(_sources_text(report)) + "\n")
+    told = [p for p in phrases if explainers.told(looked.get(p) or {})]
+    print()
+    if args.explain:
+        print(f"{len(told)} of {len(phrases)} phrases are explained by a video or a web page.")
+    print(f"What each place found is in {os.path.join(folder, 'sources.md')}")
+
+
+def _sources_text(report):
+    """sources.md: for each phrase, what memes.json says, what each place found, and what
+    the videos and web pages explain read said."""
+    lines = [f"# Where explanations come from ({report['made']})", ""]
+    for place, counted in report["places"].items():
+        lines.append(f"- {place}: answered {counted['answered']} of {counted['asked']}, found "
+                     f"something for {counted['found']}" +
+                     (f"; refused: {counted['refused']}" if counted["refused"] else ""))
+    for phrase in report["phrases"]:
+        lines += ["", f"## {phrase}", ""]
+        if phrase in report["learned"]:
+            lines.append(f"memes.json: {report['learned'][phrase]}")
+            lines.append("")
+        for place, answer in report["checked"][phrase].items():
+            if not answer.get("ok"):
+                lines.append(f"- {place}: {answer.get('error', '')}")
+            elif "entry" in answer:
+                entry = answer["entry"]
+                lines.append(f"- {place}: " + (f"[{entry['title']}]({entry['url']}) "
+                                               f"{' '.join(entry['text'].split())[:150]}"
+                                               if entry else "no entry"))
+            else:
+                lines.append(f"- {place}: {len(answer['results'])} results, "
+                             f"{len(answer['videos'])} Bilibili videos, "
+                             f"{len(answer['pages'])} other pages that name it")
+                for video in answer["videos"][:3]:
+                    lines.append(f"  - video [{video['title']}]"
+                                 f"(https://www.bilibili.com/video/{video['bvid']})")
+                for page in answer["pages"][:3]:
+                    lines.append(f"  - page [{page['title']}]({page['url']}): {page['snippet'][:80]}")
+        entry = report["explained"].get(phrase)
+        if entry is None:
+            continue
+        said = explainers._summaries(entry)
+        lines.append("")
+        lines.append("Looked up as explain does: " + ("nothing found" if not said else ""))
+        for summary in said:
+            where = (f"page {summary.get('site', '')} [{summary.get('title', '')}]"
+                     f"({summary.get('url', '')})" if summary.get("kind") == "page" else
+                     f"video [{summary.get('title', '')}]({summary.get('url', '')})")
+            lines.append(f"- {where}: " + (
+                summary["meaning"] + (f" (出自 {summary['origin']})" if summary.get("origin")
+                                      else "") +
+                (f" 「{summary['quote']}」" if summary.get("quote") else "")
+                if summary.get("about") else "doesn't explain it"))
+    return lines
+
+
+def _auto(args):
+    """auto start, extend, stop, status, report, daily or live (auto.py)."""
+    logging = not os.environ.get("MEMELEARNER_LOG")  # else main() logs there already
+    log = lambda: _log_to(auto.log_file(), ["auto", args.action]) if logging else None
+    try:
+        if args.action == "start":
+            if not auto.start(args.at, auto.DAYS if args.days is None else args.days,
+                              args.every or auto.EVERY, args.rooms or list(auto.ROOMS),
+                              args.games or list(auto.GAMES), args.hours, bool(args.pull)):
+                sys.exit(1)
+        elif args.action == "extend":
+            if args.days is None:
+                sys.exit("auto extend wants --days N: how many days from when it started")
+            if not auto.extend(args.days, args.every):
+                sys.exit(1)
+        elif args.action == "stop":
+            auto.stop()
+        elif args.action == "status":
+            auto.status(args.lines)
+        elif args.action == "report":
+            auto.report(args.model, args.port, not args.no_browser)
+        elif args.action == "daily":
+            log()
+            auto.daily(args.model, args.pull)
+        else:
+            auto.watch(args.model, log, args.rooms)
+    except ValueError as error:
+        sys.exit(str(error))
+    except OSError as error:
+        sys.exit(f"Couldn't open the report on port {args.port}: {error}"
+                 if args.action == "report" else str(error))
+
+
 def _recording_options(command):
     """The options of live-phrases, which live-report has too."""
     command.add_argument("recordings", nargs="*", metavar="RECORDING",
@@ -511,6 +654,64 @@ def parser():
                        help="don't hear the videos, even with Whisper installed")
     whole.set_defaults(run=_live_report)
 
+    look = sub.add_parser("sources", help="ask every search engine and wiki about some "
+                          "phrases, to see which ones explain memes from this computer")
+    look.add_argument("phrases", nargs="*", metavar="PHRASE")
+    look.add_argument("--file", metavar="PATH", help="more phrases, one a line (UTF-8)")
+    look.add_argument("--out", metavar="FOLDER",
+                      help="where to write what was found (default: sources in the cache)")
+    look.add_argument("--raw", action="store_true",
+                      help="also keep every page as it came, in the folder's raw/")
+    look.add_argument("--explain", action="store_true",
+                      help="then look them up as explain does (videos, then web pages) and "
+                      "sum up what they say with the model")
+    look.add_argument("--videos", type=int, default=explainers.VIDEOS, metavar="N",
+                      help="videos read for each phrase with --explain (default %(default)s)")
+    look.add_argument("--model", default=judging.MODEL,
+                      help=f"the model that sums up (default %(default)s; "
+                      f"{judging.LOCAL_MODEL} when it can't be reached)")
+    look.add_argument("--no-audio", action="store_true", help="don't hear videos (--explain)")
+    look.set_defaults(run=_sources)
+
+    by_itself = sub.add_parser(
+        "auto", help="run by itself for days with Windows Task Scheduler: start, extend (a "
+        "later end), stop, status, report (what the runs found), or one daily or live run "
+        "(what the tasks run)")
+    by_itself.add_argument("action", choices=("start", "extend", "stop", "status", "report",
+                                              "daily", "live"))
+    by_itself.add_argument("--at", default=auto.AT, metavar="HH:MM",
+                           help="start: when the daily run starts (default %(default)s; the "
+                           "first one starts at once)")
+    by_itself.add_argument("--days", type=int, metavar="N",
+                           help=f"start: days to run, then the tasks stop (default {auto.DAYS}); "
+                           "extend: days from when it started")
+    by_itself.add_argument("--games", nargs="+", metavar="GAME",
+                           help="start: whose videos the daily run reads (default: "
+                           f"{' '.join(auto.GAMES)})")
+    by_itself.add_argument("--rooms", nargs="+", metavar="ROOM[:GAME]",
+                           help="start: the live rooms watched, each by a task of its own: a "
+                           "room's number or link, :valorant after it for a Valorant room "
+                           f"(default: {' '.join(auto.ROOMS)}); live: the rooms to look at "
+                           "(default: start's)")
+    by_itself.add_argument("--every", type=int, metavar="MINUTES",
+                           help="start, extend: minutes between two looks at the live rooms "
+                           f"(default {auto.EVERY}; extend: as it was)")
+    by_itself.add_argument("--hours", type=int, default=auto.LIVE_HOURS, metavar="N",
+                           help="start: a recording stops after this many hours, if the room is "
+                           "still live (default %(default)s)")
+    pulling = by_itself.add_mutually_exclusive_group()
+    pulling.add_argument("--pull", action="store_true", default=None,
+                         help="start, daily: pull the newest code of this folder's branch "
+                         "before each daily run (git pull --ff-only)")
+    pulling.add_argument("--no-pull", dest="pull", action="store_false",
+                         help="daily: don't pull, even if start was given --pull")
+    by_itself.add_argument("--lines", type=int, default=auto.TAIL, metavar="N",
+                           help="status: lines of the log shown (default %(default)s)")
+    _report_options(by_itself, "the model that judges and sums up (daily, live), or merges your "
+                    f"notes (report) (default %(default)s; {judging.LOCAL_MODEL} when it can't "
+                    "be reached)")
+    by_itself.set_defaults(run=_auto)
+
     scan = sub.add_parser("find", help="the learned memes in a text")
     scan.add_argument("text")
     scan.add_argument("--json", action="store_true", help="print JSON")
@@ -518,9 +719,50 @@ def parser():
     return commands
 
 
+class _Log:
+    """What a command prints, to the screen (when there is one) and to a file too."""
+
+    encoding = "utf-8"
+
+    def __init__(self, stream, file):
+        self.stream, self.file = stream, file
+
+    def write(self, text):
+        if self.stream is not None:
+            try:
+                self.stream.write(text)
+            except (OSError, ValueError):
+                pass  # the window was closed
+        self.file.write(text)
+        self.file.flush()
+        return len(text)
+
+    def flush(self):
+        for stream in (self.stream, self.file):
+            try:
+                stream and stream.flush()
+            except (OSError, ValueError):
+                pass
+
+    def isatty(self):
+        return False
+
+
+def _log_to(path, argv):
+    """Have what this command prints go to the file path too (MEMELEARNER_LOG)."""
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    file = open(path, "a", encoding="utf-8")
+    file.write(f"\n== {time.strftime('%Y-%m-%d %H:%M:%S')}  py -m memelearner "
+               f"{' '.join(sys.argv[1:] if argv is None else argv)}\n")
+    sys.stdout, sys.stderr = _Log(sys.stdout, file), _Log(sys.stderr, file)
+
+
 def main(argv=None):
-    if hasattr(sys.stdout, "reconfigure"):
-        sys.stdout.reconfigure(encoding="utf-8")  # Chinese in the Windows console and in --json
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")  # Chinese in the Windows console and in --json
+    if os.environ.get("MEMELEARNER_LOG"):
+        _log_to(os.environ["MEMELEARNER_LOG"], argv)
     args = parser().parse_args(argv)
     try:
         args.run(args)

@@ -10,7 +10,7 @@ apps learn them from it. Other apps only need what is in this file.
     memelearner.candidates()                # what the last run found, not looked at yet
     memelearner.learn(games=["lol"])        # read Bilibili now (takes minutes)
     memelearner.judge()                     # a model tells memes from names (minutes)
-    memelearner.explain()                   # read videos that explain those memes (minutes)
+    memelearner.explain()                   # read videos and pages that explain them (minutes)
     memelearner.watching()                  # what the model wasn't sure of yet
     memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
     memelearner.reject("下路")              # not a meme: never list it again
@@ -106,12 +106,15 @@ def judge(games=None, model=None, again=False, quiet=False):
 
 def explain(phrases=None, games=None, videos=explainers.VIDEOS, top=explainers.TOP, links=None,
             model=None, again=False, hearing=True, judge=True, quiet=False):
-    """Find and read the Bilibili videos that explain memes (阿一古是什么梗？), have the model
-    sum up what each says, and judge those memes again with it (see explainers.py). It reads
-    as a visitor, 5 to 7 seconds between requests, so it takes minutes: about half a minute
-    to a minute per video. Returns {"game:phrase": [summary, ...]} for the videos read now;
-    a summary is {"bvid", "url", "title", "author", "about", "meaning", "origin",
-    "english", "quote", "heard", "model", "summarized"}.
+    """Find and read the Bilibili videos that explain memes (阿一古是什么梗？), and the web
+    pages for the ones no video explains, have the model sum up what each says, and judge
+    those memes again with it (see explainers.py). It reads as a visitor, seconds between
+    requests, so it takes minutes: about half a minute to a minute per video. Returns
+    {"game:phrase": [summary, ...]} for the videos and pages read now; a video's summary is
+    {"bvid", "url", "title", "author", "about", "meaning", "origin", "english", "quote",
+    "heard", "model", "summarized"}, the web pages' {"kind": "page", "url", "site", "title",
+    "about", "meaning", "origin", "english", "quote", "snippet", "pages", "model",
+    "summarized"} (explainers.summarize_pages()).
 
     phrases: only these (default: the memes the judge found, the ones whose meaning is
     least sure first); games: only these games' phrases; videos: read per phrase; top:
