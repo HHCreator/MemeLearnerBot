@@ -390,8 +390,9 @@ def _sources(args):
 
 
 def _sources_text(report):
-    """sources.md: for each phrase, what memes.json says, what each place found, and what
-    the videos and web pages explain read said."""
+    """sources.md: for each phrase, what memes.json says, what each place found, what the
+    videos and web pages explain read said, and the ones it skipped (not about games), each
+    with its link."""
     lines = [f"# Where explanations come from ({report['made']})", ""]
     for place, counted in report["places"].items():
         lines.append(f"- {place}: answered {counted['answered']} of {counted['asked']}, found "
@@ -423,8 +424,9 @@ def _sources_text(report):
         if entry is None:
             continue
         said = explainers._summaries(entry)
+        skipped = entry.get("dropped") or []
         lines.append("")
-        lines.append("Looked up as explain does: " + ("nothing found" if not said else ""))
+        lines.append("Looked up as explain does: " + ("" if said or skipped else "nothing found"))
         for summary in said:
             where = (f"page {summary.get('site', '')} [{summary.get('title', '')}]"
                      f"({summary.get('url', '')})" if summary.get("kind") == "page" else
@@ -434,6 +436,9 @@ def _sources_text(report):
                                       else "") +
                 (f" 「{summary['quote']}」" if summary.get("quote") else "")
                 if summary.get("about") else "doesn't explain it"))
+        for dropped in skipped:
+            lines.append(f"- skipped [{dropped.get('title', '')}]({dropped.get('url', '')}): "
+                         f"{dropped.get('why', '')}")
     return lines
 
 

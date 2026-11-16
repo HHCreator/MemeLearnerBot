@@ -1,6 +1,8 @@
 """Offline tests for telling the variants of one meme (variants.py)."""
 
+import os
 import tempfile
+import time
 import unittest
 
 from memelearner import variants
@@ -158,6 +160,78 @@ class VariantTest(unittest.TestCase):
         found = variants.groups(["超威同意了", "chovy同意了", "ruler同意了", "开始同意"])
         self.assertEqual([g["phrases"] for g in found],
                          [["超威同意了", "chovy同意了", "ruler同意了"], ["开始同意"]])
+
+    def test_more_ways_of_writing_one_meme(self):
+        # Hao's 4-day report (2026-11-11..15): one meme in two rows
+        for a, b in [("我先翻怎么来的", "我先来怎么翻的"),   # the same characters in another order
+                     ("关闭得分通道", "得分通道关闭"),
+                     ("别狐狸", "不要狐狸"),                # 别 = 不要
+                     ("領會員", "领会员"),                  # traditional characters
+                     ("零会员", "领会员"),                  # a typo that sounds the same
+                     ("零会员了", "领会员")]:
+            self.assertTrue(variants.same_meme(a, b), (a, b))
+        for a, b in [("目前不知道怎么赢", "目前不知道怎么输"),  # another character, another sound
+                     ("好送", "送好"),                       # too few to turn around
+                     ("零会", "领会"),                       # too few for a typo
+                     ("零会员呀", "领会员会")]:               # two characters differ
+            self.assertFalse(variants.same_meme(a, b), (a, b))
+        self.assertEqual(variants.shape("不要狐狸"), "别狐狸")
+        self.assertEqual(variants.shape("領會員"), "领会员")
+        self.assertTrue(variants.sound_alike("零", "领"))
+        self.assertFalse(variants.sound_alike("赢", "输"))
+        found = variants.groups({"领会员": 53502, "大会员": 5829, "零会员": 130, "領會員": 55,
+                                 "别狐狸": 104, "不要狐狸": 56, "我先翻怎么来的": 117,
+                                 "我先来怎么翻的": 113})
+        self.assertEqual(summary(found), [
+            ("领会员", ["领会员", "零会员", "領會員"]), ("大会员", ["大会员"]),
+            ("我先翻怎么来的", ["我先翻怎么来的", "我先来怎么翻的"]),
+            ("别狐狸", ["别狐狸", "不要狐狸"])])
+
+    def test_a_phrase_with_two_places_for_a_name_doesnt_put_two_memes_together(self):
+        """The four-day run had 多兰是人啊, 多兰mvp and 多兰生气了 as variants of 多兰同意了 with
+        超威同意了: 多兰 is XX in XX同意了, and 同意 was XX in 多兰XX (mvp and nb go there).
+        A phrase has one name, and where the most names go comes first (Chovy, faker, Canyon
+        and ruler in XX同意了)."""
+        for mvp in (55, 160):  # 多兰mvp sent by fewer people than 超威同意了, or by more
+            found = variants.groups({"多兰同意了": 151, "超威同意了": 100, "faker同意了": 50,
+                                     "三叔同意了": 40, "ruler同意了": 30, "多兰是人啊": 60,
+                                     "多兰mvp": mvp, "多兰nb": 50, "多兰生气了": 10})
+            together = {phrase: g["phrases"][0] for g in found for phrase in g["phrases"]}
+            self.assertEqual(together["超威同意了"], together["多兰同意了"], mvp)
+            for other in ("多兰是人啊", "多兰mvp", "多兰生气了"):
+                self.assertNotEqual(together[other], together["多兰同意了"], (mvp, other))
+
+    def test_ways_listed_in_the_table_are_one_meme(self):
+        with open(variants.SAME_FILE, "w", encoding="utf-8") as f:
+            f.write("# 一行一个梗\n41翻 = 41上 = 41中  # Hao 说的\n区区区 ＝ 区区 = 好多区\n")
+        self.assertTrue(variants.same_meme("41翻", "41上"))
+        self.assertTrue(variants.same_meme("41中", "41上"))
+        self.assertTrue(variants.same_meme("好多区", "区区区区"))  # written longer too
+        self.assertFalse(variants.same_meme("41翻", "好多区"))
+        self.assertFalse(variants.same_meme("41下", "41上"))  # not on the line
+        self.assertEqual(variants.same_table(), [["41翻", "41上", "41中"], ["区区区", "区区", "好多区"]])
+        found = variants.groups({"41翻": 1714, "41上": 636, "区区": 30, "好多区": 12})
+        self.assertEqual([g["phrases"] for g in found], [["41翻", "41上"], ["区区", "好多区"]])
+        time.sleep(0.01)
+        with open(variants.SAME_FILE, "w", encoding="utf-8") as f:
+            f.write("区区区 = 区区 = 好多区\n")  # an edited table counts at once
+        self.assertFalse(variants.same_meme("41翻", "41上"))
+        with open(variants.SAME_FILE, "w", encoding="utf-8") as f:
+            f.write("41翻 = 41上\n区区 = 好多区\n41上 = 41中\n超威同意了 = 超威点头了\n")
+        self.assertTrue(variants.same_meme("41翻", "41中"))  # lines with a phrase in common
+        self.assertFalse(variants.same_meme("41翻", "区区"))
+        self.assertTrue(variants.same_meme("三叔同意了", "三叔点头了"))  # a name is anyone
+        self.assertFalse(variants.same_meme("三叔同意了", "三叔摇头了"))
+        with open(variants.SAME_FILE, "a", encoding="utf-8") as f:
+            f.write("大的要来了 = 要来力\n")  # 大的来了 is 大的要来了 without 要: it goes too
+        found = variants.groups({"大的要来了": 50, "要来力": 30, "大的来了": 20})
+        self.assertEqual([g["phrases"] for g in found], [["大的要来了", "要来力", "大的来了"]])
+        with open(variants.SAME_FILE, "w", encoding="utf-8") as f:
+            f.write("41翻 41上\n")
+        with self.assertRaisesRegex(variants.TableError, "line 1 .*41翻 = 41上"):
+            variants.same_meme("41翻", "41上")
+        os.remove(variants.SAME_FILE)
+        self.assertEqual(variants.same_table(), [])
 
     def test_an_edited_table_counts_at_once(self):
         with open(self.table, "w", encoding="utf-8") as f:
