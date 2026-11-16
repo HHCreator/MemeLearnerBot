@@ -205,20 +205,48 @@ once these differences are taken away:
 - **turned around**: 不 or 没 added (三叔不同意).
 - **written longer**: a character written more than once in a row (同意意意了, chooooovy,
   ggg and gg), and mood words at the end. 啊 anywhere else is 阿 (啊一占 is 阿一占).
+- **other order**: the same characters in another order, at least 4 of them besides names
+  (我先来怎么翻的 is 我先翻怎么来的, 关闭得分通道 is 得分通道关闭).
+- **same word**: 不要 is 别 (不要狐狸 is 别狐狸).
+- **traditional characters**: 領會員 is 领会员 (`memelearner/data/t2s.txt`, from OpenCC).
+- **a typo**: one character for another that sounds the same, in phrases with at least 3
+  characters besides names (零会员 is 领会员; `memelearner/data/pinyin.txt`, from
+  pinyin-data, today's readings). Tones don't count.
+- **you said so**: the ways of writing one meme on one line of
+  `memelearner/data/same_memes.txt` (below).
 
 Anything else keeps them apart: 我们是冠军 and 我们是路边, or 目前不知道怎么赢 and
-目前不知道怎么输, mean different things. A phrase that is only a name or a word in letters
+目前不知道怎么输, mean different things (赢 and 输 don't sound the same, and 路边 is two
+characters for two others). A phrase that is only a name or a word in letters
 (ggg) is nobody's variant. Every phrase in a group shares at least 2 characters that
 aren't names with its most sent one: a phrase with two memes in it (阿一古加油, ig加油必胜)
 doesn't make them one. Each group is named by its most sent phrase that has a name, with
 the name as XX, when at least half as many send it as the most sent one
 (「XX今年真不一样了」); else by the most sent one (让二追三).
 
+Some ways of writing one meme follow no rule: 41翻 and 41上 (41 sounds like 世一), or
+好多区 and 区区. `memelearner/data/same_memes.txt` lists them, and you can edit it in
+Notepad, one meme a line, its ways of writing apart by `=`:
+
+```
+41翻 = 41上 = 41中
+大的要来了 = 要来力
+```
+
+`#` starts a note. Lines with a phrase in common are one meme (`41上 = 41中` on another
+line puts 41中 with 41翻 too), and a name in a line stands for anyone, as in the rules
+above (`超威同意了 = 超威点头了` puts 三叔同意了 with 三叔点头了). A line with only one
+phrase on it stops the bot with the line's number.
+
 The bot finds, judges and learns a meme as one group: the candidate is its most sent
 phrase, with the others as its `variants`; the judge sees them all, with who the names in
 them are; the report shows it as one row, so you decide once; and `memes.json` keeps it as
 one entry with its `variants`. A new variant of a learned meme (ruler同意了, once
-超威同意了 is learned) says so in the report, and Add puts it into that meme.
+超威同意了 is learned) says so in the report, and Add puts it into that meme. A meme found
+as more than one candidate is still one row: the same phrase in two games' danmu (笑嘻了
+in LoL's and in Valorant's, which says so under it), two new variants of one learned meme
+(多兰好兄弟 and 兰子好兄弟 of 好兄弟), or two candidates the rules above put together; the
+likeliest one shows it, and the others are its variants.
 
 **Finding videos.** Bilibili asks a visitor's search for a captcha more often than not,
 and the bot never solves captchas, so it finds videos the way a viewer does: in the related
@@ -645,6 +673,8 @@ found, how many memes were explained, and the problems.
 | `memelearner/data/surf_common.txt` | everyday phrases the bot never lists |
 | `memelearner/data/nicknames.txt` | players' nicknames, which you edit (`nicknames.py` reads it) |
 | `memelearner/variants.py` | tells the variants of one meme (XX同意了) |
+| `memelearner/data/same_memes.txt` | ways of writing one meme no rule tells, which you edit |
+| `memelearner/data/t2s.txt`, `pinyin.txt` | traditional to simplified characters, and how characters sound, for `variants.py` |
 | `surf.py` | `py surf.py`, short for `py -m memelearner learn` |
 | `开始自动跑.bat` and the three beside it | `auto start`, `stop`, `status` and `report`, to double-click |
 

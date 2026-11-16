@@ -57,7 +57,7 @@ import time
 import urllib.parse
 import webbrowser
 
-from . import explainers, judging, meanings, store, surf
+from . import explainers, judging, meanings, store, surf, variants
 
 MARKS = ("Correct", "Half correct", "Correct, no meaning", "No point", "Wrong", "I don't know")
 POINTS = {"Correct": 1, "Half correct": 0.5, "Correct, no meaning": 0.5, "No point": 0,
@@ -150,12 +150,92 @@ def _examples(lines, phrase):
     return picked
 
 
+def _together(found, same):
+    """found's candidates in groups that are one meme each, as indexes into found: one
+    phrase found in more than one game (笑嘻了 in LoL's danmu and in Valorant's), a phrase
+    that another candidate has as a variant, the new variants of one learned meme (多兰好兄弟
+    and 兰子好兄弟 of 好兄弟; same: judging.same_memes()), and phrases variants.groups() puts
+    together (别狐狸 and 不要狐狸). Each group in found's order."""
+    leader = list(range(len(found)))
+
+    def lead(i):
+        while leader[i] != i:
+            leader[i] = leader[leader[i]]
+            i = leader[i]
+        return i
+
+    def join(i, j):
+        i, j = lead(i), lead(j)
+        if i != j:
+            leader[max(i, j)] = min(i, j)
+
+    by_phrase, by_learned, people = {}, {}, {}
+    for i, c in enumerate(found):
+        phrase = store.normal(c["phrase"])
+        join(i, by_phrase.setdefault(phrase, i))
+        people[c["phrase"]] = people.get(c["phrase"], 0) + (c.get("people") or 0)
+        learned = (same.get(f"{c['game']}:{c['phrase']}") or [None])[0]
+        if learned:
+            join(i, by_learned.setdefault(learned, i))
+    for i, c in enumerate(found):
+        for variant in c.get("variants") or []:
+            other = by_phrase.get(store.normal(variant["phrase"]))
+            if other is not None:
+                join(i, other)
+    at = {}
+    for i, c in enumerate(found):
+        at.setdefault(c["phrase"], []).append(i)
+    for group in variants.groups(people):
+        firsts = [at[phrase][0] for phrase in group["phrases"]]
+        for i in firsts[1:]:
+            join(firsts[0], i)
+    groups = {}
+    for i in range(len(found)):
+        groups.setdefault(lead(i), []).append(i)
+    return list(groups.values())
+
+
+def _merge(row, others):
+    """One row for a meme found as more than one candidate: row, the one that shows it (the
+    likeliest, as rows() orders them), with the others' games, phrases and variants as its
+    variants (each once, the most people first), and the people of the same phrase in
+    another game added to its own."""
+    if not others:
+        row["games"] = [row["game"]]
+        return row
+    games = [row["game"]] + [o["game"] for o in others]
+    row["games"] = sorted(set(games), key=games.index)
+    mine = store.normal(row["phrase"])
+    row["people"] += sum(o["people"] for o in others if store.normal(o["phrase"]) == mine)
+    listed, seen = [], {mine}
+    for variant in row["variants"] + [v for o in others for v in
+                                      [{"phrase": o["phrase"], "people": o["people"]}] +
+                                      o["variants"]]:
+        if store.normal(variant["phrase"]) not in seen:
+            seen.add(store.normal(variant["phrase"]))
+            listed.append(variant)
+    row["variants"] = sorted(listed, key=lambda v: -v["people"])
+    named = {store.normal(n["name"]) for n in row["names"]}
+    for o in others:
+        for name in o["names"]:
+            if store.normal(name["name"]) not in named:
+                named.add(store.normal(name["name"]))
+                row["names"].append(name)
+    if not row["learned"]:
+        row["learned"] = next((o["learned"] for o in others if o["learned"]), None)
+    row["members"] = [o["key"] for o in others]
+    return row
+
+
 def rows(last=None):
     """The report's rows, one for each meme: the last run's candidates (or last's, in the
     shape of candidates.json, like auto.py's pool of several runs) not learned or turned
     down yet, the likeliest memes first (_group()), and the most people first within a
-    group. A row is {"key": "game:phrase", "phrase": the way most people write it, "pattern":
-    the meme's, a name in it as XX (XX同意了), "game", "people", "variants": [{"phrase",
+    group. A meme found as more than one candidate (_together(): in two games, or as two
+    ways of writing it) is one row, shown as its likeliest candidate, the others its
+    variants. A row is {"key": "game:phrase", "phrase": the way most people write it, "pattern":
+    the meme's, a name in it as XX (XX同意了), "game", "games": the games it was found in,
+    "members": the keys of the other candidates in it, "people", "variants": [{"phrase",
     "people"}], its other ways of writing it (variants.py), "names": [{"name", "player"}],
     the names in them and who they are by the nickname table (judging.names_in()),
     "learned": {"phrase", "meaning", "english"} of the learned meme it is a new variant of,
@@ -210,8 +290,16 @@ def rows(last=None):
             "model": verdict.get("model", ""), "answer": _answer(verdict) if verdict else "",
             "group": _group(verdict), "told": _told(verdict, learned),
             "unexplained": _unexplained(verdict, looked.get(key) or {})})
-    made.sort(key=lambda row: (row["group"], -row["people"]))
-    return made
+    verdicts = {row["key"]: c.get("judge") or {} for row, c in zip(made, found)}
+    merged = []
+    for group in _together(found, same):
+        members = sorted((made[i] for i in group), key=lambda row: (row["group"], -row["people"]))
+        row = _merge(members[0], members[1:])
+        if row["learned"] and [told["how"] for told in row["told"]] in (["tested"], ["guess"]):
+            row["told"] = _told(verdicts[row["key"]], row["learned"]["phrase"])  # another's
+        merged.append(row)
+    merged.sort(key=lambda row: (row["group"], -row["people"]))
+    return merged
 
 
 def about():
@@ -388,7 +476,8 @@ def finish(rows, model=None):
         if result:
             meaning, english = result["meaning"], result["english"]
         joining = ([row["phrase"]] if row.get("learned") else []) + kept(row)
-        meme = store.accept(_meme_of(row), meaning, english, games=[row["game"]],
+        meme = store.accept(_meme_of(row), meaning, english,
+                            games=row.get("games") or [row["game"]],
                             examples=row["examples"], sources=row["sources"], note=note(row),
                             variants=joining, apart=picked[row["key"]]["apart"],
                             source=sources[row["key"]])
@@ -472,9 +561,9 @@ def page(rows, picked, token, line=""):
         (models.most_common(1)[0][0] if models else "")  # the column's; others are marked
     data = {"token": token, "about": line, "model": model, "name": _short(model),
             "marks": MARKS, "decisions": DECISIONS, "shown": SHOWN, "order": ORDER,
-            "picked": picked,
+            "picked": picked, "games": judging.GAMES,
             "rows": [{k: row.get(k) for k in ("key", "phrase", "pattern", "people", "variants",
-                                              "names", "learned", "examples", "kind",
+                                              "names", "learned", "games", "examples", "kind",
                                               "meaning", "why", "guess", "source", "test",
                                               "model", "told", "unexplained")}
                      for row in rows]}
@@ -798,6 +887,9 @@ function meme(row) {  // the pattern, the way most write it, and the learned mem
     cell.append(row.phrase);
   }
   if (row.learned) cell.append(el("span", {class: "flag"}, "已学的梗「" + row.learned.phrase + "」的新变体：Add 就加进它"));
+  if ((row.games || []).length > 1) {  // one row for a meme found in more than one game
+    cell.append(el("span", {class: "flag"}, row.games.map(game => DATA.games[game] || game).join("、") + "的弹幕里都有"));
+  }
   return cell;
 }
 

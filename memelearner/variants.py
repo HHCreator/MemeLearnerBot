@@ -23,6 +23,16 @@ Two phrases are the same meme when they are the same once these differences are 
     Written longer A character written more than once in a row (同意意意了, chooooovy, ggg
                    and gg), and mood words at the end (了 呢 吧 啊 ...), as the finder counts
                    them. 啊 anywhere else is 阿: 啊一占 is 阿一占.
+    Other order    The same characters in another order, at least ANAGRAM_KEPT of them that
+                   aren't names: 我先来怎么翻的 is 我先翻怎么来的, 关闭得分通道 is 得分通道关闭.
+    Same word      A word for another that means the same (SAME_WORDS): 不要狐狸 is 别狐狸.
+    Traditional    A traditional character is its simplified one (data/t2s.txt): 領會員 is
+                   领会员.
+    A typo         One character for another that sounds the same, tones aside
+                   (data/pinyin.txt), where at least SOUND_KEPT characters aren't names:
+                   零会员 is 领会员 (but 目前不知道怎么赢 isn't 目前不知道怎么输).
+    You said so    Ways of writing one meme listed on one line of data/same_memes.txt, a
+                   table you edit yourself: 41翻 = 41上 = 41中, 区区区 = 区区 = 好多区.
 
 Phrases that differ in anything else stay apart, however much they look alike: 我们是冠军
 and 我们是路边, or 目前不知道怎么赢 and 目前不知道怎么输, mean different things. A phrase
@@ -34,7 +44,9 @@ ig, but 阿一古 and ig加油 have nothing in common, so they stay apart (kin()
 """
 
 import functools
+import os
 import re
+import unicodedata
 
 from . import nicknames, store, surf
 
@@ -58,6 +70,110 @@ LETTERS = re.compile(r"[0-9a-z]*[a-z][0-9a-z]*")  # a word in letters (with digi
 RUNS = re.compile(r"(.)\1+")
 SAME_CHARS = str.maketrans({"啊": "阿"})  # one character written two ways (but 啊 at the end
 #                                          is a mood word: ig冲啊 is ig冲)
+SAME_WORDS = (("不要", "别"),)  # a word for another that means the same: 不要狐狸 is 别狐狸
+ANAGRAM_KEPT = 4  # characters, not counting names, that the same ones in another order need
+SOUND_KEPT = 3  # ... and that a phrase with one character for another that sounds the same
+T2S_FILE = os.path.join(store.HERE, "data", "t2s.txt")
+PINYIN_FILE = os.path.join(store.HERE, "data", "pinyin.txt")
+SAME_FILE = os.path.join(store.HERE, "data", "same_memes.txt")
+SAME_SEPARATOR = re.compile(r"\s*=\s*")
+
+_same_cache = {}  # the last data/same_memes.txt read: {"stamp", "lines": [[phrase, ...]], "shapes"}
+
+
+class TableError(ValueError):
+    """data/same_memes.txt has a line the bot can't read: the message names it."""
+
+
+@functools.lru_cache(maxsize=1)
+def _simplified():
+    """The str.translate() table from data/t2s.txt: traditional -> simplified character."""
+    table = {}
+    with open(T2S_FILE, encoding="utf-8") as f:
+        for line in f:
+            if not line.startswith("#"):
+                table.update((ord(pair[0]), pair[1]) for pair in line.split() if len(pair) == 2)
+    return table
+
+
+@functools.lru_cache(maxsize=1)
+def _sounds():
+    """{character: the syllables it is read as, tones aside} from data/pinyin.txt."""
+    found = {}
+    with open(PINYIN_FILE, encoding="utf-8") as f:
+        for line in f:
+            if line.startswith("#") or not line.strip():
+                continue
+            syllable, _, chars = line.strip().partition(" ")
+            for char in chars:
+                found.setdefault(char, set()).add(syllable)
+    return {char: frozenset(syllables) for char, syllables in found.items()}
+
+
+def sound_alike(a, b):
+    """Whether two characters can be read the same, tones aside: 零 and 领 (ling)."""
+    sounds = _sounds()
+    return bool(sounds.get(a, frozenset()) & sounds.get(b, frozenset()))
+
+
+def parse_same(text, name="same_memes.txt"):
+    """The lines of data/same_memes.txt in a text: [[phrase, ...], ...], the ways of writing
+    one meme a line, as written. Raises TableError naming a line without = between two."""
+    lines = []
+    for number, raw in enumerate(text.splitlines(), 1):
+        line = unicodedata.normalize("NFKC", raw).split("#", 1)[0].strip()
+        if not line:
+            continue
+        phrases = [p for p in SAME_SEPARATOR.split(line) if store.normal(p)]
+        if len(phrases) < 2:
+            raise TableError(f"{name} line {number} ({raw.strip()}): write two ways of "
+                             "writing one meme or more, with = between them (41翻 = 41上)")
+        lines.append(phrases)
+    return lines
+
+
+def same_table(path=None):
+    """data/same_memes.txt (or path): [[phrase, ...], ...] as parse_same() gives them; empty
+    when there's no file. Read again only when the file changed."""
+    return [list(line) for line in _same(path)["lines"]]
+
+
+def _same(path=None):
+    path = path or SAME_FILE
+    try:
+        stat = os.stat(path)
+    except FileNotFoundError:
+        return {"lines": [], "shapes": {}}
+    stamp = (path, stat.st_mtime_ns, stat.st_size, nicknames._read().get("stamp"))
+    if _same_cache.get("stamp") != stamp:
+        try:
+            with open(path, encoding="utf-8-sig") as f:
+                lines = parse_same(f.read(), os.path.basename(path))
+        except UnicodeDecodeError:
+            raise TableError(f"{path} isn't UTF-8: save it as UTF-8 (Notepad: Save as, "
+                             "Encoding UTF-8)") from None
+        meme = list(range(len(lines)))  # lines with a phrase in common are one meme
+
+        def first(number):
+            while meme[number] != number:
+                number = meme[number]
+            return number
+
+        shapes = {}
+        for number, line in enumerate(lines):
+            for phrase in line:
+                was = first(shapes.setdefault(shape(phrase), number))
+                meme[max(was, first(number))] = min(was, first(number))
+        shapes = {found: first(number) for found, number in shapes.items()}
+        _same_cache.update(stamp=stamp, lines=lines, shapes=shapes)
+    return _same_cache
+
+
+def _listed_together(a, b):
+    """Whether two shapes are one meme by data/same_memes.txt: on one line, or on two lines
+    that have a phrase in common (41翻 = 41上, then 41上 = 41中)."""
+    shapes = _same()["shapes"]
+    return a in shapes and shapes.get(b) == shapes[a]
 
 
 def names(phrase):
@@ -91,9 +207,13 @@ def _with(text, found, name):
 def shape(phrase):
     """What is left of a phrase once names are someone (X), each character is written once
     and the mood words at its end are left out: 超威同意了 -> X同意, 三叔不同意 -> X不同意,
-    chooooovy同意意意了 -> X同意, 真不一样了 -> 真不一样, 啊一占 -> 阿一占."""
-    text = store.normal(phrase)
+    chooooovy同意意意了 -> X同意, 真不一样了 -> 真不一样, 啊一占 -> 阿一占, and traditional
+    characters and words that mean the same are written one way: 領會員 -> 领会员,
+    不要狐狸 -> 别狐狸."""
+    text = store.normal(phrase).translate(_simplified())
     shape = RUNS.sub(r"\1", _with(text, _names(text), SLOT))
+    for word, same in SAME_WORDS:
+        shape = shape.replace(word, same)
     while shape and shape[-1] in surf.PARTICLES:
         shape = shape[:-1]
     return RUNS.sub(r"\1", shape.translate(SAME_CHARS))
@@ -157,12 +277,29 @@ def _turned(shape):
     return "".join(char for char in shape if char not in NEGATIONS)
 
 
+def _reordered(a, b):
+    """Whether two shapes are the same characters in another order, at least ANAGRAM_KEPT
+    that aren't names: 我先来怎么翻的 and 我先翻怎么来的."""
+    return sorted(a) == sorted(b) and _kept(a) >= ANAGRAM_KEPT
+
+
+def _misheard(a, b):
+    """Whether one shape is the other with one character for another that sounds the same
+    (a typo: 零会员 for 领会员), at least SOUND_KEPT characters that aren't names."""
+    if len(a) != len(b) or min(_kept(a), _kept(b)) < SOUND_KEPT:
+        return False
+    differ = [(x, y) for x, y in zip(a, b) if x != y]
+    return len(differ) == 1 and SLOT not in differ[0] and sound_alike(*differ[0])
+
+
 def _same_shapes(a, b):
     """same_meme() for two shapes, without names in Chinese that aren't in the table."""
     if a == b:
         return _kept(a) >= 1  # not two names on their own (chooovy and ruler)
     if _turned(a) == _turned(b):
         return _kept(_turned(a)) >= 1
+    if _listed_together(a, b) or _reordered(a, b) or _misheard(a, b):
+        return True
     return _leaves_out(a, b) or _leaves_out(_turned(a), _turned(b))
 
 
@@ -254,7 +391,8 @@ def groups(phrases):
         return True
 
     # What two phrases must have for _same_shapes() to be worth asking: about as many
-    # characters, and one's characters all among the other's (without names, 不 and 没)
+    # characters, and one's characters all among the other's (without names, 不 and 没);
+    # or as many, but for one (_misheard()); or a line of data/same_memes.txt
     quick = {}
     for phrase in order:
         turned = _turned(shapes[phrase])
@@ -263,7 +401,11 @@ def groups(phrases):
         kept_a, chars_a = quick[a]
         for b in order[i + 1:]:
             kept_b, chars_b = quick[b]
-            if abs(kept_a - kept_b) > MAX_ADDED or not (chars_a <= chars_b or chars_b <= chars_a):
+            maybe = abs(kept_a - kept_b) <= MAX_ADDED and (chars_a <= chars_b or
+                                                         chars_b <= chars_a)
+            misheard = kept_a == kept_b and len(chars_a - chars_b) <= 1 and \
+                len(chars_b - chars_a) <= 1  # one character for another: _misheard()
+            if not (maybe or misheard or _listed_together(shapes[a], shapes[b])):
                 continue
             if _same_shapes(shapes[a], shapes[b]):
                 join(a, b)

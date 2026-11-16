@@ -12,3 +12,4 @@
 
 Chovy = 超威, 大超, chooovy
 Canyon = 三叔, 三姆斯
+Doran = 多兰, 兰子, 篮子

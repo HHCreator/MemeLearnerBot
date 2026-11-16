@@ -13,7 +13,7 @@ import urllib.error
 import urllib.request
 from unittest import mock
 
-from memelearner import cli, explainers, judging, meanings, review, store
+from memelearner import cli, explainers, judging, meanings, review, store, surf
 from tests import test_judge
 
 AYIGU, CHANT = test_judge.AYIGU, test_judge.CHANT
@@ -236,6 +236,47 @@ class ReviewTest(unittest.TestCase):
         self.assertEqual((meme["meaning"], meme["notes"], meme["variants"][-1]),
                          ("调侃超威点头认可；谁都可以同意", ["谁都可以同意"], "faker同意了"))
 
+    def test_a_meme_found_as_more_than_one_candidate_is_one_row(self):
+        """The four-day run's report had 笑嘻了 twice (in LoL's danmu and in Valorant's),
+        多兰好兄弟 and 兰子好兄弟 (both new variants of the learned 好兄弟), and 别狐狸 and
+        不要狐狸 (one meme written two ways) as rows of their own: one row each now, and one
+        decision takes all of a row's candidates."""
+        store.accept("好兄弟", meaning="说两个人关系好", english="good buddies")
+        bros = (["多兰好兄弟", "多兰好兄弟！", "兰子好兄弟"], ["兰子好兄弟啊", "多兰好兄弟又来了"])
+        fox = (["别狐狸", "别狐狸了", "不要狐狸"], ["别狐狸啊", "不要狐狸了兄弟"])
+        self.write_run(more={"多兰好兄弟": bros, "兰子好兄弟": bros, "别狐狸": fox,
+                             "不要狐狸": fox}, people={"兰子好兄弟": 4, "不要狐狸": 3},
+                       variants={"别狐狸": [("别玩狐狸", 2)]})
+        self.judge()
+        last = surf._load_json(surf.CANDIDATES_FILE, {})  # Valorant's danmu had 阿一古 too
+        ayigu = next(c for c in last["candidates"] if c["phrase"] == "阿一古")
+        last["candidates"].append(dict(ayigu, game="valorant", people=2, judge={}))
+        rows = review.rows(last)
+        by = {row["phrase"]: row for row in rows}
+        self.assertEqual(sorted(by), sorted(["阿一古", "正义必胜", "怎么翻", "神中神", "fpx",
+                                             "多兰好兄弟", "别狐狸"]))
+        self.assertEqual((by["阿一古"]["games"], by["阿一古"]["people"], by["阿一古"]["members"],
+                          by["阿一古"]["variants"]),
+                         (["lol", "valorant"], 7, ["valorant:阿一古"], []))
+        self.assertEqual(by["正义必胜"]["games"], ["lol"])
+        bro = by["多兰好兄弟"]
+        self.assertEqual((bro["learned"]["phrase"], bro["variants"], bro["members"]),
+                         ("好兄弟", [{"phrase": "兰子好兄弟", "people": 4}], ["lol:兰子好兄弟"]))
+        self.assertEqual((by["别狐狸"]["variants"], by["别狐狸"]["people"]),
+                         ([{"phrase": "不要狐狸", "people": 3}, {"phrase": "别玩狐狸", "people": 2}],
+                          5))  # another way of writing it: not the same phrase, so not added
+        review.choose(rows, "lol:阿一古", "decision", "Add")
+        review.choose(rows, bro["key"], "decision", "Add")
+        review.choose(rows, by["别狐狸"]["key"], "decision", "Not a meme")
+        result = review.finish(rows)
+        memes = store.load()["memes"]
+        self.assertEqual(memes["阿一古"]["games"], ["lol", "valorant"])
+        self.assertEqual(memes["好兄弟"]["variants"], ["多兰好兄弟", "兰子好兄弟"])
+        self.assertEqual(sorted(store.load()["rejected"]), ["不要狐狸", "别狐狸", "别玩狐狸"])
+        self.assertEqual(result["rejected"][0]["variants"], ["不要狐狸", "别玩狐狸"])
+        self.assertEqual(sorted(row["phrase"] for row in review.rows(last)),
+                         sorted(["正义必胜", "怎么翻", "神中神", "fpx"]))  # none of them again
+
     def test_where_a_meme_comes_from_is_shown_and_kept_as_far_as_your_mark_lets_it(self):
         store.accept("我们是冠军", meaning="庆祝夺冠的口号", note="我们是路边是从它变来的")
         self.model.answers_for["deepseek-r1:14b"] = {
@@ -344,6 +385,8 @@ class ReviewTest(unittest.TestCase):
         self.assertEqual((data["rows"][0]["examples"], data["token"], data["name"]),
                          ([line], "token123", "deepseek-r1:14b"))
         self.assertEqual(list(data["marks"]), list(review.MARKS))
+        self.assertEqual((data["rows"][0]["games"], data["games"]["valorant"]),
+                         (["lol"], judging.GAMES["valorant"]))  # a meme in two games says so
 
     def test_the_page_is_only_served_through_its_link_and_done_stops_the_bot(self):
         rows = review.rows()
