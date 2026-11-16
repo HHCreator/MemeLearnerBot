@@ -198,6 +198,8 @@ once these differences are taken away:
   someone, XX. So is a Chinese name of two or three characters that isn't in the table
   (兰子同意了), where at least two other names go in the same place, unless far more
   people send it than any of those (正义必胜 is a meme of its own, not ig必胜 with 正义).
+  A phrase has one such name, in the place the most names go: 多兰同意了 is 多兰 in
+  XX同意了, so it isn't 同意 in 多兰XX (多兰mvp, 多兰nb) as well.
 - **left out**: one or two parts of one are left out (真不一样了 is 超威今年真不一样了
   without 超威今年), keeping at least 2 characters that aren't names and leaving out at
   most 2 others besides names (感谢多兰 isn't 千言万语感谢多兰). Two characters alone need
@@ -220,7 +222,8 @@ Anything else keeps them apart: 我们是冠军 and 我们是路边, or 目前�
 characters for two others). A phrase that is only a name or a word in letters
 (ggg) is nobody's variant. Every phrase in a group shares at least 2 characters that
 aren't names with its most sent one: a phrase with two memes in it (阿一古加油, ig加油必胜)
-doesn't make them one. Each group is named by its most sent phrase that has a name, with
+doesn't make them one. Ways of writing you list in `same_memes.txt` go together anyway
+(大的要来了 = 要来力 puts 大的来了 with 要来力 too). Each group is named by its most sent phrase that has a name, with
 the name as XX, when at least half as many send it as the most sent one
 (「XX今年真不一样了」); else by the most sent one (让二追三).
 

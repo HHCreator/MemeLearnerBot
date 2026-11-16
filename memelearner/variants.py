@@ -377,14 +377,17 @@ def groups(phrases):
             phrase = leader[phrase]
         return phrase
 
-    def join(a, b):
+    def join(a, b, listed=False):
         """Put the groups of a and b together, the one sent more leading, unless a phrase of
-        the other one isn't kin() to it. Returns whether they are one group now."""
+        the other one isn't kin() to it, or listed: data/same_memes.txt says a and b are one
+        meme (大的来了 has only 来 in common with 要来力, but goes with 大的要来了 = 要来力).
+        Returns whether they are one group now."""
         a, b = lead(a), lead(b)
         if a == b:
             return True
         first, second = sorted((a, b), key=rank.get)
-        if not all(kin(shapes[first], shapes[phrase]) for phrase in members[second]):
+        if not listed and not all(kin(shapes[first], shapes[phrase])
+                                  for phrase in members[second]):
             return False
         leader[second] = first
         members[first] += members.pop(second)
@@ -405,10 +408,11 @@ def groups(phrases):
                                                          chars_b <= chars_a)
             misheard = kept_a == kept_b and len(chars_a - chars_b) <= 1 and \
                 len(chars_b - chars_a) <= 1  # one character for another: _misheard()
-            if not (maybe or misheard or _listed_together(shapes[a], shapes[b])):
+            listed = _listed_together(shapes[a], shapes[b])
+            if not (maybe or misheard or listed):
                 continue
             if _same_shapes(shapes[a], shapes[b]):
-                join(a, b)
+                join(a, b, listed)
 
     # Names in Chinese that aren't in the table: where two different names go already
     who = {}  # {shape with someone: the names that go there}
@@ -418,11 +422,13 @@ def groups(phrases):
                 player or store.normal(phrase)[start:end]
                 for start, end, player in found[phrase])
     unknown = {}  # {phrase: the name in it that isn't in the table}
-    for slotted, names_there in who.items():
-        if len(names_there) < SHOWN_NAMES:
-            continue
+    for slotted, names_there in sorted(who.items(), key=lambda item: -len(item[1])):
+        if len(names_there) < SHOWN_NAMES:  # where the most names go first: XX同意了 has
+            continue  # 超威, chovy, 三叔 ..., 多兰XX only mvp and nb
         named = [p for p in order if _turned(shapes[p]) == slotted]  # the most sent first
         for phrase in order:
+            if phrase in unknown:  # one name a phrase: 多兰同意了 is 多兰 in XX同意了, so
+                continue  # it isn't 同意 in 多兰XX too (that put 多兰是人啊 with 超威同意了)
             name = _fill(slotted, shapes[phrase])
             if name and people[phrase] <= UNKNOWN_MORE * people[named[0]] and \
                     join(phrase, named[0]):
