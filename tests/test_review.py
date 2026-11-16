@@ -319,7 +319,8 @@ class ReviewTest(unittest.TestCase):
         rows = {row["phrase"]: row for row in review.rows()}
         self.assertTrue(rows["正义必胜"]["unexplained"])  # a video about its source doesn't
         self.assertFalse(rows["fpx"]["unexplained"])
-        # One of each kind that backs a meaning: a video, a web page, a line explaining it
+        # What backs a meaning: every video and web page, each with its link, and a line
+        # explaining it
         verdict = {"kind": "meme", "verdict": "untested", "meaning": "给受欢迎的一方加油",
                    "videos": [{"url": "u0", "title": "别的", "says": "x", "for": "别的说法"},
                               {"url": "u1", "title": "正义必胜是什么梗", "says": "y"},
@@ -328,6 +329,7 @@ class ReviewTest(unittest.TestCase):
                    "explanations": ["正义必胜的意思是给受欢迎的一方加油"]}
         self.assertEqual(review._told(verdict, None), [
             {"how": "video", "title": "正义必胜是什么梗", "url": "u1"},
+            {"how": "video", "title": "第二个", "url": "u2"},
             {"how": "page", "site": "zhihu.com", "title": "正义必胜？", "url": "u3"},
             {"how": "explanation", "line": "正义必胜的意思是给受欢迎的一方加油"}])
         # ... else the learned meme it is, else the model's own

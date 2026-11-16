@@ -102,23 +102,20 @@ def _group(verdict):
 
 
 def _told(verdict, learned):
-    """Where a meme's meaning comes from, for the report: [{"how", ...}], one of each kind
-    that backs it: {"how": "video", "title", "url"}, {"how": "page", "site", "title", "url"}
-    (what the judge was shown of them, not those about where it may come from),
-    {"how": "explanation", "line"} (a line explaining it), {"how": "learned", "phrase"} (the
-    learned meme it is), or else the model's own: {"how": "tested"} when its meaning passed
-    the blind test, {"how": "guess"}. Empty for a phrase that isn't a meme or has no
-    meaning."""
+    """Where a meme's meaning comes from, for the report: [{"how", ...}]: every video and web
+    page that explains it, each with its link to check it by, {"how": "video", "title",
+    "url"}, {"how": "page", "site", "title", "url"} (what the judge was shown of them, not
+    those about where it may come from), {"how": "explanation", "line"} (a line explaining
+    it), {"how": "learned", "phrase"} (the learned meme it is), or else the model's own:
+    {"how": "tested"} when its meaning passed the blind test, {"how": "guess"}. Empty for a
+    phrase that isn't a meme or has no meaning."""
     if verdict.get("kind") != "meme" or not verdict.get("meaning"):
         return []
-    told = []
-    video = next((v for v in verdict.get("videos") or [] if not v.get("for")), None)
-    if video:
-        told.append({"how": "video", "title": video.get("title", ""), "url": video.get("url", "")})
-    page = next((p for p in verdict.get("pages") or [] if not p.get("for")), None)
-    if page:
-        told.append({"how": "page", "site": page.get("site", ""), "title": page.get("title", ""),
-                     "url": page.get("url", "")})
+    told = [{"how": "video", "title": video.get("title", ""), "url": video.get("url", "")}
+            for video in verdict.get("videos") or [] if not video.get("for")]
+    told += [{"how": "page", "site": page.get("site", ""), "title": page.get("title", ""),
+              "url": page.get("url", "")}
+             for page in verdict.get("pages") or [] if not page.get("for")]
     if verdict.get("explanations"):
         told.append({"how": "explanation", "line": verdict["explanations"][0]})
     if not told and learned:

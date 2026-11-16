@@ -492,7 +492,8 @@ def _tracks(items):
 def video_detail(bvid):
     """What a video's page shows, in one request (view/detail, which a visitor gets without
     a captcha): {"bvid", "aid", "title", "author", "pubdate", "duration" (seconds),
-    "desc", "tags", "plays", "parts": [cid, ...], "subtitles" (the tracks a visitor can
+    "desc", "tags", "zone" (its zone: 单机游戏, 电子竞技, 动画 ...; the new name too when
+    Bilibili gives one), "plays", "parts": [cid, ...], "subtitles" (the tracks a visitor can
     read, see _tracks(); Bilibili only gives its AI subtitles to logged-in viewers, so this
     is often empty), "related" (the videos beside it, like related_videos())}."""
     data = _request("/x/web-interface/view/detail", {"bvid": bvid}) or {}
@@ -512,6 +513,9 @@ def video_detail(bvid):
         "desc": "" if desc == "-" else desc,  # "-" is what the page shows for none
         "tags": [tag["tag_name"] for tag in data.get("Tags") or []
                  if isinstance(tag, dict) and tag.get("tag_name")],
+        "zone": " ".join(dict.fromkeys(str(view.get(key) or "").strip()
+                                       for key in ("tname", "tname_v2")
+                                       if str(view.get(key) or "").strip())),
         "plays": _number(stat.get("view")),
         "parts": parts or ([view["cid"]] if view.get("cid") else []),
         "subtitles": _tracks((view.get("subtitle") or {}).get("list")),

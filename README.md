@@ -465,15 +465,22 @@ For each phrase it:
    something (是什么梗, 什么意思, 出处, 由来). They come from the links you give, from the
    explainer videos the bot saw in related-video lists (the collector's and those beside
    every explainer it reads, which a visitor gets without a captcha), from a search engine's
-   results for "阿一古是什么梗" (Bing, or DuckDuckGo or Baidu when Bing doesn't answer:
-   `memelearner/web.py`), and from Bilibili's own search for it. Bilibili's search is tried
+   results for "阿一古是什么梗 site:bilibili.com" (Bing, or DuckDuckGo or Baidu when Bing
+   doesn't answer: `memelearner/web.py`; only Bilibili's pages, as many memes come from
+   there and pages elsewhere were often about something else of the same name, like 汽车人
+   in the manga 刃牙), and from Bilibili's own search for it. Bilibili's search is tried
    until it asks for a captcha once in a run, then skipped (the bot never solves captchas);
    both searches happen for each phrase at most once a week. When no video names a meme the judge says comes from another one (see Where a meme
    comes from), it looks the same way for videos about that one: 千言万语感谢现役是什么梗
    for 千言万语感谢多兰, 超威同意了 for the pattern XX同意了.
-2. **Reads** up to 2 of them per phrase, each video once, as any visitor who isn't logged in
-   sees them: the page (title, description, tags, the subtitles a visitor gets, related
-   videos), the hot comments and the danmu. That is 3 or 4 requests, 5 to 7 seconds apart.
+2. **Reads** them, each video once, as any visitor who isn't logged in sees them: the page
+   (title, description, tags, zone, the subtitles a visitor gets, related videos), the hot
+   comments and the danmu. That is 3 or 4 requests, 5 to 7 seconds apart. A video that
+   isn't about games or esports is skipped: none of its title, description, tags, zone or
+   what it says has a game word (游戏, 电竞, 英雄联盟, LPL, 打野 ..., or a player in the
+   nickname table; the phrase itself doesn't count). It is written down with why, and not
+   read again. It goes on until 2 videos about games are summed up, reading 6 at most. A
+   video from a link you give is always summed up.
 3. **Hears** a video when it has no subtitles, if Whisper is installed (see below): it saves
    the smallest audio stream (about half a megabyte a minute, only for videos up to 10
    minutes), a Whisper model on this computer writes down what is said, and the audio is
@@ -482,25 +489,31 @@ For each phrase it:
    reached, as for the judge): does it explain the phrase, what does it say the phrase
    means and where it comes from, and a line quoted from it (a quote that isn't in the
    video is dropped). The model is told to write only what the video says.
-5. **Reads the web** when no video explains the phrase: 萌娘百科's entry for it (the page
-   its mobile site's search goes to; its API wants a login since November 2026), 百度百科's
-   and what 小鸡词典's search page shows, and up
-   to 3 of the other pages the search engine found that name it, explainer sites first
-   (萌娘百科, 百度百科, 知乎, 贴吧 ...); for the rest, the search results' snippets. Only the
-   lines around the phrase go to the model, which sums them up as it does a video, names
+5. **Reads Bilibili's other pages** when no video explains the phrase: up to 3 of the
+   articles and posts the search engine found on Bilibili whose titles name it, the ones
+   asking what it means (是什么梗) first; for the rest, the search results' snippets. Only
+   the lines around the phrase go to the model, which sums them up as it does a video, names
    the page it went by and quotes it (a quote that page doesn't contain is dropped). A page
-   may be about something else of the same name, so the model is told which game the phrase
-   is from. 小鸡词典's own API wants an encrypted header that only its page makes; the bot
-   doesn't make one, so it only reads what anyone sees there.
-6. **Judges again** the phrases a video or a page explains: the model gets their summaries
+   that isn't about games is skipped and written down, as a video is.
+6. **Reads the wikis** only when nothing on Bilibili explains it either: 萌娘百科's entry
+   for it (the page its mobile site's search goes to; its API wants a login since November
+   2026), 百度百科's and what 小鸡词典's search page shows, each only when its title names
+   the phrase and it is about games (百度百科's 汽车人 is the Transformers). They are summed
+   up the same way. A page may still be about something else of the same name, so the
+   model is told which game the phrase is from. 小鸡词典's own API wants an encrypted header
+   that only its page makes; the bot doesn't make one, so it only reads what anyone sees
+   there.
+7. **Judges again** the phrases a video or a page explains: the model gets their summaries
    beside the danmu, and a meaning a video or a page backs isn't only a guess any more, so
-   `accept` takes it. `candidates` shows which video or page it came from. A video about
-   where a meme comes from shows the model that source, marked as such, but doesn't back
-   the meme's own meaning.
+   `accept` takes it. `candidates` shows which video or page it came from, and the report
+   links every video and page that explains it, to check it by. A video about where a meme
+   comes from shows the model that source, marked as such, but doesn't back the meme's own
+   meaning.
 
 What it read stays in `memelearner/.cache/surf/explainers.json` and `explainers/`. A phrase
-nothing explains is looked up again after a week; `--again` looks up everything again. A
-site that wants a captcha, refuses the bot (HTTP 403, 429) or can't be reached twice is left
+nothing explains is looked up again after a week, or at the next run when its search was
+made before the bot searched only Bilibili; `--again` looks up everything again. A site
+that wants a captcha, refuses the bot (HTTP 403, 412, 429) or can't be reached twice is left
 alone for the rest of the run; there are a few seconds between two requests to the same site.
 
 Which search engines and wikis answer depends on where your computer is, so you can try them:
@@ -511,8 +524,9 @@ py -m memelearner sources --file phrases.txt --raw   # phrases one a line; keep 
 ```
 
 It writes what each place found to `.cache/surf/sources/` (`--out` for another folder):
-`sources.md` to read, beside what `memes.json` says the learned ones mean, `sources.json`,
-and `links.json`, the Bilibili videos found for each phrase.
+`sources.md` to read, beside what `memes.json` says the learned ones mean, with a link to
+every video and page used and every one skipped (and why), `sources.json`, and
+`links.json`, the Bilibili videos found for each phrase.
 
 **Hearing the videos (optional).** Most explainer videos are spoken, and Bilibili only gives
 its AI subtitles to logged-in viewers, which the bot never is. To hear them, install Whisper:
@@ -665,7 +679,7 @@ found, how many memes were explained, and the problems.
 | `memelearner/surf.py` | the bot: find videos, read them, find the phrases people send on their own |
 | `memelearner/judging.py` | the judge: a model tells memes from names and explains them; compare |
 | `memelearner/explainers.py` | finds, reads and sums up the videos and web pages that explain memes |
-| `memelearner/web.py` | search engines and wikis, for what explains a meme (read only) |
+| `memelearner/web.py` | search engines (Bilibili's pages only) and wikis, for what explains a meme (read only) |
 | `memelearner/live.py` | records a live room's danmu, and finds its phrases |
 | `memelearner/auto.py` | runs by itself for days with Windows Task Scheduler (`auto`) |
 | `memelearner/meanings.py` | merges your notes with the model's meanings |
