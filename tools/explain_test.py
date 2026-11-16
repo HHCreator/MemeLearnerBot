@@ -18,6 +18,9 @@ uses as it is.
                             videos the bot read, and beside the explainer videos found
                             there, and their collections (合集)
                   web       the Bilibili videos a search engine finds (the bot's lookup)
+                  up-...    what the uploaders of explainer videos list: their collections
+                            and series (up-lists), the videos in them (up-collection,
+                            up-series) and their newest videos (up-videos)
                   api-type  the search the bot uses now
                   api-old   the same search at its old address, without the signature
                   api-all   the "all results" search
@@ -26,7 +29,8 @@ uses as it is.
                             search page gives a browser
                 The first PROBES phrases try the five searches; the others use the ones that
                 worked. It never logs in and never solves a captcha: a way that is refused
-                is dropped.
+                is dropped. The videos given as links are read first, so that a way that
+                gets the bot refused later doesn't lose them.
     2. Read     Up to VIDEOS videos for each phrase, as explain does (explainers.read()),
                 and heard on the processor when Whisper is installed (the .bat offers to
                 put it in the test's own folder). The web pages about each phrase, as the
@@ -77,6 +81,10 @@ DROP_AFTER = 3  # times in a row a way to search may fail before it is dropped
 RAW = 400_000  # characters kept of an answer saved as it came
 PAGE = "https://search.bilibili.com/video?keyword={}"
 ROUTES = ("api-type", "api-old", "api-all", "page", "api-page")
+UP_ROUTES = ("up-lists", "up-collection", "up-series", "up-videos")
+UPLOADERS = 3  # uploaders of explainer videos whose lists are asked for
+COLLECTIONS = 2  # collections read of each
+SPACE = "https://space.bilibili.com/{}"
 BROWSER_ACCEPT = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
 
 HOME = os.environ.get("MEMELEARNER_HOME") or ""
@@ -295,7 +303,7 @@ class Searcher:
         url = f"{bilibili.API}{path}?" + urllib.parse.urlencode(query,
                                                                 quote_via=urllib.parse.quote)
         status, headers, text = fetch(url, cookies, referer, origin)
-        out = {"route": route, "status": status, "bytes": len(text),
+        out = {"route": route, "url": url, "status": status, "bytes": len(text),
                "headers": gateway(headers)}
         if status is None:
             return dict(out, outcome="error", note=text[:120]), {}, text
@@ -322,7 +330,7 @@ class Searcher:
         url = PAGE.format(urllib.parse.quote(query))
         status, headers, text = fetch(url, self.jar or None, "https://www.bilibili.com/",
                                       False, BROWSER_ACCEPT)
-        out = {"route": "page", "status": status, "bytes": len(text),
+        out = {"route": "page", "url": url, "status": status, "bytes": len(text),
                "headers": gateway(headers)}
         if status is None:
             return dict(out, outcome="error", note=text[:120]), {}, text
@@ -390,8 +398,36 @@ class Searcher:
         except Exception as error:  # a shape nobody expected: write it down, go on
             out, videos, text = {"route": route, "outcome": "error",
                                  "note": f"{error!r}"[:200]}, {}, traceback.format_exc()
+        return self._record(route, phrase, out, videos, text)
+
+    def probe(self, route, label, path, params, referer=None):
+        """One of an uploader's lists, asked for as the search is (signed, with the bot's
+        visitor cookies), kept and counted like a search: (what it answered, {bvid: video},
+        the answer's data)."""
+        try:
+            out, videos, text = self._api(route, path, params, True,
+                                          bilibili._visitor_cookies(), referer)
+        except bilibili.Blocked:
+            raise
+        except Exception as error:  # a shape nobody expected: write it down, go on
+            out, videos, text = {"route": route, "outcome": "error",
+                                 "note": f"{error!r}"[:200]}, {}, traceback.format_exc()
+        try:
+            data = json.loads(text).get("data")
+        except (ValueError, AttributeError):
+            data = None
+        out, videos = self._record(route, label, out, videos, text)
+        return out, videos, data if isinstance(data, dict) else {}
+
+    def _record(self, route, phrase, out, videos, text):
+        """Count an answer, keep the first of each kind as it came, and say what it was."""
         self.count += 1
         out["phrase"] = phrase
+        listed = self.state.setdefault("route_videos", {}).setdefault(route, {})
+        for bvid, video in videos.items():
+            listed.setdefault(bvid, video["title"])
+        if videos:
+            self.state.setdefault("examples", {}).setdefault(route, out.get("url", ""))
         tally = self.tally.setdefault(route, {})
         tally[out["outcome"]] = tally.get(out["outcome"], 0) + 1
         good = out["outcome"] in ("videos", "empty")
@@ -401,7 +437,7 @@ class Searcher:
             keep_raw(f"{route}-{out['outcome']}-{tally[out['outcome']]}.txt", text)
         out["titles"] = [video["title"] for video in list(videos.values())[:10]]
         _requests.append({"to": route, "status": out.get("status"), "outcome": out["outcome"]})
-        say(f"      {route:9} {out['outcome']:8} "
+        say(f"      {route:13} {out['outcome']:8} "
             + (f"{len(videos)} videos" if videos else out.get("note") or out.get("message")
                or f"code {out.get('code')}"))
         if out.get("status") in (412, 429):
@@ -476,6 +512,7 @@ def note_detail(state, bvid, data):
     looks = lambda videos: sum(1 for v in videos if explainers.looks_like_explainer(v["title"]))
     state.setdefault("pages", {})[bvid] = {
         "title": view.get("title", ""), "author": (view.get("owner") or {}).get("name", ""),
+        "mid": (view.get("owner") or {}).get("mid"),
         "related": len(related), "explainers": looks(related),
         "collection": season.get("title", "") if season else "", "episodes": len(episodes),
         "collection_explainers": looks(episodes)}
@@ -554,9 +591,10 @@ def read_page(state, bvid, done):
     save_state(state)
 
 
-def pool_matches(state, memes):
-    """{phrase: [video]} for every learned meme a video in the pool names in its title."""
-    pool = state.get("pool") or {}
+def pool_matches(state, memes, videos=None):
+    """{phrase: [video]} for every learned meme a video in the pool (or in videos, {bvid:
+    {"title"}}) names in its title."""
+    pool = (state.get("pool") or {}) if videos is None else videos
     parts = {bvid: surf.units(surf.clean(video["title"])) for bvid, video in pool.items()}
     joined = {bvid: "".join(units) for bvid, units in parts.items()}
     found = {}
@@ -574,6 +612,91 @@ def pool_matches(state, memes):
                         hits.append(dict(pool[bvid], bvid=bvid, explains=explainers.
                                          looks_like_explainer(pool[bvid]["title"])))
     return found
+
+
+def uploaders(state, searcher):
+    """Other lists a visitor may get without searching: what the people who made explainer
+    videos have uploaded. For up to UPLOADERS of them (whose pages were read here, the ones
+    with the most explainer videos seen first): their collections and series (up-lists), the
+    videos of up to COLLECTIONS collections (up-collection) and of one series (up-series),
+    and their newest videos (up-videos: it wanted a captcha on 2026-10-31). What they list
+    goes to the pool, with how "uploader". Returns how many videos that added."""
+    pool, pages = state.setdefault("pool", {}), state.get("pages") or {}
+    asked = state.setdefault("uploaders", {})
+    seen, mids = {}, {}
+    for video in pool.values():
+        if explainers.looks_like_explainer(video["title"]) and video.get("author"):
+            seen[video["author"]] = seen.get(video["author"], 0) + 1
+    for page in pages.values():
+        if page.get("mid") and page.get("author") and \
+                explainers.looks_like_explainer(page.get("title", "")):
+            mids.setdefault(page["author"], page["mid"])
+    todo = [name for name in sorted(mids, key=lambda name: -seen.get(name, 0))[:UPLOADERS]
+            if str(mids[name]) not in asked]
+    if not todo:
+        return 0
+    say(f"1d. What {len(todo)} uploaders of explainer videos list (their collections, series "
+        "and newest videos) ...")
+    metas = lambda items: [item["meta"] for item in items or []
+                           if isinstance(item, dict) and isinstance(item.get("meta"), dict)]
+    best = lambda found: sorted((item for item in found if item[0]), key=lambda item: (
+        not explainers.looks_like_explainer(item[1]), -item[2]))
+    before = len(pool)
+    sizes = [100, 30]  # videos asked for of a collection at once: 30 is what the page asks for
+    for name in todo:
+        mid, got = mids[name], {}
+        entry = asked[str(mid)] = {"name": name, "lists": [], "videos": 0, "explainers": 0}
+        referer = SPACE.format(mid)
+        say(f"    {name} ({mid}): {seen.get(name, 0)} explainer videos seen so far")
+        if "up-lists" not in searcher.dropped:
+            _, videos, data = searcher.probe(
+                "up-lists", name, "/x/polymer/web-space/home/seasons_series",
+                {"mid": mid, "page_num": 1, "page_size": 20}, referer)
+            got.update(videos)
+            lists = data.get("items_lists") if isinstance(data.get("items_lists"), dict) else {}
+            seasons = [(meta.get("season_id"), str(meta.get("name") or ""), meta.get("total") or 0)
+                       for meta in metas(lists.get("seasons_list"))]
+            series = [(meta.get("series_id"), str(meta.get("name") or ""), meta.get("total") or 0)
+                      for meta in metas(lists.get("series_list"))]
+            entry["lists"] = [{"kind": kind, "id": item[0], "name": item[1], "total": item[2]}
+                              for kind, found in (("collection", seasons), ("series", series))
+                              for item in found]
+            for number, title, total in best(seasons)[:COLLECTIONS]:
+                if "up-collection" in searcher.dropped:
+                    break
+                for size in list(sizes):
+                    out, videos, _ = searcher.probe(
+                        "up-collection", f"{name}: {title}",
+                        "/x/polymer/web-space/seasons_archives_list",
+                        {"mid": mid, "season_id": number, "sort_reverse": "false",
+                         "page_num": 1, "page_size": size}, referer)
+                    if out["outcome"] != "error" or "up-collection" in searcher.dropped:
+                        break
+                    sizes.remove(size)  # too many at once, perhaps: not asked for again
+                got.update(videos)
+            for number, title, total in best(series)[:1]:
+                if "up-series" in searcher.dropped:
+                    break
+                _, videos, _ = searcher.probe(
+                    "up-series", f"{name}: {title}", "/x/series/archives",
+                    {"mid": mid, "series_id": number, "only_normal": "true", "sort": "desc",
+                     "pn": 1, "ps": 30}, referer)
+                got.update(videos)
+        if "up-videos" not in searcher.dropped:
+            _, videos, _ = searcher.probe(
+                "up-videos", name, "/x/space/wbi/arc/search",
+                {"mid": mid, "ps": 30, "pn": 1, "order": "pubdate"}, referer)
+            got.update(videos)
+        for bvid, video in got.items():
+            pool.setdefault(bvid, {"title": video["title"], "plays": video.get("plays") or 0,
+                                   "author": video.get("author") or name, "how": "uploader",
+                                   "beside": ""})
+        entry.update(videos=len(got), explainers=sum(
+            1 for video in got.values() if explainers.looks_like_explainer(video["title"])))
+        searcher.drop_failing()
+        save_state(state)
+    say(f"    {len(pool) - before} videos more in the pool")
+    return len(pool) - before
 
 
 # -- the phrases --------------------------------------------------------------------------
@@ -611,7 +734,20 @@ def find_videos(state, wanted, memes, links, hearing, materials, known):
         "and the web pages for each phrase"
         + ("" if hearing else "; not hearing the videos, Whisper isn't installed") + " ...")
     try:
+        for phrase in wanted:  # the videos given as links: read before anything is searched
+            given = given_videos(links.get(phrase, ()))
+            if given:
+                entry = found.setdefault(phrase, {"searches": [], "videos": []})
+                entry["videos"] = given + [video for video in entry["videos"] if video["bvid"]
+                                           not in [g["bvid"] for g in given]]
+                say(f"    {phrase} (the videos given)")
+                read_videos(state, phrase, entry, hearing, materials)
+                save_state(state)
         _find_videos(state, wanted, memes, links, hearing, materials, found, searcher, known)
+        if uploaders(state, searcher):
+            say("1e. The phrases once more, with what the uploaders list ...")
+            _find_videos(state, wanted, memes, links, hearing, materials, found, searcher,
+                         known)
     finally:
         state["search_requests"] = state.get("search_requests", 0) + searcher.count
         save_state(state)
@@ -622,15 +758,7 @@ def _find_videos(state, wanted, memes, links, hearing, materials, found, searche
         entry = found.setdefault(phrase, {"searches": [], "videos": []})
         names = names_of(phrase, memes[phrase])
         say(f"    {phrase}")
-        given = []
-        for link in links.get(phrase, ()):
-            try:
-                bvid = bilibili.bvid_of(link)
-            except OSError as error:
-                say(f"      couldn't open {link}: {error}")
-                continue
-            if bvid:
-                given.append({"bvid": bvid, "title": "", "how": "link", "plays": 0})
+        given = given_videos(links.get(phrase, ()))
         if entry.get("searched"):
             say("      searched in an earlier run")
         elif number < PROBES and not state.get("probed", {}).get(phrase):
@@ -676,6 +804,21 @@ def _find_videos(state, wanted, memes, links, hearing, materials, found, searche
         save_state(state)
         read_videos(state, phrase, entry, hearing, materials)
         save_state(state)
+
+
+def given_videos(links):
+    """[{"bvid", "title", "how": "link", "plays"}] for some video links."""
+    given = []
+    for link in links:
+        match = bilibili.BVID.search(link)  # a short link (b23.tv) has to be opened
+        try:
+            bvid = match.group() if match else bilibili.bvid_of(link)
+        except OSError as error:
+            say(f"      couldn't open {link}: {error}")
+            continue
+        if bvid and bvid not in [video["bvid"] for video in given]:
+            given.append({"bvid": bvid, "title": "", "how": "link", "plays": 0})
+    return given
 
 
 def add_matches(entry, videos, names, route):
@@ -746,7 +889,10 @@ def read_videos(state, phrase, entry, hearing, materials):
     """Step 2 for a phrase: read up to VIDEOS of its videos, as explain does, and hear the
     ones without subtitles when Whisper is there. materials[phrase] = [{"how", "read": the
     video as its page shows it, "heard": the same with what was heard, or None}]."""
+    read = [material["read"]["bvid"] for material in materials.get(phrase, [])]
     for video in (entry.get("videos") or [])[:VIDEOS]:
+        if video["bvid"] in read:  # in the pass before
+            continue
         try:
             material = explainers.read(video["bvid"], phrase,
                                        hearing and whisper_ready(state))
@@ -963,8 +1109,26 @@ def write_results(state, wanted, memes, started, model, hearing, problem):
                      "videos": verdicts.get("told") or [], "lines": verdicts.get("lines"),
                      "without": verdicts.get("without"), "with_pages": verdicts.get("pages"),
                      "with_read": verdicts.get("read"), "with_heard": verdicts.get("heard")})
+    listed = {}  # what each way listed: the searches and the uploaders' lists, then the pool
+    groups = {route: {bvid: {"title": title, "plays": 0, "how": route}
+                      for bvid, title in videos.items()}
+              for route, videos in (state.get("route_videos") or {}).items()}
+    for how in ("related", "collection", "seen", "uploader"):
+        groups[how] = {bvid: video for bvid, video in pool.items() if video["how"] == how}
+    for name, videos in groups.items():
+        if videos:
+            listed[name] = {
+                "videos": len(videos),
+                "explainers": sum(1 for video in videos.values()
+                                  if explainers.looks_like_explainer(video["title"])),
+                "memes": len(pool_matches(state, memes, videos))}
+    examples = dict(state.get("examples") or {})
+    if state.get("pages"):
+        examples["related, collection"] = (f"{bilibili.API}/x/web-interface/view/detail?bvid="
+                                           + next(iter(state["pages"])))
     result = {
         "made": time.strftime("%Y-%m-%d %H:%M"), "seconds": round(time.time() - started),
+        "listed": listed, "examples": examples, "uploaders": state.get("uploaders") or {},
         "code": os.path.dirname(os.path.abspath(explainers.__file__)),
         "model": model, "hearing": hearing, "whisper": whisper, "heard": heard,
         "problem": problem, "slow": bool(state.get("slow")),
@@ -995,12 +1159,30 @@ def write_results(state, wanted, memes, started, model, hearing, problem):
            f"Made {result['made']} in {result['seconds']} s with {model or 'no model'}; {hears}."
            + (f" Stopped early: {problem}" if problem else ""), "",
            "## Ways to find the videos", "",
-           "| Way | Found videos | Nothing found | Captcha | Refused | Error |", "|---|---|---|---|---|---|"]
-    for route in ROUTES:
+           "Each row counts requests by what they answered, then the different videos the "
+           "way listed in all, how many of those look like explainers, and how many of the "
+           f"{len(memes)} learned memes their titles name.", "",
+           "| Way | Found videos | Nothing found | Captcha | Refused | Error | Videos listed "
+           "| Explainers | Learned memes named |", "|---|---|---|---|---|---|---|---|---|"]
+    for route in ROUTES + UP_ROUTES:
         tally = (state.get("routes") or {}).get(route) or {}
         out.append(f"| {route}{' (dropped)' if route in result['dropped'] else ''} | "
                    + " | ".join(str(tally.get(k, 0)) for k in
-                                ("videos", "empty", "captcha", "refused", "error")) + " |")
+                                ("videos", "empty", "captcha", "refused", "error"))
+                   + " | " + " | ".join(str(result["listed"].get(route, {}).get(k, 0)) for k in
+                                        ("videos", "explainers", "memes")) + " |")
+    for how in ("related", "collection", "seen", "uploader"):
+        listed = result["listed"].get(how)
+        if listed:
+            out.append(f"| {how} (the lists beside videos) | | | | | | " + " | ".join(
+                str(listed[k]) for k in ("videos", "explainers", "memes")) + " |")
+    if result["examples"]:
+        out += ["", "A request of each way that listed videos:", ""] + [
+            f"- {route}: `{url}`" for route, url in result["examples"].items()]
+    for mid, uploader in (state.get("uploaders") or {}).items():
+        out.append(f"- Uploader {uploader['name']} ({mid}): {len(uploader['lists'])} "
+                   f"collections and series, {uploader['videos']} videos listed, "
+                   f"{uploader['explainers']} look like explainers")
     hows = {}
     for row in rows:
         for how in {video["how"] for video in row["found"]}:
