@@ -1,5 +1,5 @@
 @echo off
-rem explain-test.bat, second version (thread "Add a meme video summary bot", 2026-11-11)
+rem explain-test.bat, fourth version (thread "Add a meme video summary bot", 2026-11-23)
 rem
 rem Tries the bot's explain step on memes it has learned: finds the videos and web pages
 rem that explain them, reads them (and hears the videos, if you say yes to Whisper), and
@@ -20,11 +20,15 @@ set MEMELEARNER_HOME=%TEST%
 echo Getting the test's code (a fresh copy in %CODE%) ...
 if exist "%CODE%" rmdir /s /q "%CODE%"
 git clone -q -b claude/project-thread-id2prd https://github.com/HHCreator/MemeLearnerBot "%CODE%" || goto fail
-echo Copying what the bot has read to %TEST% ...
+rem The danmu are copied only the first time: a later run judges with the same lines,
+rem so its answers compare with the first run's
 if not exist "%TEST%\surf\explainers" mkdir "%TEST%\surf\explainers"
+if exist "%TEST%\surf\live" goto copied
+echo Copying what the bot has read to %TEST% ...
 xcopy /d /e /i /q /y "%CACHE%surf\bilibili" "%TEST%\surf\bilibili" >nul
 xcopy /d /e /i /q /y "%CACHE%surf\live" "%TEST%\surf\live" >nul
 copy /y "%CACHE%surf\videos.json" "%TEST%\surf\videos.json" >nul
+:copied
 rem The explainer videos the bot and the lookup test read already: not asked for again
 if exist "%CACHE%surf\explainers\*.json" xcopy /d /q /y "%CACHE%surf\explainers\*.json" "%TEST%\surf\explainers" >nul
 if exist "%CACHE%lookup-test\surf\explainers\*.json" xcopy /d /q /y "%CACHE%lookup-test\surf\explainers\*.json" "%TEST%\surf\explainers" >nul

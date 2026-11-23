@@ -33,8 +33,11 @@ uses as it is.
                 gets the bot refused later doesn't lose them.
     2. Read     Up to VIDEOS videos for each phrase, as explain does (explainers.read()),
                 and heard on the processor when Whisper is installed (the .bat offers to
-                put it in the test's own folder). The web pages about each phrase, as the
-                bot reads them (explainers.read_pages()). What the lookup test and the
+                put it in the test's own folder). The sound is fetched by hear_video(),
+                which tries the ways a visitor has and writes down what each answered:
+                on 2026-11-23 every video's sound was refused to the bot's own way, and a
+                later run hears those videos again. The web pages about each phrase, as
+                the bot reads them (explainers.read_pages()). What the lookup test and the
                 bot's own runs read already isn't asked for again.
     3. Sum up   explainers.summarize() for a video: once from what its page shows (title,
                 description, comments, danmu), and once more with what was heard.
@@ -51,9 +54,12 @@ model's answers; nobody is marked here.
 """
 
 import html
+import http.client
 import json
 import os
+import random
 import re
+import socket
 import sys
 import time
 import traceback
@@ -920,6 +926,367 @@ def read_videos(state, phrase, entry, hearing, materials):
             + (f", not heard: {material['unheard']}" if material.get("unheard") else ""))
 
 
+# -- hearing: a way to fetch the sound ----------------------------------------------------
+#
+# On 2026-11-23 the sound of every video was refused (HTTP 403 or 567) when the bot asked
+# for it as it does (bilibili.download(): the first address of the smallest stream, with the
+# API's headers and no Range). This tries the other ways a visitor has, writes down what
+# each one answered, and hears the video with the first way that works:
+#   sources  page   the streams the video's page carries (window.__playinfo__), as the bot
+#            api    the player's API (/x/player/wbi/playurl), the sound alone
+#            html5  the same API as a phone's browser asks it: one small mp4, sound and
+#                   pictures
+#   servers  the addresses as given (the first, then the spare ones), then the first one
+#            moved to the other UPOS servers (AUDIO_HOSTS), as some downloaders do
+#   styles   player  what the player in a browser sends: the video's page as Referer,
+#                    Origin, Range
+#            plain   what most downloaders send: the site as Referer, Range
+#            bare    no Referer, Range
+#            bot     what the bot sends now
+# Each try asks for the first PROBE_BYTES only. The first video tries every way, so the
+# results show them all; later videos try the ways that worked first, and every way only
+# when those fail. After GIVE_UP videos in a row that no way could fetch, the run stops
+# trying. Nothing written down holds a whole address: they name this computer (oi) and its
+# visitor id.
+
+AUDIO_HOSTS = ("upos-sz-mirrorcos.bilivideo.com", "upos-sz-mirrorali.bilivideo.com",
+               "upos-sz-mirrorhw.bilivideo.com", "upos-sz-mirror08c.bilivideo.com",
+               "upos-sz-mirrorcosov.bilivideo.com", "upos-sz-mirroraliov.bilivideo.com")
+SOURCES = ("page", "api", "html5")
+STYLES = ("player", "plain", "bare", "bot")
+MOVED_STYLES = ("player", "plain")  # the styles tried on a moved address
+PROBE_BYTES = 1024
+CDN_DELAY = 2  # seconds between two requests for a stream, plus up to 1 at random
+GIVE_UP = 2  # videos in a row that no way could fetch before the run stops trying
+MAX_VIDEO_FILE = 80_000_000  # bytes of an html5 mp4 saved at most (sound and pictures)
+# Why an earlier run didn't hear a video, when a way tried here may fetch its sound
+FETCH_FAILED = re.compile(r"the audio stream answered|/x/player/|no way fetched its sound|"
+                          r"not trying")
+IP_LIKE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b|\b(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\b",
+                     re.I)
+_audio = {"state": None, "last": 0.0, "family": "", "opener": None}
+
+
+def _host_kind(host):
+    host = (host or "").lower()
+    if host.endswith("akamaized.net"):
+        return "akamai"
+    if ".mcdn." in host or host.endswith(".szbdyd.com"):
+        return "pcdn"  # servers in people's homes that Bilibili rents
+    if host.startswith("upos-"):
+        return "upos-ov" if host.split(".")[0].endswith("ov") else "upos"
+    if host.startswith("cn-") and host.endswith(".bilivideo.com"):
+        return "cn"
+    return "other"
+
+
+def _about(url):
+    """What a stream address says of itself, without the parts that name this computer or
+    someone's home: {"host", "kind", "os", "og", "platform", "oi": "IPv4", "IPv6" or ""
+    (which kind of address the stream was given to)}."""
+    parts = urllib.parse.urlsplit(url)
+    query = urllib.parse.parse_qs(parts.query)
+    first = lambda name: (query.get(name) or [""])[0][:20]
+    host = (parts.hostname or "").lower()
+    if _host_kind(host) == "pcdn":
+        host = "*." + host.split(".", 1)[-1]  # its first part is the home's address
+    try:
+        host += f":{parts.port}" if parts.port else ""
+    except ValueError:
+        pass
+    oi = first("oi").lower()
+    if oi.startswith("0x"):
+        family = "IPv6" if len(oi) > 10 else "IPv4"
+    elif oi.isdigit():
+        family = "IPv4" if int(oi) < 2 ** 32 else "IPv6"
+    else:
+        family = ""
+    return {"host": host, "kind": _host_kind(parts.hostname), "os": first("os"),
+            "og": first("og"), "platform": first("platform"), "oi": family}
+
+
+def _snippet(body):
+    """The start of an answer's text, without tags or anything like an address."""
+    text = body.decode("utf-8", "replace") if isinstance(body, bytes) else str(body or "")
+    return IP_LIKE.sub("<address>", " ".join(re.sub(r"<[^>]+>", " ", text).split()))[:160]
+
+
+def _cdn_headers(headers):
+    """The headers of a stream server's answer that may say why it refused, cut short."""
+    keep = ("server", "content-type", "content-length", "content-range", "via", "age")
+    try:
+        return {name.lower(): IP_LIKE.sub("<address>", str(value))[:80]
+                for name, value in headers.items()
+                if name.lower() in keep or "bili" in name.lower()
+                or name.lower().startswith("x-")}
+    except AttributeError:
+        return {}
+
+
+class _Watched(http.client.HTTPSConnection):
+    """A connection that notes whether it went over IPv4 or IPv6 (to the proxy, when this
+    computer has one)."""
+
+    def connect(self):
+        super().connect()
+        _audio["family"] = "IPv6" if self.sock.family == socket.AF_INET6 else "IPv4"
+
+
+class _WatchedHTTPS(urllib.request.HTTPSHandler):
+    def https_open(self, req):
+        return self.do_open(_Watched, req, context=getattr(self, "_context", None))
+
+
+def _cdn_open(request, timeout=30):
+    """Open a stream's address (the simulation replaces this)."""
+    if _audio["opener"] is None:
+        _audio["opener"] = urllib.request.build_opener(_WatchedHTTPS())
+    return _audio["opener"].open(request, timeout=timeout)
+
+
+def _style_headers(style, bvid):
+    agent = bilibili.HEADERS["User-Agent"]
+    if style == "bot":
+        return dict(bilibili.HEADERS)
+    if style == "player":
+        return {"User-Agent": agent, "Accept": "*/*", "Accept-Encoding": "identity",
+                "Accept-Language": bilibili.HEADERS["Accept-Language"],
+                "Origin": "https://www.bilibili.com",
+                "Referer": bilibili.PAGE.format(bvid=bvid), "Sec-Fetch-Dest": "empty",
+                "Sec-Fetch-Mode": "cors", "Sec-Fetch-Site": "cross-site"}
+    if style == "plain":
+        return {"User-Agent": agent, "Accept": "*/*", "Referer": "https://www.bilibili.com/"}
+    return {"User-Agent": agent, "Accept": "*/*"}  # bare
+
+
+def _try_stream(url, style, bvid, path=None, limit=bilibili.MAX_DOWNLOAD):
+    """One try at a stream: its first PROBE_BYTES (no path), or all of it into path.
+    {"status" (None when it couldn't be reached), "bytes", "media" (not a web page),
+    "headers", "note", "family", "ms"}."""
+    headers = _style_headers(style, bvid)
+    if style != "bot":
+        headers["Range"] = "bytes=0-" if path else f"bytes=0-{PROBE_BYTES - 1}"
+    wait = _audio["last"] + CDN_DELAY + random.random() - time.time()
+    if wait > 0:
+        time.sleep(wait)
+    began, out = time.time(), {"status": None, "bytes": 0}
+    _audio["family"] = ""
+    try:
+        with _cdn_open(urllib.request.Request(url, headers=headers)) as response:
+            out.update(status=response.status, headers=_cdn_headers(response.headers))
+            if getattr(response, "url", url) != url:  # sent on to another server
+                out["went_to"] = _about(response.url)["host"]
+            if path is None:
+                head = response.read(PROBE_BYTES)
+                out.update(bytes=len(head), media=not head.lstrip()[:1] in (b"<", b"{"))
+            else:
+                with open(path, "wb") as f:
+                    while True:
+                        chunk = response.read(65536)
+                        if not chunk:
+                            break
+                        if not out["bytes"]:
+                            out["media"] = not chunk.lstrip()[:1] in (b"<", b"{")
+                        out["bytes"] += len(chunk)
+                        if out["bytes"] > limit:
+                            out["note"] = f"bigger than {limit // 1_000_000} MB"
+                            break
+                        f.write(chunk)
+    except urllib.error.HTTPError as error:
+        try:
+            body = error.read(400)
+        except Exception:
+            body = b""
+        out.update(status=error.code, headers=_cdn_headers(error.headers),
+                   note=_snippet(body))
+        if (getattr(error, "url", None) or url) != url:
+            out["went_to"] = _about(error.url)["host"]
+    except (urllib.error.URLError, OSError, http.client.HTTPException) as error:
+        out["note"] = _snippet(f"{error!r}")
+    _audio["last"] = time.time()
+    out.update(family=_audio["family"], ms=round((time.time() - began) * 1000))
+    return out
+
+
+def _dash_urls(dash):
+    """The addresses of the smallest sound stream in a player answer's "dash" part: the
+    first one, then the spare ones."""
+    streams = sorted((stream for stream in (dash or {}).get("audio") or []
+                      if isinstance(stream, dict)),
+                     key=lambda stream: stream.get("bandwidth") or 10 ** 9)
+    for stream in streams:
+        urls = [stream.get("baseUrl") or stream.get("base_url")] + list(
+            stream.get("backupUrl") or stream.get("backup_url") or [])
+        urls = [url for url in dict.fromkeys(urls) if url]
+        if urls:
+            return urls
+    return []
+
+
+def _stream_urls(source, bvid, cid):
+    """The addresses of a video's smallest stream got one way (SOURCES), as given."""
+    if source == "page":
+        found = bilibili.PLAYINFO.search(bilibili._get(bilibili.PAGE.format(bvid=bvid),
+                                                       cookies=bilibili._visitor_cookies()))
+        if not found:
+            raise bilibili.Error("its page carries no streams")
+        try:
+            data = json.loads(found.group(1)).get("data") or {}
+        except ValueError:
+            raise bilibili.Error("its page's streams aren't JSON") from None
+        return _dash_urls(data.get("dash"))
+    params = {"bvid": bvid, "cid": cid, "qn": 16, "fnver": 0, "fourk": 0}
+    if source == "api":
+        data = bilibili._request("/x/player/wbi/playurl", dict(params, fnval=16),
+                                 signed=True) or {}
+        return _dash_urls(data.get("dash"))
+    data = bilibili._request("/x/player/wbi/playurl",
+                             dict(params, fnval=1, platform="html5", high_quality=1),
+                             signed=True) or {}
+    urls = []
+    for part in (data.get("durl") or [])[:1]:
+        urls += [part.get("url")] + list(part.get("backup_url") or [])
+    return [url for url in dict.fromkeys(urls) if url]
+
+
+def _candidates(urls):
+    """[(address, server)] to try of one source: the addresses as given ("given:<kind>"),
+    then the first one signed for the UPOS servers moved to each of AUDIO_HOSTS
+    ("moved:<server>")."""
+    out = [(url, "given:" + _host_kind(urllib.parse.urlsplit(url).hostname)) for url in urls]
+    # one a UPOS server was given, when there is one: the others are signed for another kind
+    signed = sorted((url for url in urls if "upsig=" in url and "/upgcxcode/" in url),
+                    key=lambda url: not _host_kind(urllib.parse.urlsplit(url).hostname)
+                    .startswith("upos"))
+    signed = signed[0] if signed else None
+    if signed:
+        parts = urllib.parse.urlsplit(signed)
+        have = {urllib.parse.urlsplit(url).hostname for url in urls}
+        out += [(urllib.parse.urlunsplit(("https", host, parts.path, parts.query, "")),
+                 "moved:" + host.split(".")[0].replace("upos-sz-", ""))
+                for host in AUDIO_HOSTS if host not in have]
+    return out
+
+
+def _worked(out, whole=False):
+    return out["status"] in (200, 206) and out["bytes"] > (1000 if whole else 0) \
+        and out.get("media", True) and not str(out.get("note") or "").startswith("bigger")
+
+
+def hear_video(video, phrase):
+    """explainers._hear_video() with the ways above: the sound saved, heard and deleted;
+    what is said. Raises bilibili.Error when no way fetched it (read() keeps that as the
+    reason it wasn't heard)."""
+    state = _audio["state"]
+    audio = state.setdefault("audio", {})
+    for key, empty in (("tries", []), ("works", {}), ("videos", {}), ("missed", 0),
+                       ("swept", 0)):
+        audio.setdefault(key, empty)
+    audio.setdefault("proxy", bool(urllib.request.getproxies()))
+    audio.setdefault("python", sys.version.split()[0])
+    bvid = video["bvid"]
+    if audio.get("stopped"):
+        raise bilibili.Error("not trying: no way fetched its sound for the videos before")
+    mine = audio["videos"][bvid] = {"sources": {}, "worked": None, "tries": 0}
+    asked = {}  # source: the addresses it gave this time
+
+    def urls(source):
+        if source not in asked:
+            try:
+                asked[source] = _stream_urls(source, bvid, video["cid"])
+                mine["sources"][source] = f"{len(asked[source])} addresses"
+            except bilibili.Blocked:
+                raise
+            except (bilibili.Error, bilibili.Captcha, urllib.error.URLError, OSError,
+                    KeyError, TypeError, ValueError) as error:
+                asked[source] = []
+                mine["sources"][source] = _snippet(str(error) or repr(error))
+        return asked[source]
+
+    def attempt(source, url, server, style, path=None):
+        limit = MAX_VIDEO_FILE if source == "html5" else bilibili.MAX_DOWNLOAD
+        out = _try_stream(url, style, bvid, path, limit)
+        audio["tries"].append(dict(_about(url), bvid=bvid, source=source, server=server,
+                                   style=style, whole=bool(path), **out))
+        mine["tries"] += 1
+        return _worked(out, bool(path))
+
+    found, every = None, not audio["swept"]
+    for way in ([] if every else sorted(audio["works"], key=lambda w: -audio["works"][w])):
+        source, server, style = way.split("|")
+        for url, label in _candidates(urls(source)):
+            if label == server and attempt(source, url, label, style):
+                found = (source, url, label, style)
+                break
+        if found:
+            break
+    if not found:
+        audio["swept"] += 1
+        for source in SOURCES:
+            for url, label in _candidates(urls(source)):
+                for style in STYLES if label.startswith("given") else MOVED_STYLES:
+                    if attempt(source, url, label, style):
+                        way = f"{source}|{label}|{style}"
+                        audio["works"].setdefault(way, 0)
+                        found = found or (source, url, label, style)
+                        if not every:
+                            break
+                if found and not every:
+                    break
+            if found and not every:
+                break
+    save_state(state)
+    if not found:
+        audio["missed"] += 1
+        if audio["missed"] >= GIVE_UP:
+            audio["stopped"] = True
+            say(f"      no way fetched the sound of {GIVE_UP} videos in a row: not trying "
+                "for the others in this run")
+        tally = {}
+        for one in audio["tries"]:
+            if one["bvid"] == bvid:
+                key = f"{one['source']} {one['status'] or 'unreachable'}"
+                tally[key] = tally.get(key, 0) + 1
+        missing = [f"{source}: {note}" for source, note in mine["sources"].items()
+                   if not note.endswith("addresses")]
+        raise bilibili.Error("no way fetched its sound (" + ", ".join(
+            f"{key} x{count}" for key, count in tally.items()) + "; ".join(
+            [""] + missing) + ")")
+    audio["missed"] = 0
+    source, url, label, style = found
+    way = f"{source}|{label}|{style}"
+    audio["works"][way] = audio["works"].get(way, 0) + 1
+    mine["worked"] = way
+    folder = os.path.join(surf.SURF_DIR, "explainers", "audio")
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, f"{bvid}.{'mp4' if source == 'html5' else 'm4a'}")
+    try:
+        if not attempt(source, url, label, style, path):
+            mine["worked"] = None
+            raise bilibili.Error(f"its first bytes came {way}, but not the whole of it")
+        say(f"      fetched the sound of {bvid}: {way}")
+        return explainers.hear(path, phrase)
+    finally:
+        save_state(state)
+        if os.path.exists(path):
+            os.remove(path)
+
+
+def hear_again():
+    """Take off the reason an earlier run gave for not hearing a video when a way tried here
+    may fetch its sound, so read() hears it this time. Returns how many."""
+    folder = os.path.join(surf.SURF_DIR, "explainers")
+    count = 0
+    for name in sorted(os.listdir(folder)) if os.path.isdir(folder) else []:
+        path = os.path.join(folder, name)
+        video = surf._load_json(path, None) if name.endswith(".json") else None
+        if isinstance(video, dict) and FETCH_FAILED.search(str(video.get("unheard") or "")):
+            video.pop("unheard")
+            surf._save_json(path, video)
+            count += 1
+    return count
+
+
 # -- the model ----------------------------------------------------------------------------
 
 class Model:
@@ -993,8 +1360,28 @@ def judge_phrases(state, wanted, memes, materials, model):
         uses, lines = {}, {}
     titles = surf._load_json(surf.VIDEOS_FILE, {})
     say(f"4. Summing the pages and videos up and judging with {model.name} ...")
+    kept_as_was = []
     for phrase in wanted:
         game, entry = game_of[phrase], memes[phrase]
+        candidate = dict(known.get((game, phrase)) or {
+            "phrase": phrase, "game": game,
+            "variants": [{"phrase": v, "people": 0} for v in entry.get("variants") or []]})
+        candidate.pop("judge", None)
+        where = (game, phrase)
+        used = lines.get(where) or [e if isinstance(e, str) else e.get("text", "")
+                                    for e in (candidate.get("examples") or [])
+                                    + list(entry.get("examples") or [])]
+        old = judged.get(phrase) or {}
+        if old.get("without") and (old.get("model") != model.name
+                                   or old.get("lines") != len(used)
+                                   or old.get("used", used) != used):
+            # Judged in an earlier run with another model or other danmu lines: those
+            # answers stay as they are (they are the ones being marked), and a new one
+            # wouldn't compare with them
+            kept_as_was.append(phrase)
+            continue
+        if old.get("model") != model.name or old.get("lines") != len(used):
+            old = {}
         kept = looked.setdefault(phrase, {})
         if kept.get("texts") and "pages" not in kept:
             kept["pages"] = [model.ask(lambda name: explainers.summarize_pages(
@@ -1024,19 +1411,8 @@ def judge_phrases(state, wanted, memes, materials, model):
                 "heard": [row["heard"] or row["read"] for row in told
                           if backs(row["heard"] or row["read"])]
                 if any(row["heard"] for row in told) else []}
-        candidate = dict(known.get((game, phrase)) or {
-            "phrase": phrase, "game": game,
-            "variants": [{"phrase": v, "people": 0} for v in entry.get("variants") or []]})
-        candidate.pop("judge", None)
-        where = (game, phrase)
-        used = lines.get(where) or [e if isinstance(e, str) else e.get("text", "")
-                                    for e in (candidate.get("examples") or [])
-                                    + list(entry.get("examples") or [])]
         shown = judging._titles(uses.get(where) or [], titles)
-        old = judged.get(phrase) or {}
-        if old.get("model") != model.name or old.get("lines") != len(used):
-            old = {}
-        result = {"model": model.name, "lines": len(used), "marks": {},
+        result = {"model": model.name, "lines": len(used), "used": used, "marks": {},
                   "without": old.get("without"), "told": told,
                   "web_says": kept.get("pages") or []}
         if not result["without"]:
@@ -1072,6 +1448,10 @@ def judge_phrases(state, wanted, memes, materials, model):
         for arm, label in ARMS:
             if result[arm]:
                 say(f"     {label}: {short(result[arm])}")
+    state["kept_as_was"] = kept_as_was
+    if kept_as_was:
+        say(f"   Not judged again, because the model or the danmu lines differ from the run "
+            f"that judged them: {', '.join(kept_as_was)}")
 
 
 # -- what came out ------------------------------------------------------------------------
@@ -1082,6 +1462,61 @@ def _cell(text):
 
 QUOTE = {"title": "its title", "description": "its description", "said": "what is said in it",
          "comments": "a comment", "danmu": "a danmu"}
+
+
+def sound_section(audio):
+    """result.md's lines on the ways hear_video() tried to fetch the sound."""
+    tries = audio.get("tries") or []
+    if not tries and not audio.get("videos"):
+        return []
+    videos = audio.get("videos") or {}
+    out = ["## Ways to fetch the sound", "",
+           f"{len(tries)} tries for {len(videos)} videos "
+           f"({sum(1 for v in videos.values() if v.get('worked'))} fetched); Python "
+           f"{audio.get('python', '?')}, a proxy on this computer: "
+           f"{'yes' if audio.get('proxy') else 'no'}. Each try asked for the first "
+           f"{PROBE_BYTES} bytes, except the ones marked whole.", "",
+           "| Source | Server | Style | Tries | Worked | Answers |",
+           "|---|---|---|---|---|---|"]
+    ways = {}
+    for one in tries:
+        way = ways.setdefault((one["source"], one["server"], one["style"]),
+                              {"tries": 0, "worked": 0, "answers": {}})
+        way["tries"] += 1
+        way["worked"] += _worked(one, one.get("whole"))
+        answer = str(one["status"] or "unreachable") + (" whole" if one.get("whole") else "")
+        way["answers"][answer] = way["answers"].get(answer, 0) + 1
+    for (source, server, style), way in ways.items():
+        out.append(f"| {source} | {server} | {style} | {way['tries']} | {way['worked']} | "
+                   + ", ".join(f"{a} x{n}" for a, n in sorted(way["answers"].items())) + " |")
+    seen, said = set(), []
+    for one in tries:  # what the refusals said, once each
+        if _worked(one, one.get("whole")):
+            continue
+        what = (f"{one['source']} {one['kind']} {one['host']} {one['style']} -> "
+                f"{one['status'] or 'unreachable'}, server "
+                f"{(one.get('headers') or {}).get('server', '?')}, os={one.get('os')} "
+                f"og={one.get('og')} given to an {one.get('oi') or '?'} address, went over "
+                f"{one.get('family') or '?'}"
+                + (f", sent on to {one['went_to']}" if one.get("went_to") else "")
+                + f": {_cell(one.get('note')) or '(nothing said)'}")
+        key = (one["kind"], one["status"], one.get("note"))
+        if key not in seen:
+            seen.add(key)
+            said.append(f"- {what}")
+    if said:
+        out += ["", "What the refusals said (once for each kind of server and answer):", ""]
+        out += said[:20]
+    out += ["", "Videos:", ""]
+    for bvid, video in videos.items():
+        out.append(f"- {bvid}: " + (f"fetched {video['worked']}" if video.get("worked")
+                                     else "not fetched")
+                   + f" after {video.get('tries', 0)} tries; "
+                   + ", ".join(f"{source}: {note}"
+                               for source, note in (video.get("sources") or {}).items()))
+    if audio.get("stopped"):
+        out.append(f"- Stopped trying after {GIVE_UP} videos in a row that no way fetched.")
+    return out + [""]
 
 
 def write_results(state, wanted, memes, started, model, hearing, problem):
@@ -1145,6 +1580,7 @@ def write_results(state, wanted, memes, started, model, hearing, problem):
                             if explainers.looks_like_explainer(video["title"])][:400]},
         "pool_matches": matches,
         "usage": {name: dict(counts) for name, counts in judging.usage.items()},
+        "audio": state.get("audio") or {}, "kept_as_was": state.get("kept_as_was") or [],
         "phrases": rows}
     surf._save_json(os.path.join(HOME, "result.json"), result)
 
@@ -1198,7 +1634,12 @@ def write_results(state, wanted, memes, started, model, hearing, problem):
             f"{sum(1 for row in rows if row['web']['results'])} of {len(rows)} phrases, pages "
             f"that explain {sum(1 for row in rows if any(backs(p) for p in row['web_says']))}"
             + (f"; left alone in this run: {', '.join(web.refused)}" if web.refused else "")
-            + ".", "", "## Phrases", ""]
+            + ".", ""]
+    out += sound_section(result["audio"])
+    if result["kept_as_was"]:
+        out += [f"Not judged again (another model or other danmu lines than the run that "
+                f"judged them): {', '.join(result['kept_as_was'])}.", ""]
+    out += ["## Phrases", ""]
     short = lambda v: "-" if not v else _cell(
         f"**{v['kind']}** ({v['verdict']}{', guess' if v.get('guess') else ''}): "
         f"{v['meaning'] or '(no meaning)'}")
@@ -1298,6 +1739,17 @@ def main(argv=None):
         return said
 
     explainers.hear = timed
+    # Fetch the sound the ways hear_video() tries, and try again the videos an earlier run
+    # couldn't fetch
+    _audio["state"] = state
+    explainers._hear_video = hear_video
+    if state.get("audio"):  # a new run: its first video tries every way again
+        state["audio"].update(stopped=False, missed=0, swept=0)
+    if hearing:
+        again = hear_again()
+        if again:
+            say(f"{again} videos whose sound couldn't be fetched before are heard again, "
+                "trying other ways to fetch it.")
 
     # Keep what every video page shows of other videos, whoever asks for it
     ask_bilibili = bilibili._request
