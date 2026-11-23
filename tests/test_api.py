@@ -152,6 +152,13 @@ class EntryPointTest(unittest.TestCase):
         self.assertEqual(meme["source"], {"phrase": "我们是冠军", "how": "learned"})
         meme = store.accept("我们是路边路边", source={"phrase": "我们是区", "how": "guess"})
         self.assertEqual(meme["source"], {"phrase": "我们是区", "how": "guess"})
+        # ... but folded into the meme it comes from, that one doesn't come from itself
+        store.accept("阿一古", meaning="아이고 的音译", variants=["阿一古啊"])
+        store.accept("哎一古", meaning="同上", source={"phrase": "阿一古", "how": "guess"})
+        store.accept("大喊阿一古", meaning="同上", source={"phrase": "阿一古啊", "how": "guess"})
+        meme = store.accept("阿一古", variants=["哎一古", "大喊阿一古"])
+        self.assertEqual((meme["source"], meme["variants"], meme["meaning"]),
+                         (None, ["阿一古啊", "哎一古", "大喊阿一古"], "아이고 的音译"))
 
     def test_find_prefers_longer_memes_and_whole_words(self):
         for phrase in ["绷不住了", "不住", "yyds", "下饭"]:

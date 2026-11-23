@@ -86,6 +86,33 @@ MOEGIRL = ("https://mzh.moegirl.org.cn/%E6%AD%A3%E4%B9%89%E5%BF%85%E8%83%9C", ""
 <div id="mw-content-text" class="mw-body-content"><div class="mw-parser-output"><p>别的</p>
 <p><b>正义必胜</b>是一句口号。</p><p>完。</p></div></div></body></html>""")
 
+# What Bing finds for 正义必胜是什么梗 site:bilibili.com (web.QUERY): Bilibili's pages, and one
+# elsewhere (an engine doesn't always keep to site:)
+BILIBILI = f"""<ol id="b_results">
+<li class="b_algo"><h2><a href="{bing_link('https://www.bilibili.com/video/BV1web000001')}">
+正义必胜是什么梗？_哔哩哔哩_bilibili</a></h2><div class="b_caption"><p>观众一起刷的口号</p></div></li>
+<li class="b_algo"><h2><a href="https://www.bilibili.com/read/cv100">正义必胜是什么梗？ - 哔哩哔哩</a>
+</h2><div class="b_caption"><p>英雄联盟比赛的弹幕里常有人刷正义必胜</p></div></li>
+<li class="b_algo"><h2><a href="https://t.bilibili.com/300">正义必胜 合集</a></h2>
+<p>LPL 正义必胜名场面</p></li>
+<li class="b_algo"><h2><a href="https://www.bilibili.com/read/cv999">正义必胜！</a></h2>
+<p>足球比赛集锦</p></li>
+<li class="b_algo"><h2><a href="https://www.bilibili.com/read/cv555">电竞圈的口号大全</a></h2>
+<p>正义必胜、阿一古……</p></li>
+<li class="b_algo"><h2><a href="https://space.bilibili.com/1">正义必胜的个人空间</a></h2>
+<p>正义必胜</p></li>
+<li class="b_algo"><h2><a href="https://search.bilibili.com/all?keyword=正义必胜">
+正义必胜-哔哩哔哩_bilibili搜索</a></h2></li>
+<li class="b_algo"><h2><a href="https://www.zhihu.com/question/1">正义必胜是什么梗？ - 知乎</a></h2>
+<p>正义必胜的意思是……</p></li></ol>"""
+
+# A Bilibili article that explains it, and one about football
+ARTICLE = """<html><head><title>正义必胜是什么梗？ - 哔哩哔哩</title></head><body>
+<div>专栏</div><p>英雄联盟比赛的弹幕里常有人刷。</p>
+<p>正义必胜就是给更受欢迎的一方加油，对面黑粉多的时候刷得最多。</p><p>完。</p></body></html>"""
+FOOTBALL = """<html><head><title>正义必胜！ - 哔哩哔哩</title></head><body>
+<p>足球比赛集锦的弹幕里，正义必胜刷满了屏。</p><p>完。</p></body></html>"""
+
 ZHIHU = """<html><head><title>正义必胜是什么梗？ - 知乎</title></head><body>
 <div>别的回答</div><p>这句口号是观众一起刷的。</p>
 <p>正义必胜就是给更受欢迎的一方加油，对面黑粉多的时候刷得最多。</p>
@@ -146,7 +173,7 @@ class SearchTest(WebTest):
         self.assertEqual(found[0]["url"], "https://baike.baidu.com/item/阿一古")  # its mu
         self.assertEqual(found[0]["snippet"], "阿一古是韩语感叹词的音译。")
         # The engines' own pages (Bing's videos, Baidu's other searches) aren't results
-        self.web(("cn.bing.com/search", BING), ("baidu.com/s", BAIDU))
+        self.web(("www.bing.com/search", BING), ("baidu.com/s", BAIDU))
         found = web.search_with("bing", "正义必胜是什么梗", ["正义必胜"])
         self.assertNotIn("https://cn.bing.com/videos/search?q=x", [r["url"] for r in found])
         self.assertEqual(len(found), 5)
@@ -158,8 +185,8 @@ class SearchTest(WebTest):
         self.assertEqual([r["url"] for r in found], ["https://a.cn/1"])
 
     def test_a_site_that_wants_a_captcha_or_refuses_is_left_alone_for_the_run(self):
-        fake = self.web(("cn.bing.com", CAPTCHA), ("duckduckgo.com", 403),
-                        ("baidu.com/s", BAIDU))
+        fake = self.web(("www.bing.com", CAPTCHA), ("duckduckgo.com", 403),
+                        ("baidu.com/s", BAIDU), ("bilibili.com/read", 412))
         found, printed = self.quietly(web.search, "阿一古是什么梗", ["阿一古"])
         self.assertEqual([r["engine"] for r in found], ["baidu"])
         self.assertIn("bing wants a captcha solved", printed)
@@ -168,9 +195,12 @@ class SearchTest(WebTest):
         asked = len(fake.calls)
         self.quietly(web.search, "正义必胜是什么梗", ["正义必胜"])
         self.assertEqual(len(fake.calls), asked + 1)  # only Baidu
+        with self.assertRaises(web.Refused):  # Bilibili's "too many requests"
+            web.get("https://www.bilibili.com/read/cv1")
+        self.assertEqual(web.refused["bilibili.com"], "HTTP 412")
         # Nobody answers: None (try again next run); answered with nothing: []
         web.reset()
-        self.web(("cn.bing.com", CAPTCHA), ("duckduckgo.com", 429), ("baidu.com", CAPTCHA))
+        self.web(("www.bing.com", CAPTCHA), ("duckduckgo.com", 429), ("baidu.com", CAPTCHA))
         self.assertIsNone(self.quietly(web.search, "阿一古是什么梗")[0])
         web.reset()
         self.web()
@@ -185,15 +215,29 @@ class SearchTest(WebTest):
         with self.assertRaises(web.Refused):
             web.get("https://example.com/b")
 
+    def test_bing_sending_the_bot_to_its_front_page_is_left_alone_for_the_run(self):
+        # On 2026-11-23 cn.bing.com sent Hao's computer to the front page of www.bing.com,
+        # which has no results, for 18 searches of 18: it is asked at www.bing.com now, and if
+        # that sends the bot to its front page too, the next engine is asked instead
+        front = ("https://www.bing.com/?q=x&mkt=zh-CN", "<title>搜索 - Microsoft 必应</title>")
+        fake = self.web(("www.bing.com/search", front), ("duckduckgo.com", DUCKDUCKGO))
+        found, printed = self.quietly(web.search, "阿一古是什么梗 site:bilibili.com")
+        self.assertIn("www.bing.com/search?q=阿一古是什么梗 site:bilibili.com&mkt=zh-CN",
+                      fake.calls[0])
+        self.assertEqual([r["engine"] for r in found], ["duckduckgo"])
+        self.assertIn("bing sent the bot to its front page, which has no results", printed)
+        self.quietly(web.search, "正义必胜是什么梗 site:bilibili.com")
+        self.assertEqual(len([c for c in fake.calls if "bing.com" in c]), 1)
+
     def test_results_that_name_the_phrase_nowhere_are_passed_over(self):
-        fake = self.web(("cn.bing.com", OFF_TOPIC), ("duckduckgo.com", DUCKDUCKGO))
+        fake = self.web(("www.bing.com", OFF_TOPIC), ("duckduckgo.com", DUCKDUCKGO))
         found, printed = self.quietly(web.search, "阿一古是什么梗", ["阿一古"])
         self.assertEqual([r["engine"] for r in found], ["duckduckgo"])
         self.assertEqual(printed, "")
         self.assertNotIn("bing", web.refused)  # it may answer properly the next time
         self.assertEqual(len(fake.calls), 2)
         # Named nowhere by any of them: [] (nothing found), not the pages about something else
-        self.web(("cn.bing.com", OFF_TOPIC), ("duckduckgo.com", ""), ("baidu.com", ""))
+        self.web(("www.bing.com", OFF_TOPIC), ("duckduckgo.com", ""), ("baidu.com", ""))
         self.assertEqual(self.quietly(web.search, "阿一古是什么梗", ["阿一古"])[0], [])
         self.assertFalse(web.named(web.parse_bing(OFF_TOPIC), ["龙颜大悦"]))
         self.assertTrue(web.named(web.parse_bing(BING), ["正义必胜"]))
@@ -222,14 +266,32 @@ class SearchTest(WebTest):
             web.get("https://html.duckduckgo.com/html/?q=1", site="duckduckgo")
         self.assertEqual(len(fake.calls), web.FAILS)
 
+    def test_with_site_bilibili_only_bilibilis_pages_are_results(self):
+        fake = self.web(("www.bing.com", BILIBILI))
+        found = web.search_with("bing", web.QUERY.format("正义必胜"), ["正义必胜"])
+        self.assertIn("正义必胜是什么梗 site:bilibili.com", fake.calls[0])
+        self.assertNotIn("https://www.zhihu.com/question/1", [r["url"] for r in found])
+        self.assertTrue(all(web.on(r["url"], "bilibili.com") for r in found))
+        self.assertEqual(len(found), 7)
+        self.assertFalse(web.on("https://notbilibili.com/a", "bilibili.com"))
+        # Without names, a result has to name the query's words, not its site:
+        self.assertEqual(len(self.quietly(web.search, web.QUERY.format("正义必胜"))[0]), 7)
+        # The pages: their titles name it (电竞圈的口号大全 only names it below); Bilibili's
+        # articles are read, its other pages only used for their snippets; its searches and
+        # people's spaces aren't results
+        self.assertEqual([(p["url"], p["read"]) for p in web.pages(found, ["正义必胜"])],
+                         [("https://www.bilibili.com/read/cv100", True),
+                          ("https://www.bilibili.com/read/cv999", True),
+                          ("https://t.bilibili.com/300", False)])
+
     def test_the_videos_and_the_pages_that_explain_a_phrase_come_first(self):
         results = web.parse_bing(BING)
         self.assertEqual(web.videos(results, ["正义必胜"]), [
             {"bvid": "BV1web000001", "title": "正义必胜是什么梗？", "how": "web"}])
         pages = web.pages(results, ["正义必胜"])
         # Explainer sites first, the one that asks what it means (是什么梗) before the one that
-        # only names it; a video site's page is only used for its snippet; a result not naming
-        # it, or Bing's own page, is left out
+        # only names it; a video site's page is only used for its snippet; a result whose
+        # title doesn't name it, or Bing's own page, is left out
         self.assertEqual([(p["site"], p["read"]) for p in pages],
                          [("zhihu.com", True), ("zh.moegirl.org.cn", True),
                           ("douyin.com", False)])
@@ -284,7 +346,7 @@ class WikiTest(WebTest):
 
     def test_check_says_which_places_answer(self):
         folder = os.path.join(self.folder, "sources")
-        self.web(("cn.bing.com", BING), ("duckduckgo.com", 403), ("baidu.com/s", CAPTCHA),
+        self.web(("www.bing.com", BING), ("duckduckgo.com", 403), ("baidu.com/s", CAPTCHA),
                  ("baike.baidu.com", ("https://baike.baidu.com/search/none", "")),
                  ("search=正义必胜", MOEGIRL))
         report, _ = self.quietly(web.check, ["正义必胜", "阿一古"], folder=folder)
@@ -337,46 +399,58 @@ class LookUpTest(WebTest):
                         mock.patch.object(explainers.bilibili, "search_videos", return_value=[]),
                         mock.patch.object(explainers, "read", side_effect=lambda bvid, *a: {
                             "bvid": bvid, "url": f"https://www.bilibili.com/video/{bvid}",
-                            "title": "看完就懂", "said": "", "comments": [], "danmu": []})):
+                            "title": "看完就懂", "zone": "电子竞技", "said": "",
+                            "comments": [], "danmu": []})):
             patcher.start()
             self.addCleanup(patcher.stop)
 
     def test_the_videos_a_search_engine_finds_are_read_once_a_week(self):
         explainers.remember([video("BV1explain03", "正义必胜的由来")])
-        fake = self.web(("cn.bing.com", BING))
+        fake = self.web(("www.bing.com", BILIBILI))
         chant = {"phrase": "正义必胜", "game": "lol", "variants": []}
         data = explainers.load()
         found = explainers.find(chant, data=data)
-        # The ones seen first, then the search engine's, then (none found) no Bilibili search
+        # The ones seen, Bilibili's search (it found none here) and the search engine's
         self.assertEqual([(v["bvid"], v["how"]) for v in found],
                          [("BV1explain03", "related"), ("BV1web000001", "web")])
         entry = data["phrases"]["lol:正义必胜"]
-        self.assertEqual(len(entry["web"]["results"]), 5)  # kept for the web pages
+        # Only Bilibili was searched, and only its pages are kept, for step 4
+        self.assertEqual(entry["web"]["query"], "正义必胜是什么梗 site:bilibili.com")
+        self.assertEqual(len(entry["web"]["results"]), 7)
+        self.assertTrue(all(web.on(r["url"], "bilibili.com") for r in entry["web"]["results"]))
         explainers.find(chant, data=data)
         self.assertEqual(len([c for c in fake.calls if "bing.com" in c]), 1)  # once a week
-        explainers.bilibili.search_videos.assert_not_called()
+        self.assertEqual(explainers.bilibili.search_videos.call_count, 1)  # Bilibili's too
 
-    def test_with_no_video_explaining_it_the_web_pages_are_read_and_judged(self):
-        self.web(("cn.bing.com", BING), ("zhihu.com", ZHIHU), ("search=正义必胜", MOEGIRL))
+    def test_with_no_video_explaining_it_bilibilis_pages_are_read_and_judged(self):
+        fake = self.web(("www.bing.com", BILIBILI), ("bilibili.com/read/cv100", ARTICLE),
+                        ("bilibili.com/read/cv999", FOOTBALL), ("search=正义必胜", MOEGIRL))
         found, printed = self.quietly(memelearner.explain, ["正义必胜"])
         summary = found["lol:正义必胜"][-1]
-        # The model went by page 2 (知乎: 萌娘百科's entry comes first), and quoted it
+        # The model said page 2 (a post's snippet), but quoted page 1 (the article): page 1
         self.assertEqual({k: summary[k] for k in ("kind", "url", "site", "about", "meaning",
                                                    "quote", "snippet", "pages")},
-                         {"kind": "page", "url": "https://www.zhihu.com/question/1",
-                          "site": "zhihu.com", "about": True, "meaning": "给受欢迎的一方加油",
-                          "quote": "正义必胜就是给更受欢迎的一方加油", "snippet": False, "pages": 3})
+                         {"kind": "page", "url": "https://www.bilibili.com/read/cv100",
+                          "site": "bilibili.com", "about": True, "meaning": "给受欢迎的一方加油",
+                          "quote": "正义必胜就是给更受欢迎的一方加油", "snippet": False, "pages": 2})
         shown = next(q for prompt, q in self.model.asked if prompt == explainers.PAGE_SUMMARY)
         self.assertEqual(shown["game"], judging.GAMES["lol"])  # 正义必胜 is a learned LoL meme
-        # 萌娘百科's entry (its search result is the same page), then the results
+        # The article, then the post (only its snippet); not the article about football
         self.assertEqual([(p["n"], p["site"]) for p in shown["pages"]],
-                         [(1, "moegirl.org.cn"), (2, "zhihu.com"), (3, "douyin.com")])
-        self.assertIn("这句口号是观众一起刷的", shown["pages"][1]["text"])  # the lines around it
-        self.assertNotIn("var x", shown["pages"][1]["text"])
-        self.assertEqual(shown["pages"][2]["text"], "正义必胜名场面")  # only its snippet
-        self.assertIn("zhihu.com  正义必胜是什么梗？ - 知乎: 给受欢迎的一方加油", printed)
+                         [(1, "bilibili.com"), (2, "t.bilibili.com")])
+        self.assertIn("英雄联盟比赛的弹幕里常有人刷", shown["pages"][0]["text"])  # around it
+        self.assertEqual(shown["pages"][1]["text"], "LPL 正义必胜名场面")
+        self.assertIn("bilibili.com  正义必胜是什么梗？ - 哔哩哔哩: 给受欢迎的一方加油", printed)
         self.assertIn("1 more are explained by a web page.", printed)
-        self.assertTrue(explainers.told(explainers.load()["phrases"]["lol:正义必胜"]))
+        entry = explainers.load()["phrases"]["lol:正义必胜"]
+        self.assertTrue(explainers.told(entry))
+        # The football article is written down with its link and why it wasn't used
+        self.assertEqual([(d["url"], d["title"], d["why"]) for d in entry["dropped"]],
+                         [("https://www.bilibili.com/read/cv999", "正义必胜！",
+                           "not about games: no game word in its title or text")])
+        self.assertIn("skipped 正义必胜！: not about games", printed)
+        # A Bilibili page explains it: the wikis aren't asked
+        self.assertFalse([c for c in fake.calls if "moegirl" in c or "baike" in c])
         # A quote the page doesn't contain is dropped; one from another page names that page
         self.model.quote = "这句话哪里都没有"
         summary = explainers.summarize_pages("正义必胜", "lol", [
@@ -389,6 +463,34 @@ class LookUpTest(WebTest):
             {"url": "u2", "site": "b", "title": "t", "text": "正义必胜是口号"}], "m")
         self.assertEqual((summary["url"], summary["quote"]), ("u2", "正义必胜是口号"))
 
+    def test_the_wikis_are_asked_when_nothing_on_bilibili_explains_it(self):
+        transformers = ("https://baike.baidu.com/item/汽车人/1", '<html><head><title>汽车人_百度'
+                        '百科</title><meta name="description" content="汽车人是《变形金刚》里的一族'
+                        '机器人。"></head></html>')
+        lol = ("https://mzh.moegirl.org.cn/汽车人", '<h1 id="firstHeading">汽车人</h1><div id='
+               '"mw-content-text"><p>汽车人是英雄联盟弹幕里的梗：漏了炮车的最后一刀，就是弃车人。</p>'
+               '</div>')
+        fake = self.web(("baike.baidu.com/item/汽车人", transformers), ("search=汽车人", lol))
+        found, printed = self.quietly(memelearner.explain, ["汽车人"], games=["lol"])
+        [summary] = found["lol:汽车人"]
+        self.assertEqual((summary["url"], summary["about"]),
+                         ("https://zh.moegirl.org.cn/汽车人", True))
+        shown = next(q for prompt, q in self.model.asked if prompt == explainers.PAGE_SUMMARY)
+        self.assertEqual([p["site"] for p in shown["pages"]], ["moegirl.org.cn"])
+        entry = explainers.load()["phrases"]["lol:汽车人"]
+        self.assertEqual([(d["url"], d["why"]) for d in entry["dropped"]],
+                         [("https://baike.baidu.com/item/汽车人/1",
+                           "not about games: no game word in its title or text")])
+        self.assertIn("Bilibili's pages: nothing that names it and is about games", printed)
+        self.assertTrue([c for c in fake.calls if "site:bilibili.com" in c])
+        # An entry whose title doesn't name it (a wiki's redirect to another entry)
+        self.web(("search=汽车人", ("https://mzh.moegirl.org.cn/变形金刚", '<h1 id="firstHeading">'
+                                    '变形金刚</h1><div id="mw-content-text"><p>汽车人的游戏</p></div>')))
+        web.reset()
+        dropped = []
+        self.assertEqual(explainers.read_wikis("汽车人", ["汽车人"], ["moegirl"], dropped), [])
+        self.assertEqual([d["why"] for d in dropped], ["its title doesn't name it"])
+
     def test_a_phrase_whose_search_named_it_nowhere_is_looked_up_again(self):
         # Run 1 on 2026-11-11 kept Bing's pages about something else for 龙颜大悦, and marked
         # the phrase looked up: it is wanted again, and searched again
@@ -399,11 +501,17 @@ class LookUpTest(WebTest):
             for phrase in ("龙颜大悦", "滔一下")]})
         data = explainers.load()
         data["phrases"]["lol:龙颜大悦"] = {"looked": now, "web": {
-            "searched": now, "results": web.parse_bing(OFF_TOPIC)}}
-        data["phrases"]["lol:滔一下"] = {"looked": now, "web": {"searched": now, "results": []}}
+            "searched": now, "query": web.QUERY.format("龙颜大悦"),
+            "results": web.parse_bing(OFF_TOPIC)}}
+        data["phrases"]["lol:滔一下"] = {"looked": now, "web": {
+            "searched": now, "query": web.QUERY.format("滔一下"), "results": []}}
         wanted = explainers._wanted(None, None, 10, False, data)
         self.assertEqual([c["phrase"] for c in wanted], ["龙颜大悦"])  # 滔一下: nothing found
-        fake = self.web(("cn.bing.com", OFF_TOPIC), ("duckduckgo.com", duckduckgo(
+        # A search of the whole web, from before the bot searched only Bilibili: again
+        data["phrases"]["lol:滔一下"]["web"].pop("query")
+        wanted = explainers._wanted(None, None, 10, False, data)
+        self.assertEqual([c["phrase"] for c in wanted], ["龙颜大悦", "滔一下"])
+        fake = self.web(("www.bing.com", OFF_TOPIC), ("duckduckgo.com", duckduckgo(
             "龙颜大悦是什么梗_哔哩哔哩_bilibili", "https://www.bilibili.com/video/BV1web000009")))
         entry = data["phrases"]["lol:龙颜大悦"]
         found = explainers._web("龙颜大悦", ["龙颜大悦"], entry, "web", False)
@@ -414,7 +522,7 @@ class LookUpTest(WebTest):
         self.assertEqual(len(fake.calls), asked)  # this time it named it: kept for a week
 
     def test_a_site_that_refused_the_bot_is_named_once_in_a_run(self):
-        self.web(("baike.baidu.com", 403), ("cn.bing.com", BING), ("zhihu.com", ZHIHU))
+        self.web(("baike.baidu.com", 403), ("www.bing.com", BING), ("zhihu.com", ZHIHU))
         _, printed = self.quietly(memelearner.explain, ["正义必胜", "阿一古"])
         self.assertEqual(printed.count("baike.baidu.com refused the bot (HTTP 403)"), 1)
         self.assertNotIn("earlier in this run", printed)
@@ -448,7 +556,8 @@ class LookUpTest(WebTest):
                          {"phrase": "我们是冠军", "how": "page"})
 
     def test_the_sources_command_writes_what_each_place_found(self):
-        self.web(("cn.bing.com", BING), ("zhihu.com", ZHIHU), ("duckduckgo.com", 403))
+        self.web(("www.bing.com", BILIBILI), ("bilibili.com/read/cv100", ARTICLE),
+                 ("bilibili.com/read/cv999", FOOTBALL), ("duckduckgo.com", 403))
         folder = os.path.join(self.folder, "out")
         phrases = os.path.join(self.folder, "phrases.txt")
         with open(phrases, "w", encoding="utf-8-sig") as f:
@@ -458,11 +567,16 @@ class LookUpTest(WebTest):
                       "--no-audio"])
         self.assertIn("1 of 2 phrases are explained by a video or a web page.",
                       printed.getvalue())
+        # Looked up first, then every place asked: Baidu wanted a captcha after 11 phrases
+        # of every place's 18 on 2026-11-23, and explain got nothing from it
+        self.assertLess(printed.getvalue().index("Looking for videos"),
+                        printed.getvalue().index("Asking 3 search engines"))
+        self.assertIsNone(web.raw)
         with open(os.path.join(folder, "sources.json"), encoding="utf-8") as f:
             report = json.load(f)
         self.assertEqual(report["phrases"], ["正义必胜", "阿一古"])
         self.assertEqual(report["learned"]["阿一古"], store.load()["memes"]["阿一古"]["meaning"])
-        self.assertEqual(report["explained"]["正义必胜"]["pages"][0]["site"], "zhihu.com")
+        self.assertEqual(report["explained"]["正义必胜"]["pages"][0]["site"], "bilibili.com")
         with open(os.path.join(folder, "links.json"), encoding="utf-8") as f:
             self.assertEqual(json.load(f),
                              {"正义必胜": ["https://www.bilibili.com/video/BV1web000001"]})
@@ -470,8 +584,13 @@ class LookUpTest(WebTest):
             text = f.read()
         self.assertIn("## 正义必胜", text)
         self.assertIn("- duckduckgo: duckduckgo refused the bot (HTTP 403)", text)
-        self.assertIn("- page zhihu.com [正义必胜是什么梗？ - 知乎](https://www.zhihu.com/question/1): "
-                      "给受欢迎的一方加油 「正义必胜就是给更受欢迎的一方加油」", text)
+        self.assertIn("- page bilibili.com [正义必胜是什么梗？ - 哔哩哔哩](https://www.bilibili.com/read/"
+                      "cv100): 给受欢迎的一方加油 「正义必胜就是给更受欢迎的一方加油」", text)
+        self.assertIn("- skipped [正义必胜！](https://www.bilibili.com/read/cv999): not about games: "
+                      "no game word in its title or text", text)
+        # Each video with how it was found
+        self.assertIn("- video [看完就懂](https://www.bilibili.com/video/BV1web000001) "
+                      "(via a search engine): ", text)
         self.assertTrue(os.listdir(os.path.join(folder, "raw")))
 
     def test_a_log_file_gets_what_a_command_prints(self):

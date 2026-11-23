@@ -1,16 +1,20 @@
-"""Look memes up on the web outside Bilibili: what search engines and wikis say a phrase
-means, and the Bilibili videos they find that explain it (explainers.py reads those).
+"""Look memes up with search engines and wikis: the Bilibili videos and pages a search
+engine finds that explain a phrase (explainers.py reads those), and what wikis say it means.
 
 Bilibili asks a visitor's search for a captcha more often than not, so the bot's own search
 for 阿一古是什么梗 rarely works (it found no video in the first two real runs). Search
-engines find the same videos, and the web pages that explain memes too:
+engines find the same videos. explain asks them only for Bilibili's pages (QUERY:
+"阿一古是什么梗 site:bilibili.com"): many memes come from Bilibili, and pages elsewhere were
+often about something else of the same name (汽车人 in the manga 刃牙, on 2026-11-11).
 
     search(query, names)    a search engine's results: [{"title", "url", "snippet", "site",
                             "engine"}], from the first engine in ENGINES whose results name
                             the phrase (Bing sometimes answers a bot with pages about
-                            something else entirely: then DuckDuckGo is asked)
+                            something else entirely: then DuckDuckGo is asked); with
+                            site:bilibili.com in the query, only results on Bilibili
     videos(results, names)  the Bilibili videos among them whose titles name a phrase
-    pages(results, names)   the other results that name it, the likeliest explainers first
+    pages(results, names)   the other results whose titles name it, the likeliest
+                            explainers first
     page(url, phrase)       what a web page says around a phrase, for the model
     baike(phrase)           百度百科's entry for it, if it has one
     moegirl(phrase)         萌娘百科's, from its mobile site's search, which goes straight
@@ -59,15 +63,20 @@ TEXT = 1500  # characters of a page's text kept around the phrase
 SNIPPET = 200  # characters kept of a search result's snippet
 FAILS = 2  # a site that can't be reached this many times is left alone for the rest of the run
 
-# The search engines, tried in this order until one answers: Bing's Chinese site,
-# DuckDuckGo's page that works without scripts, and Baidu (which mostly wants a captcha)
+# The search engines, tried in this order until one answers: Bing in Chinese, DuckDuckGo's
+# page that works without scripts, and Baidu (which mostly wants a captcha). Bing is asked at
+# www.bing.com: cn.bing.com sent Hao's computer to www.bing.com's front page, which has no
+# results, for 18 searches of 18 on 2026-11-23
 ENGINES = ("bing", "duckduckgo", "baidu")
 SEARCH_URLS = {
-    "bing": "https://cn.bing.com/search?q={q}&ensearch=0",
+    "bing": "https://www.bing.com/search?q={q}&mkt=zh-CN",
     "duckduckgo": "https://html.duckduckgo.com/html/?q={q}&kl=cn-zh",
     "baidu": "https://www.baidu.com/s?wd={q}&ie=utf-8",
 }
 SITES = ("baike", "moegirl", "jikipedia")  # the wikis check() tries besides the engines
+# What explain asks a search engine for a phrase: only Bilibili's pages (search() leaves out
+# the results elsewhere, for an engine that doesn't keep to site:)
+QUERY = "{}是什么梗 site:bilibili.com"
 
 # Sites whose pages are videos, apps or log-in walls: their results are used for their
 # titles and snippets, but the pages aren't read
@@ -79,6 +88,13 @@ EXPLAINER_SITES = ("moegirl.org.cn", "jikipedia.com", "baike.baidu.com", "zhidao
                    "baike.sogou.com", "baike.so.com", "bilibili.com/read", "zhihu.com",
                    "tieba.baidu.com", "nga.cn", "hupu.com")
 MEME_TITLE = re.compile(r"梗|什么意思|啥意思|出处|由来|来源|是什么|含义|意思")
+# Bilibili's pages that are read: its articles and posts (a video is read through its API
+# instead, explainers.read())
+BILIBILI_READ = ("bilibili.com/read/", "bilibili.com/opus/")
+# ... and the ones that aren't results at all: searches, people's spaces, live rooms, log-ins
+NOT_PAGES = ("search.bilibili.com", "space.bilibili.com", "live.bilibili.com",
+             "passport.bilibili.com", "account.bilibili.com", "member.bilibili.com",
+             "message.bilibili.com")
 
 # What a page that wants a captcha, or that only scripts can get through, looks like
 CHALLENGE = re.compile(r"captcha|challenge-platform|cf-chl|Just a moment\.\.\.|"
@@ -123,6 +139,13 @@ def site_of(url):
     stays zh.moegirl.org.cn; it is only for showing and for waiting turns)."""
     host = urllib.parse.urlsplit(url).netloc.lower().split(":")[0]
     return host[4:] if host.startswith("www.") else host
+
+
+def on(url, site):
+    """Whether an address is on a site or one of its subdomains (space.bilibili.com is on
+    bilibili.com; notbilibili.com isn't)."""
+    host = site_of(url)
+    return host == site or host.endswith("." + site)
 
 
 # -- requests -----------------------------------------------------------------------------
@@ -209,7 +232,7 @@ def get(url, site=None, data=None, headers=None, challenge=CHALLENGE):
         except (OSError, EOFError, zlib.error):
             pass
         _keep(site, url, error.code, url, body)
-        if error.code in (403, 429, 503):
+        if error.code in (403, 412, 429, 503):  # 412: Bilibili's "too many requests"
             refused[site] = f"HTTP {error.code}"
             raise Refused(f"{site} refused the bot (HTTP {error.code})") from None
         raise Error(f"{site}: HTTP {error.code}") from None
@@ -371,18 +394,31 @@ PARSERS = {"bing": parse_bing, "duckduckgo": parse_duckduckgo, "baidu": parse_ba
 
 
 def search_with(engine, query, names=()):
-    """One search engine's results for a query, at most RESULTS (see search()). Raises
-    Refused when it wants a captcha, Error when it answers with an error."""
+    """One search engine's results for a query, at most RESULTS (see search()); with
+    site:bilibili.com in the query, only the ones on Bilibili (an engine may answer with
+    others too). Raises Refused when it wants a captcha (or, for Bing, sends the bot to its
+    front page instead of its results), Error when it answers with an error."""
     url = SEARCH_URLS[engine].format(q=urllib.parse.quote(query))
-    markup, _ = get(url, site=engine)
-    found = PARSERS[engine](markup) or parse_any(markup, engine, names or [query])
+    markup, final = get(url, site=engine)
+    if engine == "bing" and not urllib.parse.urlsplit(final).path.startswith("/search"):
+        refused[engine] = "it sends the bot to its front page, which has no results"
+        raise Refused("bing sent the bot to its front page, which has no results")
+    within = re.search(r"\bsite:(\S+)", query)
+    found = PARSERS[engine](markup) or parse_any(markup, engine, names or [_words(query)])
     seen, results = set(), []
     for result in found:
         if result["url"].startswith("http") and result["url"] not in seen and \
-                not _internal(result["url"]):
+                not _internal(result["url"]) and \
+                (not within or on(result["url"], within.group(1).lower())):
             seen.add(result["url"])
             results.append(result)
     return results[:RESULTS]
+
+
+def _words(query):
+    """A query without its site: (阿一古是什么梗 for 阿一古是什么梗 site:bilibili.com): what
+    a result names."""
+    return re.sub(r"\s*\bsite:\S+", "", query).strip()
 
 
 def _internal(url):
@@ -396,13 +432,13 @@ def _internal(url):
 
 def search(query, names=(), engines=ENGINES):
     """The results of the first search engine (in engines) whose results name one of names
-    (the query, when none are given): [{"title", "url", "snippet", "site", "engine"}]; []
-    when the ones that answered found nothing that names it, None when none answered.
-    Results that name none of them are passed over, and the next engine is asked: Bing
+    (the query without its site:, when none are given): [{"title", "url", "snippet", "site",
+    "engine"}]; [] when the ones that answered found nothing that names it, None when none
+    answered. Results that name none of them are passed over, and the next engine is asked: Bing
     sometimes answers a bot with pages about something else entirely (the ARP protocol for
     龙颜大悦, Spotify for 滔一下, on 2026-11-11). An engine that wants a captcha, or that this
     computer can't reach, is left alone for the rest of the run."""
-    answered, wanted = False, list(names) or [query]
+    answered, wanted = False, list(names) or [_words(query)]
     for engine in engines:
         if engine in refused:
             continue
@@ -450,21 +486,25 @@ def videos(results, names):
 
 
 def pages(results, names):
-    """The search results besides videos that name one of names, in the title or the
-    snippet, the likeliest explainers first: an explainer site (萌娘百科, 百度百科, 小鸡词典
-    ...), then a title that names it and asks what it means (阿一古是什么梗), then the rest.
-    Each is marked "read": False for a page that is only used for its snippet (a video site,
-    or one that needs logging in)."""
+    """The search results besides videos whose titles name one of names (a page that only
+    names it further down is about something else, more often than not), the likeliest
+    explainers first: an explainer site (Bilibili's articles, 萌娘百科, 百度百科 ...), then a
+    title that asks what it means (阿一古是什么梗), then the rest. Each is marked "read":
+    False for a page that is only used for its snippet (a video site, one that needs logging
+    in, or a page of Bilibili's other than an article or a post). Bilibili's searches,
+    spaces and live rooms aren't results."""
     picked = []
     for n, result in enumerate(results):
         where = result["url"].lower()
-        if "bilibili.com/video" in where or _internal(result["url"]) or not any(
-                _names(result["title"] + " " + result["snippet"], name) for name in names):
+        if "bilibili.com/video" in where or _internal(result["url"]) or \
+                result["site"] in NOT_PAGES or \
+                not any(_names(result["title"], name) for name in names):
             continue
-        titled = any(_names(result["title"], name) for name in names)
-        rank = (not any(site in where for site in EXPLAINER_SITES),
-                not (titled and MEME_TITLE.search(result["title"])), not titled, n)
-        picked.append((rank, dict(result, read=not any(site in where for site in NOT_READ))))
+        read = not any(site in where for site in NOT_READ) and \
+            (not on(where, "bilibili.com") or any(path in where for path in BILIBILI_READ))
+        rank = (not any(site in where for site in EXPLAINER_SITES + BILIBILI_READ),
+                not MEME_TITLE.search(result["title"]), n)
+        picked.append((rank, dict(result, read=read)))
     return [result for _, result in sorted(picked, key=lambda item: item[0])]
 
 
@@ -564,7 +604,7 @@ WIKIS = {"baike": baike, "moegirl": moegirl, "jikipedia": jikipedia}
 
 # -- which places answer ------------------------------------------------------------------
 
-def check(phrases, engines=ENGINES, sites=SITES, folder=None, queries=("{}是什么梗",)):
+def check(phrases, engines=ENGINES, sites=SITES, folder=None, queries=(QUERY,)):
     """Try every search engine and wiki for some phrases, and say what each found:
     {"phrases": {phrase: {place: {"ok", "error", "results", "videos", "pages", "found"}}},
     "places": {place: {"answered", "found", "refused"}}}. With folder, every answer is kept

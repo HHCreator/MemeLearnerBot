@@ -335,9 +335,10 @@ def _live_report(args):
 
 def _sources(args):
     """Ask every search engine and wiki about some phrases (web.check()), and with --explain
-    look them up as explain does; write what each found to a folder (sources.md for people,
-    sources.json, links.json: the Bilibili videos found for each), beside what memes.json
-    says the learned ones mean."""
+    look them up as explain does, first: the search engines' patience goes to explain (Baidu
+    wanted a captcha after 11 phrases on 2026-11-23, and explain then got nothing from it).
+    Write what each found to a folder (sources.md for people, sources.json, links.json: the
+    Bilibili videos found for each), beside what memes.json says the learned ones mean."""
     phrases = list(args.phrases)
     if args.file:
         with open(args.file, encoding="utf-8-sig") as f:
@@ -347,22 +348,25 @@ def _sources(args):
         sys.exit("Give some phrases, or --file with one a line")
     folder = args.out or os.path.join(surf.SURF_DIR, "sources")
     os.makedirs(folder, exist_ok=True)
-    print(f"Asking {len(web.ENGINES)} search engines and {len(web.SITES)} wikis about "
-          f"{len(phrases)} phrases (read only, a few seconds between two requests to the same "
-          f"site) ...")
-    checked = web.check(phrases, folder=folder if args.raw else None)
     looked = {}
     if args.explain:
-        print()
+        web.raw = os.path.join(folder, "raw") if args.raw else None
         try:
             with judging.awake():
                 explainers.explain(phrases, None, None, args.model, args.videos, len(phrases),
                                    again=True, hearing=not args.no_audio, judge=False)
         except ModelUnavailable as error:
             print(f"Couldn't ask the model: {error}. What was read so far is kept.")
+        finally:
+            web.raw = None
         entries = explainers.load()["phrases"]
         looked = {phrase: next((e for k, e in entries.items() if k.split(":", 1)[1] == phrase), {})
                   for phrase in phrases}
+        print()
+    print(f"Asking {len(web.ENGINES)} search engines and {len(web.SITES)} wikis about "
+          f"{len(phrases)} phrases (read only, a few seconds between two requests to the same "
+          f"site) ...")
+    checked = web.check(phrases, folder=folder if args.raw else None)
     memes_now = store.load()["memes"]
     links = {}
     for phrase in phrases:
@@ -390,8 +394,9 @@ def _sources(args):
 
 
 def _sources_text(report):
-    """sources.md: for each phrase, what memes.json says, what each place found, and what
-    the videos and web pages explain read said."""
+    """sources.md: for each phrase, what memes.json says, what each place found, what the
+    videos and web pages explain read said, and the ones it skipped (not about games), each
+    with its link."""
     lines = [f"# Where explanations come from ({report['made']})", ""]
     for place, counted in report["places"].items():
         lines.append(f"- {place}: answered {counted['answered']} of {counted['asked']}, found "
@@ -423,18 +428,30 @@ def _sources_text(report):
         if entry is None:
             continue
         said = explainers._summaries(entry)
+        skipped = entry.get("dropped") or []
         lines.append("")
-        lines.append("Looked up as explain does: " + ("nothing found" if not said else ""))
+        lines.append("Looked up as explain does: " + ("" if said or skipped else "nothing found"))
         for summary in said:
             where = (f"page {summary.get('site', '')} [{summary.get('title', '')}]"
                      f"({summary.get('url', '')})" if summary.get("kind") == "page" else
-                     f"video [{summary.get('title', '')}]({summary.get('url', '')})")
+                     f"video [{summary.get('title', '')}]({summary.get('url', '')})" +
+                     _found(summary))
             lines.append(f"- {where}: " + (
                 summary["meaning"] + (f" (出自 {summary['origin']})" if summary.get("origin")
                                       else "") +
                 (f" 「{summary['quote']}」" if summary.get("quote") else "")
                 if summary.get("about") else "doesn't explain it"))
+        for dropped in skipped:
+            lines.append(f"- skipped [{dropped.get('title', '')}]({dropped.get('url', '')})"
+                         f"{_found(dropped)}: {dropped.get('why', '')}")
     return lines
+
+
+def _found(item):
+    """How explain found a video, for sources.md: " (via Bilibili's search)"; "" when it
+    didn't say (a page, or a video read before 2026-11-23)."""
+    how = explainers.FOUND.get(item.get("found") or "")
+    return f" (via {how})" if how else ""
 
 
 def _auto(args):
@@ -663,8 +680,8 @@ def parser():
     look.add_argument("--raw", action="store_true",
                       help="also keep every page as it came, in the folder's raw/")
     look.add_argument("--explain", action="store_true",
-                      help="then look them up as explain does (videos, then web pages) and "
-                      "sum up what they say with the model")
+                      help="also look them up as explain does (videos, then web pages), "
+                      "before asking every place, and sum up what they say with the model")
     look.add_argument("--videos", type=int, default=explainers.VIDEOS, metavar="N",
                       help="videos read for each phrase with --explain (default %(default)s)")
     look.add_argument("--model", default=judging.MODEL,

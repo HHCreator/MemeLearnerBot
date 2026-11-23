@@ -2,26 +2,9 @@
  "_comment": "Memes learned by MemeLearnerBot (https://github.com/HHCreator/MemeLearnerBot). Change them with py -m memelearner accept, reject or forget; the format is in memelearner/store.py and the README.",
  "version": 2,
  "memes": {
-  "41上": {
-   "meaning": "「世一上」（世界第一上单）的谐音，弹幕里用来称呼或戏称顶尖上单选手（如BIN、TheShy）。",
-   "english": "Homophone of \"world's best top laner,\" used in bullet comments to praise or mock a top laner.",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-15",
-   "examples": [
-    "果然太阳升起BIN就是41上",
-    "开玩笑，41上你就学吧",
-    "让41上玩坦克 41上不开心就提麦摆烂了"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6",
-    "https://www.bilibili.com/video/BV17XxP6CE7n"
-   ]
-  },
   "41翻": {
    "meaning": "41谐音世一，也就是世界第一。 可以有各种变体，41上，就是世界第一上单，41中，就是世界第一中单",
-   "english": "",
+   "english": "Homophone of \"world's best top laner,\" used in bullet comments to praise or mock a top laner.",
    "games": [
     "lol"
    ],
@@ -29,13 +12,20 @@
    "examples": [
     "41中，41上，41教，41翻，41评",
     "41翻牛41翻牛壁",
-    "41翻硬控blg全队"
+    "41翻硬控blg全队",
+    "果然太阳升起BIN就是41上",
+    "开玩笑，41上你就学吧",
+    "让41上玩坦克 41上不开心就提麦摆烂了"
    ],
    "sources": [
-    "https://live.bilibili.com/6"
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV17XxP6CE7n"
    ],
    "notes": [
     "41谐音世一，也就是世界第一。 可以有各种变体，41上，就是世界第一上单，41中，就是世界第一中单"
+   ],
+   "variants": [
+    "41上"
    ]
   },
   "bin神": {
@@ -635,28 +625,6 @@
     "”X补“的变体，拼多多广告百亿补贴宣传语买什么都有国家补贴帮你，也就是”国补“，所以”X补“表示某某某帮你，比如让你赢或者让你杀。兰补就是多兰帮对方赢"
    ]
   },
-  "关闭得分通道": {
-   "meaning": "调侃某一方即将或已经拿不到分、得分势头被掐断的说法，常在比赛开局或上半场就刷，用来唱衰或打趣某队。",
-   "english": "A joking way of saying a team is about to stop scoring or has had its scoring run cut off.",
-   "games": [
-    "valorant"
-   ],
-   "added": "2026-11-15",
-   "examples": [
-    "fpx即将关闭得分通道",
-    "暂时关闭得分通道",
-    "还没开打就关闭得分通道是什么意思（狗头）"
-   ],
-   "sources": [
-    "https://www.bilibili.com/video/BV17vxq6NEBi",
-    "https://www.bilibili.com/video/BV1BAng6CEwf",
-    "https://www.bilibili.com/video/BV1vcaY6YEQQ"
-   ],
-   "source": {
-    "phrase": "得分通道关闭",
-    "how": "guess"
-   }
-  },
   "初见端倪": {
    "meaning": "观众化用成语，形容某首背景音乐（小曲）开始显露名堂、自己逐渐了解它，常和「渐入佳境」等一起刷；在弹幕里也用来调侃某事物刚露出苗头。",
    "english": "A playful use of the idiom \"first signs appear,\" used in danmaku to comment on a background track (or something else) st",
@@ -706,22 +674,9 @@
    ],
    "sources": [
     "https://live.bilibili.com/6"
-   ]
-  },
-  "别奶了": {
-   "meaning": "别乌鸦嘴、别夸了，怕夸了反而输（电竞圈把看好、吹捧叫“奶”）",
-   "english": "Don't jinx it / stop praising them",
-   "games": [
-    "lol"
    ],
-   "added": "2026-11-09",
-   "examples": [
-    "别奶谢谢",
-    "兄弟们别奶，保持质疑，加油BLG",
-    "别奶对方，还是奶自己吧"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6"
+   "variants": [
+    "别奶了"
    ]
   },
   "前方高能": {
@@ -757,15 +712,21 @@
     "区区区区区区区区区",
     "区区区区区",
     "乐乐区区凑一桌",
-    "我们是区区"
+    "我们是区区",
+    "好多区好多区好多区好多区好多区好多区好多区好多区",
+    "好多区"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV1ie8t6UEzH",
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV1vcaY6YEQQ"
    ],
+   "notes": [
+    "跟区区一样，用区来代替蛆字，说好多蛆，说这场比赛里打的差的人太多了"
+   ],
    "variants": [
-    "区区"
+    "区区",
+    "好多区"
    ]
   },
   "千言万语": {
@@ -1102,27 +1063,6 @@
     "neeko的表情动作会有“咻咻咻”的声音发出，一般跟选出neeko的时候刷"
    ]
   },
-  "哎一古": {
-   "meaning": "韩语感叹词「아이고」的音译，相当于「哎呀」「哎哟」，用来表达惊讶、感叹、无奈或吐槽。",
-   "english": "Korean interjection \"aigo\", like \"oh my\" or \"sigh\", used to express surprise, exasperation, or resignation.",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-15",
-   "examples": [
-    "说家乡话诶，哎一古",
-    "请到哎一古了",
-    "哎一古马头把线带出来了"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6",
-    "https://www.bilibili.com/video/BV1ua4W6XEJd"
-   ],
-   "source": {
-    "phrase": "阿一古",
-    "how": "guess"
-   }
-  },
   "哪条": {
    "meaning": "用来嘲讽或质疑对方身份/资格的说法，相当于「你算哪根葱」「你是哪条路边（的野狗）」，常带「路边」一起用。",
    "english": "A mocking way to question who someone is or whether they're worth mentioning, like \"who even are you?\"",
@@ -1336,9 +1276,10 @@
   },
   "大的要来了": {
    "meaning": "用来预告即将发生大事或精彩场面，常带调侃、起哄语气",
-   "english": "",
+   "english": "Something big is about to happen (cutesy variant of \"大的要来了\").",
    "games": [
-    "valorant"
+    "valorant",
+    "lol"
    ],
    "added": "2026-11-08",
    "examples": [
@@ -1346,16 +1287,23 @@
     "大的要来了",
     "有一就有二哈哈哈哈 等下大的来喽",
     "最大的来了",
-    "大的来了吗"
+    "大的来了吗",
+    "绝境豹女要来力",
+    "要来力（喜）",
+    "这个位置…要来力…"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV1vcaY6YEQQ",
     "https://www.bilibili.com/video/BV199h969EbR",
     "https://www.bilibili.com/video/BV1CvaN6iE9t",
-    "https://www.bilibili.com/video/BV1t6x76FEHd"
+    "https://www.bilibili.com/video/BV1t6x76FEHd",
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV17XxP6CE7n",
+    "https://www.bilibili.com/video/BV1MgWp6MEV2"
    ],
    "variants": [
-    "大的来了"
+    "大的来了",
+    "要来力"
    ]
   },
   "大结局了": {
@@ -1454,24 +1402,6 @@
     "多兰真是好兄弟啊",
     "多兰真好兄弟",
     "兰子好兄弟"
-   ]
-  },
-  "好多区": {
-   "meaning": "跟区区一样，用区来代替蛆字，说好多蛆，说这场比赛里打的差的人太多了",
-   "english": "",
-   "games": [
-    "valorant"
-   ],
-   "added": "2026-11-15",
-   "examples": [
-    "好多区好多区好多区好多区好多区好多区好多区好多区",
-    "好多区"
-   ],
-   "sources": [
-    "https://www.bilibili.com/video/BV1ie8t6UEzH"
-   ],
-   "notes": [
-    "跟区区一样，用区来代替蛆字，说好多蛆，说这场比赛里打的差的人太多了"
    ]
   },
   "好好好": {
@@ -1739,7 +1669,7 @@
   },
   "得分通道关闭": {
    "meaning": "比赛中用来调侃某一方再也拿不到分、得分势头被掐断的说法，常在上半场或开局就刷",
-   "english": "",
+   "english": "A joking way of saying a team is about to stop scoring or has had its scoring run cut off.",
    "games": [
     "valorant"
    ],
@@ -1750,15 +1680,21 @@
     "得分通道关闭喽",
     "上半场得分通道已关闭",
     "得分通道已关闭80%",
-    "本张图得分通道已关闭"
+    "本张图得分通道已关闭",
+    "fpx即将关闭得分通道",
+    "暂时关闭得分通道",
+    "还没开打就关闭得分通道是什么意思（狗头）"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV1CvaN6iE9t",
     "https://www.bilibili.com/video/BV1vcaY6YEQQ",
-    "https://www.bilibili.com/video/BV199h969EbR"
+    "https://www.bilibili.com/video/BV199h969EbR",
+    "https://www.bilibili.com/video/BV17vxq6NEBi",
+    "https://www.bilibili.com/video/BV1BAng6CEwf"
    ],
    "variants": [
-    "得分通道已关闭"
+    "得分通道已关闭",
+    "关闭得分通道"
    ]
   },
   "怎么翻的": {
@@ -1999,32 +1935,6 @@
     "how": "learned"
    }
   },
-  "我先来怎么翻的": {
-   "meaning": "看比赛时感叹某一方劣势太大、看不出还能怎么翻盘；也常被已经知道结果的人拿来事后调侃，假装刚来不知道局势。",
-   "english": "A sarcastic way of asking how the losing side could possibly come back, often used by people who already know the result",
-   "games": [
-    "lol"
-   ],
-   "added": "2026-11-15",
-   "examples": [
-    "人家在玩“我先来 怎么翻的”梗而已，不是真的不知道啦",
-    "我先来，怎么翻得",
-    "我先来，怎么翻的这？"
-   ],
-   "sources": [
-    "https://www.bilibili.com/video/BV1TgWp6MEHJ",
-    "https://www.bilibili.com/video/BV17XxP6CE7n",
-    "https://www.bilibili.com/video/BV1ua4W6XEJd"
-   ],
-   "source": {
-    "phrase": "怎么翻的",
-    "how": "guess"
-   },
-   "variants": [
-    "我先来这怎么翻的",
-    "我先来怎么翻得"
-   ]
-  },
   "我先翻怎么来的": {
    "meaning": "在比赛里感叹某一方劣势太大、看不出还能怎么翻盘取胜，常被已经知道结果的人拿来事后调侃。",
    "english": "How are they supposed to come back from this?",
@@ -2034,18 +1944,26 @@
    "added": "2026-11-15",
    "examples": [
     "我先翻，怎么来",
-    "我先翻怎么来的"
+    "我先翻怎么来的",
+    "人家在玩“我先来 怎么翻的”梗而已，不是真的不知道啦",
+    "我先来，怎么翻得",
+    "我先来，怎么翻的这？"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV1TgWp6MEHJ",
-    "https://www.bilibili.com/video/BV179H36HEgG"
+    "https://www.bilibili.com/video/BV179H36HEgG",
+    "https://www.bilibili.com/video/BV17XxP6CE7n",
+    "https://www.bilibili.com/video/BV1ua4W6XEJd"
    ],
    "source": {
     "phrase": "怎么翻的",
     "how": "guess"
    },
    "variants": [
-    "我先翻这怎么来的"
+    "我先翻这怎么来的",
+    "我先来这怎么翻的",
+    "我先来怎么翻得",
+    "我先来怎么翻的"
    ]
   },
   "我培养了一个神": {
@@ -3331,29 +3249,6 @@
     "兰子表情不对了"
    ]
   },
-  "要来力": {
-   "meaning": "「大的要来了」的谐音/卖萌写法，用来预告或起哄即将发生的大事、精彩场面，带调侃语气。",
-   "english": "Something big is about to happen (cutesy variant of \"大的要来了\").",
-   "games": [
-    "lol",
-    "valorant"
-   ],
-   "added": "2026-11-15",
-   "examples": [
-    "绝境豹女要来力",
-    "要来力（喜）",
-    "这个位置…要来力…"
-   ],
-   "sources": [
-    "https://live.bilibili.com/6",
-    "https://www.bilibili.com/video/BV17XxP6CE7n",
-    "https://www.bilibili.com/video/BV1MgWp6MEV2"
-   ],
-   "source": {
-    "phrase": "大的要来了",
-    "how": "guess"
-   }
-  },
   "警钟长鸣": {
    "meaning": "提醒自己和队友保持警惕、别松懈、稳住心态的刷屏口号，常和「稳住」「加油」连用。",
    "english": "A rallying cry to stay alert and not get complacent.",
@@ -3596,34 +3491,23 @@
     "超威要同意了",
     "ig同意了",
     "多兰同意了",
-    "多兰是人啊",
     "飞同意了",
     "超威再同意一次吧",
     "t1同意了",
     "faker不同意",
-    "多兰亮剑",
     "篮子同意了",
     "飞科同意了",
     "李哥同意了",
-    "多兰mvp",
     "超威同意了三叔不同意",
-    "多兰生气了",
-    "多兰诗人啊",
-    "多兰发力了",
     "飞哥同意了",
-    "多兰nb",
     "oner同意了",
-    "多兰自己人",
     "超威我不同意",
     "大o同意了",
-    "多兰突破口",
     "超威求你了同意吧",
     "多兰会同意的",
     "尺帝不同意",
-    "这多兰是人啊",
     "大超该同意了",
     "大超快同意",
-    "多兰来就有",
     "超威给我同意啊",
     "chovy再同意一次吧"
    ]
@@ -3894,7 +3778,7 @@
   },
   "阿一古": {
    "meaning": "韩语感叹词「아이고」的音译，表示哎呀、唉，常用来表达无奈、感叹或吐槽",
-   "english": "",
+   "english": "Korean interjection \"aigo\", like \"oh my\" or \"sigh\", used to express surprise, exasperation, or resignation.",
    "games": [
     "lol"
    ],
@@ -3902,12 +3786,20 @@
    "examples": [
     "阿一古，接q，每天抗塔",
     "theshy:阿一古对面玩不玩游戏",
-    "阿一古，队友都在上那先锋，自己下路贪吃"
+    "阿一古，队友都在上那先锋，自己下路贪吃",
+    "说家乡话诶，哎一古",
+    "请到哎一古了",
+    "哎一古马头把线带出来了"
    ],
    "sources": [
     "https://www.bilibili.com/video/BV17XxP6CE7n",
     "https://www.bilibili.com/video/BV19wnQ6sExk",
-    "https://www.bilibili.com/video/BV1Eas967EY9"
+    "https://www.bilibili.com/video/BV1Eas967EY9",
+    "https://live.bilibili.com/6",
+    "https://www.bilibili.com/video/BV1ua4W6XEJd"
+   ],
+   "variants": [
+    "哎一古"
    ]
   },
   "陌生": {
@@ -4382,6 +4274,26 @@
   "在哪领会员": {
    "reason": "not a meme (report 2026-11-15)",
    "date": "2026-11-15"
+  },
+  "多兰mvp": {
+   "reason": "not a meme (taken out of 超威同意了, comparison doc 2026-11-16)",
+   "date": "2026-11-23"
+  },
+  "多兰nb": {
+   "reason": "not a meme (taken out of 超威同意了, comparison doc 2026-11-16)",
+   "date": "2026-11-23"
+  },
+  "多兰发力了": {
+   "reason": "not a meme (taken out of 超威同意了, comparison doc 2026-11-16)",
+   "date": "2026-11-23"
+  },
+  "多兰生气了": {
+   "reason": "not a meme (taken out of 超威同意了, comparison doc 2026-11-16)",
+   "date": "2026-11-23"
+  },
+  "多兰突破口": {
+   "reason": "not a meme (taken out of 超威同意了, comparison doc 2026-11-16)",
+   "date": "2026-11-23"
   },
   "大会员": {
    "reason": "not a meme (report 2026-11-15)",

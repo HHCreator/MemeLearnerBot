@@ -183,8 +183,9 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), no
 
     variants: other phrases of the same meme (variants.py). A learned meme among them joins
     this one, with its variants, notes, games, examples and sources (its meaning only when
-    this one has none), and its own entry goes: one meme, one entry. One that was another
-    meme's variant moves here, and one you turned down isn't turned down any more. A phrase
+    this one has none; and where it comes from, unless that is this one), and its own entry
+    goes: one meme, one entry. One that was another meme's variant moves here, and one you
+    turned down isn't turned down any more. A phrase
     that is a variant of a learned meme already updates that meme (chovy同意了: 超威同意了).
     apart: phrases you said aren't this meme, though they look like it. source: the meme it
     comes from, {"phrase", "how"} (judging.judge()'s "source"), replacing the one it had."""
@@ -212,7 +213,9 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), no
             examples = list(examples) + list(folded.get("examples") or [])
             sources = list(sources) + list(folded.get("sources") or [])
             notes += list(folded.get("notes") or [])
-            entry.setdefault("source", folded.get("source"))
+            came = normal((folded.get("source") or {}).get("phrase"))
+            if came and came != key and owners(memes).get(came) != key:
+                entry.setdefault("source", folded["source"])  # not from the one it joins
             joined += [p for p in folded.get("variants") or [] if p != key and p not in away]
             away += [p for p in folded.get("apart") or [] if p not in away]
         joined.append(other)

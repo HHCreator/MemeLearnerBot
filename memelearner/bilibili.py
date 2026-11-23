@@ -4,13 +4,16 @@ Everything here only reads, anonymously: nothing is ever posted, liked or sent, 
 is used. The bot sees what anyone sees on a video page without logging in.
 
     search_videos(keyword, since, until)   videos for a search word, most danmu first
+                                           (signed=False: at the old address, which
+                                           answered a visitor without a captcha)
     related_videos(bvid)                   the videos Bilibili shows beside a video
     bvid_of(link)                          the BV id of a video link, b23.tv short links too
     video_info(bvid)                       a video's title, ids, parts and counts
     danmu(cid)                             the danmu (弹幕) on one part of a video
     comments(aid)                          the hot comments under a video, with their replies
-    video_detail(bvid)                     a video's page: info, description, tags, subtitles
-                                           and related videos, in one request
+    video_detail(bvid)                     a video's page: info, description, tags, subtitles,
+                                           related videos and the collection (合集) it is
+                                           in, in one request
     subtitle_text(url)                     the text of one of a video's subtitle tracks
     audio_url(bvid, cid)                   where the smallest audio stream of a video is
     download(url, path)                    save an audio stream to a file
@@ -283,7 +286,7 @@ def _video(item):
         # Search results come with the search word highlighted: <em class="keyword">CS2</em>
         "title": html.unescape(re.sub(r"<[^>]+>", "", item.get("title") or "")),
         "author": owner.get("name") or item.get("author") or "",
-        "pubdate": pubdate if isinstance(pubdate, int) else 0,
+        "pubdate": _number(pubdate),  # the old search address writes it as text
         "plays": _number(stat.get("view", item.get("play"))),
         "danmu": _number(stat.get("danmaku", item.get("video_review"))),
         "comments": _number(stat.get("reply", item.get("review"))),
@@ -291,23 +294,29 @@ def _video(item):
     }
 
 
-def search_videos(keyword, since=None, until=None, order="dm", page=1):
+def search_videos(keyword, since=None, until=None, order="dm", page=1, signed=True):
     """Videos found by a search word, posted between the unix times since and until (any
-    time when they aren't given).
+    time when they aren't given), each with its "zone" and "tags" as the results list them.
 
     order: dm (most danmu first), click (most played), pubdate (newest), scores (most
     comments), totalrank (the best match first). Bilibili often answers a visitor's search
-    with a captcha (Captcha).
+    with a captcha (Captcha). signed=False asks the search's old address, without the WBI
+    signature: in the explain test on Hao's PC (2026-11-23) it answered a visitor with
+    videos 26 times of 26, where the signed one wanted a captcha 3 times of 3.
     """
     params = {"search_type": "video", "keyword": keyword, "order": order, "page": page}
     if since is not None and until is not None:
         params.update(pubtime_begin_s=int(since), pubtime_end_s=int(until))
-    data = _request("/x/web-interface/wbi/search/type", params, signed=True)
+    path = "/x/web-interface/wbi/search/type" if signed else "/x/web-interface/search/type"
+    data = _request(path, params, signed=signed)
     videos = []
     for item in (data or {}).get("result") or []:
         if item.get("type") != "video" or not item.get("bvid"):
             continue
         video = _video(item)
+        video["zone"] = str(item.get("typename") or "").strip()  # 电子竞技, 搞笑, 音乐 ...
+        video["tags"] = [tag.strip() for tag in str(item.get("tag") or "").split(",")
+                         if tag.strip()]
         # in case the search ignores the time range
         if since is None or until is None or since <= video["pubdate"] <= until:
             videos.append(video)
@@ -492,9 +501,12 @@ def _tracks(items):
 def video_detail(bvid):
     """What a video's page shows, in one request (view/detail, which a visitor gets without
     a captcha): {"bvid", "aid", "title", "author", "pubdate", "duration" (seconds),
-    "desc", "tags", "plays", "parts": [cid, ...], "subtitles" (the tracks a visitor can
+    "desc", "tags", "zone" (its zone: 单机游戏, 电子竞技, 动画 ...; the new name too when
+    Bilibili gives one), "plays", "parts": [cid, ...], "subtitles" (the tracks a visitor can
     read, see _tracks(); Bilibili only gives its AI subtitles to logged-in viewers, so this
-    is often empty), "related" (the videos beside it, like related_videos())}."""
+    is often empty), "related" (the videos beside it, like related_videos()), "collection"
+    (the videos of the collection (合集) it is in, the same way: an uploader who explains
+    memes often keeps all those videos in one)}."""
     data = _request("/x/web-interface/view/detail", {"bvid": bvid}) or {}
     view = data.get("View") if isinstance(data.get("View"), dict) else {}
     if not view.get("aid"):
@@ -512,12 +524,36 @@ def video_detail(bvid):
         "desc": "" if desc == "-" else desc,  # "-" is what the page shows for none
         "tags": [tag["tag_name"] for tag in data.get("Tags") or []
                  if isinstance(tag, dict) and tag.get("tag_name")],
+        "zone": " ".join(dict.fromkeys(str(view.get(key) or "").strip()
+                                       for key in ("tname", "tname_v2")
+                                       if str(view.get(key) or "").strip())),
         "plays": _number(stat.get("view")),
         "parts": parts or ([view["cid"]] if view.get("cid") else []),
         "subtitles": _tracks((view.get("subtitle") or {}).get("list")),
         "related": [_video(item) for item in data.get("Related") or []
                     if isinstance(item, dict) and item.get("bvid")],
+        "collection": _collection(view),
     }
+
+
+def _collection(view):
+    """The videos of the collection (合集) a video's page shows it in (View.ugc_season), like
+    related_videos() gives videos; [] for a video in none."""
+    season = view.get("ugc_season") if isinstance(view.get("ugc_season"), dict) else {}
+    owner = view.get("owner") if isinstance(view.get("owner"), dict) else {}
+    videos = []
+    for section in season.get("sections") or []:
+        for episode in (section.get("episodes") or []) if isinstance(section, dict) else []:
+            if not isinstance(episode, dict) or not episode.get("bvid"):
+                continue
+            arc = episode.get("arc") if isinstance(episode.get("arc"), dict) else {}
+            author = arc.get("author") if isinstance(arc.get("author"), dict) else {}
+            item = {key: value for key, value in arc.items() if key != "author"}
+            videos.append(_video(dict(item, bvid=episode["bvid"],
+                                      aid=episode.get("aid") or arc.get("aid"),
+                                      title=episode.get("title") or arc.get("title") or "",
+                                      owner=author if author.get("name") else owner)))
+    return videos
 
 
 def subtitle_text(url):

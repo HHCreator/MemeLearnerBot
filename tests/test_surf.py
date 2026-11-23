@@ -13,7 +13,7 @@ import urllib.parse
 import zlib
 from unittest import mock
 
-from memelearner import bilibili, nicknames, store, surf
+from memelearner import bilibili, nicknames, store, surf, variants
 
 NOW = 1_800_000_000
 DAY = 86400
@@ -178,13 +178,16 @@ TABLE = "Chovy = 超威, 大超, chooovy\nCanyon = 三叔, 三姆斯\n"  # the n
 def use_table(test, folder, text=TABLE):
     """A nickname table of its own for one test, in folder (TABLE unless text says
     otherwise), so the players you add to data/nicknames.txt don't change the results: its
-    path."""
+    path. The table of ways of writing one meme (data/same_memes.txt) is folder's
+    same_memes.txt, none until a test writes it."""
     path = os.path.join(folder, "nicknames.txt")
     with open(path, "w", encoding="utf-8") as f:
         f.write(text)
-    patcher = mock.patch.object(nicknames, "NICKNAMES_FILE", path)
-    patcher.start()
-    test.addCleanup(patcher.stop)
+    for patcher in (mock.patch.object(nicknames, "NICKNAMES_FILE", path),
+                    mock.patch.object(variants, "SAME_FILE",
+                                      os.path.join(folder, "same_memes.txt"))):
+        patcher.start()
+        test.addCleanup(patcher.stop)
     return path
 
 

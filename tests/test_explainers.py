@@ -107,6 +107,7 @@ DETAIL = {"code": 0, "data": {
     "View": {"aid": 42, "bvid": "BV1explain01", "title": "【梗百科】正义必胜是什么梗？",
              "desc": "-", "duration": 95, "pubdate": 1_700_000_000, "cid": 7,
              "owner": {"mid": 1, "name": "梗百科"}, "stat": {"view": 12345},
+             "tname": "电子竞技", "tname_v2": "电子竞技",
              "pages": [{"cid": 7, "page": 1, "part": "p1"}],
              "subtitle": {"list": [
                  {"lan": "ai-zh", "subtitle_url": "", "ai_type": 1},  # a visitor gets no address
@@ -115,6 +116,17 @@ DETAIL = {"code": 0, "data": {
     "Related": [{"bvid": "BV1explain02", "aid": 2, "title": "阿一古是什么梗",
                  "owner": {"name": "梗百科"}, "stat": {"view": 99}},
                 {"aid": 3, "title": "a bangumi episode, which has no bvid"}]}}
+# ... and the collection (合集) it is in, as the page lists it
+DETAIL["data"]["View"]["ugc_season"] = {"id": 9, "title": "梗百科合集", "sections": [
+    {"title": "正片", "episodes": [
+        {"aid": 42, "bvid": "BV1explain01", "title": "【梗百科】正义必胜是什么梗？",
+         "arc": {"aid": 42, "title": "【梗百科】正义必胜是什么梗？", "pubdate": 1_700_000_000,
+                 "author": {"mid": 1, "name": "梗百科"}, "stat": {"view": 12345}}},
+        {"aid": 43, "bvid": "BV1explain05", "title": "【梗百科】肯恰那是什么梗？",
+         "arc": {"aid": 43, "title": "肯恰那", "pubdate": 1_700_000_100,
+                 "author": {"mid": 1, "name": "梗百科"}, "stat": {"view": 777, "danmaku": 5}}},
+        {"aid": 44, "title": "an episode with no bvid"}]},
+    "not a section"]}
 
 
 class BilibiliTest(Folder):
@@ -133,12 +145,19 @@ class BilibiliTest(Folder):
         self.assertEqual((found["aid"], found["title"], found["author"], found["duration"]),
                          (42, "【梗百科】正义必胜是什么梗？", "梗百科", 95))
         self.assertEqual(found["desc"], "")  # "-" is the page's "no description"
-        self.assertEqual((found["tags"], found["parts"], found["plays"]),
-                         (["正义必胜", "梗百科"], [7], 12345))
+        self.assertEqual((found["tags"], found["parts"], found["plays"], found["zone"]),
+                         (["正义必胜", "梗百科"], [7], 12345, "电子竞技"))  # its zone once
         # Only the track a visitor can read, with a whole address
         self.assertEqual(found["subtitles"], [
             {"lan": "zh-CN", "url": "https://i0.hdslb.com/bfs/subtitle/1.json", "ai": False}])
         self.assertEqual([v["bvid"] for v in found["related"]], ["BV1explain02"])
+        # The videos of its collection, the way related videos come
+        self.assertEqual([(v["bvid"], v["title"], v["author"], v["plays"], v["pubdate"])
+                          for v in found["collection"]],
+                         [("BV1explain01", "【梗百科】正义必胜是什么梗？", "梗百科", 12345,
+                           1_700_000_000),
+                          ("BV1explain05", "【梗百科】肯恰那是什么梗？", "梗百科", 777,
+                           1_700_000_100)])
         self.assertEqual(fake.calls[-1][1], {"bvid": "BV1explain01"})  # unsigned, a visitor's
         self.assertEqual(fake.calls[-1][2]["buvid3"], "BUVID3")
 
@@ -197,6 +216,22 @@ class BilibiliTest(Folder):
                 bilibili.download("https://upos.example/64.m4s", path, limit=999)
         self.assertFalse(os.path.exists(path))  # nothing half-saved is left behind
 
+    def test_the_search_at_its_old_address_is_unsigned(self):
+        fake = self.site({"/x/web-interface/search/type": {"code": 0, "data": {"result": [
+            {"type": "video", "bvid": "BV1explain01", "author": "梗百科", "typename": "电子竞技",
+             "tag": "英雄联盟,梗百科,", "title": '<em class="keyword">正义必胜</em>是什么梗',
+             "play": "12345", "pubdate": "1700000000", "description": "这期讲正义必胜"}]}}})
+        found = bilibili.search_videos("正义必胜是什么梗", order="totalrank", signed=False)
+        path, query, cookies = fake.calls[-1]
+        self.assertEqual(path, "api.bilibili.com/x/web-interface/search/type")
+        self.assertNotIn("w_rid", query)  # no signature: no keys asked for either
+        self.assertFalse([call for call in fake.calls if call[0].endswith("/nav")])
+        self.assertEqual(cookies["buvid3"], "BUVID3")  # a visitor's cookies, as always
+        # Counts and times written as text, and the zone and tags of each result
+        self.assertEqual([(v["title"], v["plays"], v["pubdate"], v["zone"], v["tags"])
+                          for v in found],
+                         [("正义必胜是什么梗", 12345, 1_700_000_000, "电子竞技", ["英雄联盟", "梗百科"])])
+
     def test_a_search_with_no_time_range_sends_none(self):
         fake = self.site({"/x/web-interface/wbi/search/type": {"code": 0, "data": {"result": [
             {"type": "video", "bvid": "BV1explain01", "pubdate": 1, "title": "正义必胜是什么梗"}]}}})
@@ -208,6 +243,38 @@ class BilibiliTest(Folder):
 
 
 # -- finding and reading explainer videos -------------------------------------------------
+
+class GameTest(Folder):
+    def test_what_says_a_video_or_a_page_is_about_games(self):
+        self.assertEqual(explainers.game_words(["汽车人是什么梗？", "刃牙里的德川光成"], ["汽车人"]),
+                         [])
+        self.assertEqual(explainers.game_words(["汽车人", "英雄联盟里漏了炮车"], ["汽车人"]),
+                         ["英雄联盟", "炮车"])
+        # Letters count as whole words, in any case and width
+        self.assertEqual(explainers.game_words(["ＬＰＬ 春季赛"]), ["lpl"])
+        self.assertEqual(explainers.game_words(["lollipop", "a big dota-like map"]), ["dota"])
+        # The phrase itself doesn't count: 打野来了 is about games only if more says so
+        self.assertEqual(explainers.game_words(["打野来了是什么梗"], ["打野来了"]), [])
+        # ... nor a word with an everyday meaning (补刀 is also "to rub it in")
+        self.assertEqual(explainers.game_words(["他又补刀了一句"]), [])
+        # Players in the nickname table count (not a nickname of one character), and each
+        # game's own words
+        table = os.path.join(self.folder, "nicknames.txt")
+        with open(table, "w", encoding="utf-8") as f:
+            f.write("Canyon = 三叔, 叔\n")
+        with mock.patch.object(explainers.nicknames, "NICKNAMES_FILE", table):
+            self.assertEqual(explainers.game_words(["三叔又来了", "canyon"]), ["canyon", "三叔"])
+            self.assertEqual(explainers.game_words(["叔叔"]), [])
+        self.assertEqual(explainers.game_words(["瓦罗兰特"]), ["瓦罗兰特"])
+        why = explainers.off_topic({"title": "汽车人是什么梗", "desc": "", "zone": "动画",
+                                    "tags": ["刃牙", "德川光成"], "said": ""}, ["汽车人"])
+        self.assertEqual(why, "not about games: no game word in its title, description, tags, "
+                              "zone or what it says (zone 动画; tags 刃牙, 德川光成)")
+        self.assertEqual(explainers.off_topic({"title": "汽车人", "zone": "单机游戏"},
+                                              ["汽车人"]), "")
+        self.assertEqual(explainers.off_topic({"title": "汽车人", "said": "S赛上漏了炮车"},
+                                              ["汽车人"]), "")
+
 
 class FindTest(Folder):
     def test_titles_that_explain_something_and_phrases_in_them(self):
@@ -234,20 +301,40 @@ class FindTest(Folder):
                              time.time(), 7, 3)
         self.assertEqual(sorted(explainers.load()["seen"]), ["BV1explain01", "BV1explain02"])
 
-    def test_videos_are_found_in_links_then_the_ones_seen_then_a_search(self):
+    def test_videos_are_found_in_links_else_the_ones_seen_and_bilibilis_search(self):
         explainers.remember([video("BV1explain01", "正义必输名场面 出处", plays=900),
                              video("BV1explain02", "正义必胜是什么梗", plays=10),
                              video("BV1explain03", "正义必胜的由来", plays=50),
                              video("BV1explain04", "阿一古是什么梗")])
         chant = {"phrase": "正义必胜", "game": "lol", "variants": [{"phrase": "正义必输"}]}
-        with mock.patch.object(bilibili, "search_videos") as search:
+        with mock.patch.object(bilibili, "search_videos", return_value=[]) as search:
             found = explainers.find(chant)
             # Made to explain one phrase first, the phrase before its variants, most played
             self.assertEqual([v["bvid"] for v in found],
                              ["BV1explain03", "BV1explain02", "BV1explain01"])
             found = explainers.find(chant, links=["https://www.bilibili.com/video/BV1linked001"])
             self.assertEqual(found[0], {"bvid": "BV1linked001", "title": "", "how": "link"})
-        search.assert_not_called()  # it had videos for it
+        # Bilibili's search too, at the address that answers a visitor without a captcha;
+        # not for the links
+        self.assertEqual(search.call_args_list, [mock.call(
+            "正义必胜是什么梗", order="totalrank", signed=False)])
+
+    def test_a_title_about_games_is_read_before_one_that_isnt(self):
+        explainers.remember([video("BV1explain11", "【梗百科】春风若有怜花意是什么梗？", plays=10)])
+        poem = {"phrase": "春风若有怜花意", "game": "lol", "variants": []}
+        song = dict(video("BV1song000001", "“春风若有怜花意，可否许我再少年”", plays=587765),
+                    zone="音乐", tags=["古风", "单曲循环"])
+        player = dict(video("BV1shy0000001", "Theshy人物志：春风若有怜花意，可否许我再少年！",
+                            plays=150422), zone="电子竞技", tags=[])
+        talk = dict(video("BV1talk000001", "春风若有怜花意 弹幕名场面", plays=900),
+                    zone="电子竞技", tags=["英雄联盟"])
+        with mock.patch.object(bilibili, "search_videos", return_value=[song, player, talk]):
+            found = explainers.find(poem)
+        # Made to explain it first, then the ones with a game word in their titles, zones
+        # or tags (theshy is one), most played first, then the rest
+        self.assertEqual([(v["bvid"], v["how"]) for v in found], [
+            ("BV1explain11", "related"), ("BV1shy0000001", "search"),
+            ("BV1talk000001", "search"), ("BV1song000001", "search")])
 
     def test_with_no_video_for_a_meme_the_ones_about_where_it_comes_from_are_found(self):
         explainers.remember([video("BV1explain08", "千言万语感谢现役是什么梗"),
@@ -321,7 +408,9 @@ class ReadTest(Folder):
                   "desc": "这期讲正义必胜", "tags": ["梗百科"], "plays": 12345, "parts": [7],
                   "subtitles": [{"lan": "zh-CN", "url": "https://s/1.json", "ai": False}]
                   if subtitles else [],
-                  "related": [video("BV1explain02", "阿一古是什么梗")]}
+                  "related": [video("BV1explain02", "阿一古是什么梗")],
+                  "collection": [video("BV1explain05", "【梗百科】肯恰那是什么梗？"),
+                                 video("BV1vlog000001", "周末的日常 vlog")]}
         fakes = {
             "video_detail": lambda bvid: asked.append("page") or dict(detail, bvid=bvid),
             "subtitle_text": lambda url: asked.append("subtitles") or QUOTE,
@@ -347,7 +436,10 @@ class ReadTest(Folder):
         self.assertEqual(found["comments"], [{"text": "正义必胜的意思是 打气", "likes": 90},
                                              {"text": "前排", "likes": 3}])  # most liked first
         self.assertEqual(found["danmu"], ["正义必胜", "原来正义必胜出自比赛", "哈哈"])
-        self.assertIn("BV1explain02", explainers.load()["seen"])  # its related explainer
+        seen = explainers.load()["seen"]
+        # The explainers beside it and in its collection, each with where it was seen
+        self.assertEqual({bvid: video["how"] for bvid, video in seen.items()},
+                         {"BV1explain02": "related", "BV1explain05": "collection"})
         self.assertEqual(explainers.read("BV1explain01", "正义必胜", hearing=True), found)
         self.assertEqual(len(asked), 4)  # read once: the second time it comes from the cache
 
@@ -426,11 +518,14 @@ class ExplainTest(Folder):
             patcher.start()
             self.addCleanup(patcher.stop)
         self.read = []
+        self.zones = {}  # bvid: (zone, tags) of a video that isn't in 电子竞技
 
         def read(bvid, phrase="", hearing=False):
             self.read.append(bvid)
+            zone, tags = self.zones.get(bvid, ("电子竞技", []))
             return {"bvid": bvid, "url": f"https://www.bilibili.com/video/{bvid}",
-                    "title": self.titles[bvid], "author": "up", "desc": "", "tags": [],
+                    "title": self.titles[bvid], "author": "up", "desc": "", "tags": tags,
+                    "zone": zone,
                     "said": f"今天讲讲{phrase}。{QUOTE}" if "梗" in self.titles[bvid] else "",
                     "heard": "subtitles", "comments": [{"text": "前排", "likes": 1}],
                     "danmu": []}
@@ -561,6 +656,56 @@ class ExplainTest(Folder):
         with mock.patch(__name__ + ".FROM_VIDEO", "后来视频改口了"):
             self.quietly(memelearner.explain, again=True)
         self.assertEqual(self.model.explained["正义必胜"]["videos"][0]["says"], "后来视频改口了")
+
+    def test_a_video_that_isnt_about_games_is_skipped_and_written_down(self):
+        # 汽车人 in the manga 刃牙 (what the web found for it on 2026-11-11), and in LoL
+        self.titles.update({"BV1hanma0001": "汽车人是什么梗？", "BV1lol000001": "汽车人是什么梗"})
+        self.zones["BV1hanma0001"] = ("动画", ["刃牙", "德川光成"])
+        self.zones["BV1lol000001"] = ("", ["英雄联盟", "LPL"])  # its tags say it
+        explainers.remember([video("BV1hanma0001", "汽车人是什么梗？", plays=999),
+                             video("BV1lol000001", "汽车人是什么梗")])
+        found, printed = self.quietly(memelearner.explain, ["汽车人"], games=["lol"],
+                                      judge=False)
+        self.assertEqual(self.read, ["BV1hanma0001", "BV1lol000001"])  # the busier one first
+        self.assertEqual([summary["bvid"] for summary in found["lol:汽车人"]], ["BV1lol000001"])
+        self.assertNotIn("汽车人是什么梗？", self.model.summed)  # the model never saw it
+        entry = explainers.load()["phrases"]["lol:汽车人"]
+        [dropped] = entry["dropped"]
+        self.assertEqual((dropped["bvid"], dropped["url"], dropped["title"]),
+                         ("BV1hanma0001", "https://www.bilibili.com/video/BV1hanma0001",
+                          "汽车人是什么梗？"))
+        self.assertIn("not about games", dropped["why"])
+        self.assertIn("(zone 动画; tags 刃牙, 德川光成)", dropped["why"])
+        # Both written down with how they were found: seen beside another video
+        self.assertEqual((dropped["found"], found["lol:汽车人"][0]["found"]),
+                         ("related", "related"))
+        self.assertIn("skipped BV1hanma0001  汽车人是什么梗？: not about games", printed)
+        # It isn't read again, unless asked to (again)
+        self.read.clear()
+        _, printed = self.quietly(memelearner.explain, ["汽车人"], games=["lol"], judge=False)
+        self.assertEqual(self.read, [])
+        self.assertIn("no new video (read 2 before)", printed)
+        self.quietly(memelearner.explain, ["汽车人"], games=["lol"], judge=False, again=True)
+        self.assertEqual(self.read, ["BV1hanma0001", "BV1lol000001"])
+        # A link you give is summed up all the same
+        self.read.clear()
+        found, _ = self.quietly(memelearner.explain, ["汽车人"], games=["lol"], judge=False,
+                                links={"汽车人": ["BV1hanma0001"]})
+        self.assertEqual([summary["bvid"] for summary in found["lol:汽车人"]], ["BV1hanma0001"])
+        self.assertNotIn("dropped", [k for k, v in explainers.load()["phrases"]["lol:汽车人"]
+                                     .items() if v])  # summed up now: not dropped any more
+
+    def test_at_most_tries_times_videos_are_read_for_a_phrase(self):
+        for n in range(8):
+            bvid = f"BV1hanma{n:04d}"
+            self.titles[bvid] = "汽车人是什么梗"
+            self.zones[bvid] = ("动画", ["刃牙"])
+            explainers.remember([video(bvid, "汽车人是什么梗", plays=100 - n)])
+        found, printed = self.quietly(memelearner.explain, ["汽车人"], games=["lol"],
+                                      judge=False, videos=1)
+        self.assertEqual(len(self.read), explainers.TRIES)
+        self.assertEqual(found, {})
+        self.assertIn("0 of 1 phrases are explained by a video now.", printed)
 
     def test_a_link_is_read_for_its_phrase_without_looking(self):
         self.write_run()
