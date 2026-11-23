@@ -63,11 +63,13 @@ TEXT = 1500  # characters of a page's text kept around the phrase
 SNIPPET = 200  # characters kept of a search result's snippet
 FAILS = 2  # a site that can't be reached this many times is left alone for the rest of the run
 
-# The search engines, tried in this order until one answers: Bing's Chinese site,
-# DuckDuckGo's page that works without scripts, and Baidu (which mostly wants a captcha)
+# The search engines, tried in this order until one answers: Bing in Chinese, DuckDuckGo's
+# page that works without scripts, and Baidu (which mostly wants a captcha). Bing is asked at
+# www.bing.com: cn.bing.com sent Hao's computer to www.bing.com's front page, which has no
+# results, for 18 searches of 18 on 2026-11-23
 ENGINES = ("bing", "duckduckgo", "baidu")
 SEARCH_URLS = {
-    "bing": "https://cn.bing.com/search?q={q}&ensearch=0",
+    "bing": "https://www.bing.com/search?q={q}&mkt=zh-CN",
     "duckduckgo": "https://html.duckduckgo.com/html/?q={q}&kl=cn-zh",
     "baidu": "https://www.baidu.com/s?wd={q}&ie=utf-8",
 }
@@ -394,10 +396,13 @@ PARSERS = {"bing": parse_bing, "duckduckgo": parse_duckduckgo, "baidu": parse_ba
 def search_with(engine, query, names=()):
     """One search engine's results for a query, at most RESULTS (see search()); with
     site:bilibili.com in the query, only the ones on Bilibili (an engine may answer with
-    others too). Raises Refused when it wants a captcha, Error when it answers with an
-    error."""
+    others too). Raises Refused when it wants a captcha (or, for Bing, sends the bot to its
+    front page instead of its results), Error when it answers with an error."""
     url = SEARCH_URLS[engine].format(q=urllib.parse.quote(query))
-    markup, _ = get(url, site=engine)
+    markup, final = get(url, site=engine)
+    if engine == "bing" and not urllib.parse.urlsplit(final).path.startswith("/search"):
+        refused[engine] = "it sends the bot to its front page, which has no results"
+        raise Refused("bing sent the bot to its front page, which has no results")
     within = re.search(r"\bsite:(\S+)", query)
     found = PARSERS[engine](markup) or parse_any(markup, engine, names or [_words(query)])
     seen, results = set(), []

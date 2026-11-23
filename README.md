@@ -525,9 +525,13 @@ alone for the rest of the run; there are a few seconds between two requests to t
 Which search engines and wikis answer depends on where your computer is, so you can try them:
 
 ```
-py -m memelearner sources 阿一古 正义必胜 --explain   # ask each one, then look them up as explain does
+py -m memelearner sources 阿一古 正义必胜 --explain   # look them up as explain does, then ask each one
 py -m memelearner sources --file phrases.txt --raw   # phrases one a line; keep every page as it came
 ```
+
+With `--explain` they are looked up first, so that the search engines' patience goes to
+explain: asking every place about 18 phrases first, Baidu wanted a captcha after 11 of them
+(2026-11-23), and explain then got nothing from it.
 
 It writes what each place found to `.cache/surf/sources/` (`--out` for another folder):
 `sources.md` to read, beside what `memes.json` says the learned ones mean, with a link to
