@@ -396,7 +396,7 @@ class LookUpTest(WebTest):
         chant = {"phrase": "正义必胜", "game": "lol", "variants": []}
         data = explainers.load()
         found = explainers.find(chant, data=data)
-        # The ones seen first, then the search engine's, then (none found) no Bilibili search
+        # The ones seen, Bilibili's search (it found none here) and the search engine's
         self.assertEqual([(v["bvid"], v["how"]) for v in found],
                          [("BV1explain03", "related"), ("BV1web000001", "web")])
         entry = data["phrases"]["lol:正义必胜"]
@@ -406,7 +406,7 @@ class LookUpTest(WebTest):
         self.assertTrue(all(web.on(r["url"], "bilibili.com") for r in entry["web"]["results"]))
         explainers.find(chant, data=data)
         self.assertEqual(len([c for c in fake.calls if "bing.com" in c]), 1)  # once a week
-        explainers.bilibili.search_videos.assert_not_called()
+        self.assertEqual(explainers.bilibili.search_videos.call_count, 1)  # Bilibili's too
 
     def test_with_no_video_explaining_it_bilibilis_pages_are_read_and_judged(self):
         fake = self.web(("cn.bing.com", BILIBILI), ("bilibili.com/read/cv100", ARTICLE),
@@ -569,6 +569,9 @@ class LookUpTest(WebTest):
                       "cv100): 给受欢迎的一方加油 「正义必胜就是给更受欢迎的一方加油」", text)
         self.assertIn("- skipped [正义必胜！](https://www.bilibili.com/read/cv999): not about games: "
                       "no game word in its title or text", text)
+        # Each video with how it was found
+        self.assertIn("- video [看完就懂](https://www.bilibili.com/video/BV1web000001) "
+                      "(via a search engine): ", text)
         self.assertTrue(os.listdir(os.path.join(folder, "raw")))
 
     def test_a_log_file_gets_what_a_command_prints(self):

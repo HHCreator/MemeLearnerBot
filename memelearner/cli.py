@@ -430,16 +430,24 @@ def _sources_text(report):
         for summary in said:
             where = (f"page {summary.get('site', '')} [{summary.get('title', '')}]"
                      f"({summary.get('url', '')})" if summary.get("kind") == "page" else
-                     f"video [{summary.get('title', '')}]({summary.get('url', '')})")
+                     f"video [{summary.get('title', '')}]({summary.get('url', '')})" +
+                     _found(summary))
             lines.append(f"- {where}: " + (
                 summary["meaning"] + (f" (出自 {summary['origin']})" if summary.get("origin")
                                       else "") +
                 (f" 「{summary['quote']}」" if summary.get("quote") else "")
                 if summary.get("about") else "doesn't explain it"))
         for dropped in skipped:
-            lines.append(f"- skipped [{dropped.get('title', '')}]({dropped.get('url', '')}): "
-                         f"{dropped.get('why', '')}")
+            lines.append(f"- skipped [{dropped.get('title', '')}]({dropped.get('url', '')})"
+                         f"{_found(dropped)}: {dropped.get('why', '')}")
     return lines
+
+
+def _found(item):
+    """How explain found a video, for sources.md: " (via Bilibili's search)"; "" when it
+    didn't say (a page, or a video read before 2026-11-23)."""
+    how = explainers.FOUND.get(item.get("found") or "")
+    return f" (via {how})" if how else ""
 
 
 def _auto(args):

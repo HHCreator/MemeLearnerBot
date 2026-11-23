@@ -461,18 +461,24 @@ py surf.py --explain                         # read Bilibili, judge, read explai
 
 For each phrase it:
 
-1. **Finds** videos whose titles name the phrase (or a variant) and look made to explain
-   something (是什么梗, 什么意思, 出处, 由来). They come from the links you give, from the
-   explainer videos the bot saw in related-video lists (the collector's and those beside
-   every explainer it reads, which a visitor gets without a captcha), from a search engine's
-   results for "阿一古是什么梗 site:bilibili.com" (Bing, or DuckDuckGo or Baidu when Bing
-   doesn't answer: `memelearner/web.py`; only Bilibili's pages, as many memes come from
-   there and pages elsewhere were often about something else of the same name, like 汽车人
-   in the manga 刃牙), and from Bilibili's own search for it. Bilibili's search is tried
-   until it asks for a captcha once in a run, then skipped (the bot never solves captchas);
-   both searches happen for each phrase at most once a week. When no video names a meme the judge says comes from another one (see Where a meme
-   comes from), it looks the same way for videos about that one: 千言万语感谢现役是什么梗
-   for 千言万语感谢多兰, 超威同意了 for the pattern XX同意了.
+1. **Finds** videos whose titles name the phrase (or a variant). They come from the links
+   you give, from the explainer videos (是什么梗, 什么意思, 出处, 由来 ...) the bot saw in
+   related-video lists and collections (合集): the collector's lists, and the ones beside
+   every explainer it reads, which a visitor gets without a captcha; an uploader who
+   explains memes often keeps hundreds of them in one collection. They also come from
+   Bilibili's own search for "阿一古是什么梗", asked at its old address, which answered a
+   visitor without a captcha for 26 phrases of 26 in the explain test on Hao's PC
+   (2026-11-23), where the newer, signed one wanted a captcha every time; after a captcha
+   it isn't asked again in that run (the bot never solves captchas). And from a search
+   engine's results for "阿一古是什么梗 site:bilibili.com" (Bing, or DuckDuckGo or Baidu
+   when Bing doesn't answer: `memelearner/web.py`; only Bilibili's pages, as many memes
+   come from there and pages elsewhere were often about something else of the same name,
+   like 汽车人 in the manga 刃牙). Both searches happen for each phrase at most once a
+   week. Titles made to explain one phrase are read first, then titles with a game word
+   (for a search result, its zone and tags count too), then the rest. When no video names
+   a meme the judge says comes from another one (see Where a meme comes from), it looks
+   the same way for videos about that one: 千言万语感谢现役是什么梗 for 千言万语感谢多兰,
+   超威同意了 for the pattern XX同意了.
 2. **Reads** them, each video once, as any visitor who isn't logged in sees them: the page
    (title, description, tags, zone, the subtitles a visitor gets, related videos), the hot
    comments and the danmu. That is 3 or 4 requests, 5 to 7 seconds apart. A video that
@@ -525,8 +531,9 @@ py -m memelearner sources --file phrases.txt --raw   # phrases one a line; keep 
 
 It writes what each place found to `.cache/surf/sources/` (`--out` for another folder):
 `sources.md` to read, beside what `memes.json` says the learned ones mean, with a link to
-every video and page used and every one skipped (and why), `sources.json`, and
-`links.json`, the Bilibili videos found for each phrase.
+every video and page used and every one skipped (and why), and how each video was found
+(Bilibili's search, a search engine, the videos beside another one, a collection),
+`sources.json`, and `links.json`, the Bilibili videos found for each phrase.
 
 **Hearing the videos (optional).** Most explainer videos are spoken, and Bilibili only gives
 its AI subtitles to logged-in viewers, which the bot never is. To hear them, install Whisper:

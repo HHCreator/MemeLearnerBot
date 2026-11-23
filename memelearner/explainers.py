@@ -10,21 +10,25 @@ alone rarely do.
 For each phrase (the memes the judge found whose meaning isn't sure yet come first, up to
 TOP a run):
 
-    1. Find       Videos whose titles name the phrase and look made to explain something
-                  (是什么梗, 什么意思, 出处 ...): the links you give, the explainer videos the
-                  bot has seen beside other videos (related videos, which a visitor gets
-                  without a captcha: the lists the collector reads, and those beside every
-                  explainer it reads), the Bilibili videos a search engine finds for
-                  "阿一古是什么梗 site:bilibili.com" (web.QUERY; web.py: Bing, else DuckDuckGo,
-                  else Baidu, the first whose results name the phrase; only Bilibili's pages,
-                  as many memes come from there and pages elsewhere were often about
-                  something else of the same name; once per phrase in AGAIN_DAYS days, its
-                  results kept for step 4, but again when they named nothing), and
-                  Bilibili's own search for it, which is tried until it asks for a captcha
-                  once in a run (the bot never solves captchas), and for each phrase once in
-                  AGAIN_DAYS days. When none names it, the same for where it may come from,
-                  as the judge says (its source: 千言万语感谢现役 for 千言万语感谢多兰, 超威同意了
-                  for the pattern XX同意了).
+    1. Find       Videos whose titles name the phrase: the links you give, the explainer
+                  videos (是什么梗, 什么意思, 出处 ...) the bot has seen beside other videos
+                  and in collections (related videos and the collection (合集) a video is in,
+                  which a visitor gets without a captcha: the lists the collector reads, and
+                  those beside every explainer it reads; an uploader who explains memes keeps
+                  hundreds of them in one collection), Bilibili's own search for
+                  "阿一古是什么梗" (at its old address, which answered a visitor without a
+                  captcha 26 times of 26 in the test of 2026-11-23; once per phrase in
+                  AGAIN_DAYS days, and not again in a run once it asked for a captcha: the
+                  bot never solves captchas), and the Bilibili videos a search engine finds
+                  for "阿一古是什么梗 site:bilibili.com" (web.QUERY; web.py: Bing, else
+                  DuckDuckGo, else Baidu, the first whose results name the phrase; only
+                  Bilibili's pages, as many memes come from there and pages elsewhere were
+                  often about something else of the same name; once per phrase in
+                  AGAIN_DAYS days, its results kept for step 4, but again when they named
+                  nothing). Titles made to explain one phrase come first, then the ones with
+                  a game word (and a search result's zone and tags). When none names it, the
+                  same for where it may come from, as the judge says (its source:
+                  千言万语感谢现役 for 千言万语感谢多兰, 超威同意了 for the pattern XX同意了).
     2. Read       Up to VIDEOS of them per phrase, each video once: its page (title,
                   description, tags, zone, subtitles when a visitor gets them, related
                   videos), its hot comments and its danmu, as any visitor who isn't logged in
@@ -103,7 +107,10 @@ LINE = 100  # characters kept of each comment or danmu shown
 KEEP_SAID = 6000  # characters of what a video says kept in the cache
 KEEP_COMMENTS = 20  # hot comments kept of each video, most liked first
 KEEP_DANMU = 300  # different danmu kept of each video
-SEEN = 3000  # explainer videos remembered from related lists and searches
+SEEN = 20000  # explainer videos remembered from related lists, collections and searches
+# How find() found a video (its "how"), in the words sources.md uses
+FOUND = {"link": "a link you gave", "search": "Bilibili's search", "web": "a search engine",
+         "related": "the videos beside another one", "collection": "a collection (合集)"}
 WHISPER = os.environ.get("MEMELEARNER_WHISPER", "large-v3-turbo")  # the Whisper model
 VERSION = 1  # explainers.json's format
 
@@ -261,17 +268,17 @@ def _game_words():
     return [word for word in dict.fromkeys(words) if word]
 
 
-def game_words(texts, names=()):
-    """The words in some texts that show they are about games or esports (_game_words()),
-    the phrase itself and its variants (names) left out: 打野来了 doesn't make a page about
-    it a page about games. [] for a page about 汽车人 in the manga 刃牙."""
+def game_words(texts, names=(), words=None):
+    """The words in some texts that show they are about games or esports (_game_words(), or
+    words when given), the phrase itself and its variants (names) left out: 打野来了 doesn't
+    make a page about it a page about games. [] for a page about 汽车人 in the manga 刃牙."""
     text = unicodedata.normalize("NFKC", " ".join(str(t or "") for t in texts)).lower()
     for name in sorted(names, key=len, reverse=True):
         name = unicodedata.normalize("NFKC", name or "").lower()
         if name:
             text = text.replace(name, " ")
     found = []
-    for word in _game_words():
+    for word in _game_words() if words is None else words:
         if word.isascii():  # a whole word: lol, not the lol in lollipop
             if re.search(rf"(?<![0-9a-z]){re.escape(word)}(?![0-9a-z])", text):
                 found.append(word)
@@ -441,6 +448,7 @@ def read(bvid, phrase="", hearing=False):
     if not isinstance(video, dict):
         detail = bilibili.video_detail(bvid)
         remember(detail["related"])
+        remember(detail.get("collection"), "collection")  # its uploader's other explainers
         video = {key: detail[key] for key in ("bvid", "aid", "title", "author", "pubdate",
                                               "duration", "plays", "desc", "tags")}
         video["zone"] = detail.get("zone") or ""  # 单机游戏, 电子竞技, 动画 ...
@@ -609,10 +617,12 @@ def source_of(candidate, memes=None):
 
 
 def _search(query, search, names, how="search"):
-    """Bilibili's search for query (阿一古是什么梗): the videos it found whose titles name
-    one of names, or None when it couldn't search; search is shared by a run (see find())."""
+    """Bilibili's search for query (阿一古是什么梗), at its old address that answered a
+    visitor without a captcha (bilibili.search_videos(signed=False)): the videos it found
+    whose titles name one of names, or None when it couldn't search; search is shared by a
+    run (see find())."""
     try:
-        results = bilibili.search_videos(query, order="totalrank")
+        results = bilibili.search_videos(query, order="totalrank", signed=False)
     except bilibili.Captcha:
         search["refused"] = True
         print("    Bilibili wants a captcha for the search, so it's skipped for the rest "
@@ -675,11 +685,13 @@ def _blocked(search, error):
 def find(candidate, links=(), search=None, data=None, again=False):
     """Step 1 for a candidate: the videos that may explain it, best first: [{"bvid",
     "title", "how", "for"}]. With links, just those; else the explainer videos seen before
-    whose titles name it or one of its variants, the ones a search engine finds (_web()),
-    and when none does, Bilibili's search, once per AGAIN_DAYS days (search is shared by a
-    run: {"refused": True} once Bilibili asked for a captcha). When that finds none either,
-    the same for where it may come from (source_of(): 千言万语感谢现役 for 千言万语感谢多兰),
-    with "for" naming it."""
+    (beside other videos, in collections, in searches) whose titles name it or one of its
+    variants, the ones Bilibili's search finds, once per AGAIN_DAYS days (search is shared
+    by a run: {"refused": True} once Bilibili asked for a captcha), and the ones a search
+    engine finds (_web()). When none names it, the same for where it may come from
+    (source_of(): 千言万语感谢现役 for 千言万语感谢多兰), with "for" naming it. Best first:
+    titles made to explain one phrase (是什么梗), then titles (and zones and tags, from a
+    search) with a game word, the phrase before its variants, the most played."""
     search = {} if search is None else search
     data = load() if data is None else data
     names = [candidate["phrase"]] + [v["phrase"] for v in candidate.get("variants") or []]
@@ -701,13 +713,12 @@ def find(candidate, links=(), search=None, data=None, again=False):
     seen.update(data["seen"])
     matches = [dict(video, bvid=bvid) for bvid, video in seen.items()
                if any(mentions(video.get("title"), name) for name in names)]
-    matches += _web(candidate["phrase"], names, entry, "web", again)
-    if not matches and not search.get("refused") and \
-            (again or not _recent(entry.get("searched"))):
+    if not search.get("refused") and (again or not _recent(entry.get("searched"))):
         results = _search(f"{candidate['phrase']}是什么梗", search, names)
         if results is not None:
             entry["searched"] = time.strftime("%Y-%m-%d %H:%M")
             matches += results
+    matches += _web(candidate["phrase"], names, entry, "web", again)
     source = None if matches else source_of(candidate)
     if source:  # nothing explains it: what explains where it may come from
         matches = [dict(video, bvid=bvid, about=source) for bvid, video in seen.items()
@@ -722,10 +733,15 @@ def find(candidate, links=(), search=None, data=None, again=False):
                 matches += [dict(video, about=source) for video in results]
         names = [source]
 
+    words = _game_words()
+
     def rank(video):
         title = video.get("title") or ""
         named = min(n for n, name in enumerate(names) if mentions(title, name))
-        return (not MADE_TO_EXPLAIN.search(title), named, -(video.get("plays") or 0))
+        about_games = game_words([title, video.get("zone"), " ".join(video.get("tags") or [])],
+                                 names, words)
+        return (not MADE_TO_EXPLAIN.search(title), not about_games, named,
+                -(video.get("plays") or 0))
 
     for video in sorted(matches, key=rank):
         found.setdefault(video["bvid"], dict(
@@ -963,7 +979,8 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
                     off_topic(material, [about] if video.get("for") else names)
                 if why:  # 汽车人 in the manga 刃牙: not the meme of the game's danmu
                     _drop(entry, {"bvid": video["bvid"], "url": url,
-                                  "title": material.get("title", ""), "why": why})
+                                  "title": material.get("title", ""), "why": why,
+                                  "found": video.get("how", "")})
                     print(f"    skipped {video['bvid']}  {material.get('title', '')[:30]}: {why}")
                     continue
                 done += 1
@@ -974,6 +991,7 @@ def explain(phrases=None, games=None, links=None, model=None, videos=VIDEOS, top
                     summary = summarize(about, game, material, model)
                 if video.get("for"):
                     summary["for"] = video["for"]
+                summary["found"] = video.get("how", "")  # how find() found it (FOUND)
                 entry["videos"] = [v for v in entry.get("videos") or []
                                    if v["bvid"] != summary["bvid"]] + [summary]
                 entry["dropped"] = [kept for kept in entry.get("dropped") or []
