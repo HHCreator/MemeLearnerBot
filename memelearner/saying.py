@@ -314,18 +314,22 @@ def weigh(phrase, entry, moment, said=()):
     return weight * FUNNY ** min(rated["funny"], RATED) * WRONG ** min(rated["wrong"], RATED)
 
 
-def draw(memes, moment, said=(), rng=random, limit=CANDIDATES, recent=(), last=()):
+def draw(memes, moment, said=(), rng=random, limit=CANDIDATES, recent=(), last=(), least=1):
     """Step 2: up to limit learned memes (memes: memes.json's) for a moment, drawn by their
     weight (weigh()) without drawing one twice; the first drawn first. recent: memes said a
-    moment ago, which weigh AGAIN times as much; last: memes said just now, which come only
-    after all the others (when fewer than limit others fit)."""
+    moment ago, which weigh AGAIN times as much; last: memes said just now, which are left
+    out when at least least others fit, and else come after them."""
     keyed = []  # Efraimidis and Spirakis: the ones with the highest random ** (1 / weight)
     for phrase, entry in memes.items():
         weight = (weigh(phrase, entry, moment, said) *
                   (AGAIN if phrase in recent else 1)) ** DRAW_POWER
         if weight > 0:
             keyed.append((phrase not in last, rng.random() ** (1 / weight), phrase))
-    return [phrase for *_, phrase in sorted(keyed, reverse=True)[:limit]]
+    drawn = [phrase for *_, phrase in sorted(keyed, reverse=True)]
+    others = [phrase for phrase in drawn if phrase not in last]
+    # Only moving them to the end isn't enough: when no more than limit memes fit (12 have
+    # BP among their occasions), all are drawn every time and the model picks the same ones
+    return (others if len(others) >= least else drawn)[:limit]
 
 
 # -- 3. write and 4. check ------------------------------------------------------------------
@@ -557,15 +561,16 @@ def spender(ask):
 def speak(situation, moment, ask, count=COUNT, rng=None, recent=(), last=()):
     """Steps 2 to 4 for a moment judged from situation (judge(), with occasions): {"drawn",
     "lines", "rejected", "why"} as say() returns them. recent: memes said a moment ago, drawn
-    less; last: memes said just now, drawn after all others (draw())."""
+    less; last: memes said just now, left out when count others fit (draw())."""
     memes, said = store.load()["memes"], rated()
-    drawn = draw(memes, moment, said, rng or random, recent=recent, last=last)
+    drawn = draw(memes, moment, said, rng or random, recent=recent, last=last, least=count)
     if not drawn:
         return {"drawn": [], "lines": [], "rejected": [],
                 "why": f"学过的梗里，没有{'、'.join(moment['when'])}的时候说的"}
     lines, rejected = write(situation, moment, drawn, memes, said, ask, min(count, len(drawn)))
     return {"drawn": drawn, "lines": lines, "rejected": rejected,
-            "why": "" if lines else "模型写的弹幕都没过检查（见 rejected）"}
+            "why": "" if lines else ("模型写的弹幕都没过检查（见 rejected）" if rejected else
+                                     "抽到的梗模型觉得都对不上现在的场面，一句没写")}
 
 
 def show(result):

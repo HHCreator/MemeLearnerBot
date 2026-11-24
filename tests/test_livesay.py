@@ -193,10 +193,12 @@ class LiveSayTest(unittest.TestCase):
         self.assertEqual(saying.draw(memes, moment, rng=Fixed())[:2], ["阿一占", "wei出"])
         self.assertEqual(saying.draw(memes, moment, rng=Fixed(), recent={"阿一占"})[:2],
                          ["wei出", "阿一占"])  # 5 x AGAIN = 1, under wei出's 1.875
-        drawn = saying.draw(memes, moment, rng=Fixed(), last={"阿一占"})
-        self.assertEqual(drawn[0], "wei出")
-        self.assertEqual(drawn[-1], "阿一占")  # after all the others, however well it fits
-        self.assertEqual(sorted(drawn), sorted(saying.draw(memes, moment, rng=Fixed())))
+        every = saying.draw(memes, moment, rng=Fixed())
+        drawn = saying.draw(memes, moment, rng=Fixed(), last={"阿一占"}, least=len(every) - 1)
+        self.assertEqual(drawn, [meme for meme in every if meme != "阿一占"])  # left out
+        drawn = saying.draw(memes, moment, rng=Fixed(), last={"阿一占"}, least=len(every))
+        self.assertEqual(drawn[-1], "阿一占")  # too few others: after them, however well it fits
+        self.assertEqual(sorted(drawn), sorted(every))
 
     def test_a_model_that_cant_be_asked_is_said_once_and_it_goes_on_listening(self):
         watcher = self.watcher()

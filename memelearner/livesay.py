@@ -17,8 +17,8 @@ gifts or stickers) since it last looked:
                talk about something else, send gifts), it says nothing this time.
     2-4.       As saying.say() does for that sentence (saying.speak()): up to COUNT lines with
                the learned memes that fit, checked. Memes it said in the last RECENT seconds
-               are drawn less (saying.AGAIN), and the ones of its last LAST looks only when
-               too few others fit, so it doesn't say the same ones again and again.
+               are drawn less (saying.AGAIN), and the ones of its last LAST looks are left
+               out while COUNT others fit, so it doesn't say the same ones again and again.
 
 What it says is printed, and served on this computer for other programs, like the overlay
 window of the translator (StupidTransilator), which shows the lines to copy:
@@ -52,8 +52,8 @@ DANMU_SHOWN = 60  # different lines the model is shown ...
 DANMU_LENGTH = 40  # ... each cut to this many characters
 COUNT = 3  # lines it says each time, at most
 RECENT = 300  # seconds a meme it said is drawn less (saying.AGAIN)
-LAST = 2  # looks whose memes are drawn only after all others (on 2 recorded matches without
-#           it, 把光借给ig came 5 times in 12 looks, 3 of them in a row)
+LAST = 2  # looks whose memes are left out while COUNT others fit (on 2 recorded matches
+#           without it, 把光借给ig came in 5 of 12 looks, 3 of them in a row)
 BEFORE = 120  # seconds what it saw last stays "before" for the next look
 KEPT = 20  # rounds kept for other programs
 PORT = 8766  # where other programs ask for the lines (127.0.0.1 only)
