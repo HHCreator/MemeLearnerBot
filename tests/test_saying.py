@@ -61,6 +61,14 @@ MEMES = {
     "41翻": {"meaning": "41 是世一，41翻是世界第一翻译。", "games": ["lol"], "examples": ["41中"],
             "use": use(["解说"], "调侃", "夸翻译", "41XX", "位置")},
     "没用法": {"meaning": "还没写用法的梗。", "games": ["lol"], "examples": ["没用法"]},
+    "好兄弟": {"meaning": "反讽对手送分，像在帮自己这边。", "games": ["lol"],
+            "variants": ["多兰好兄弟"], "examples": ["多兰好兄弟", "兰子好兄弟 就这么打"],
+            "use": use(["输了"], "调侃", "对手送分时刷他的名字加好兄弟", "XX好兄弟", "选手")},
+    "相信ig": {"meaning": "给快输的战队或选手打气。", "games": ["lol"],
+             "variants": ["相信wei", "相信多兰"], "examples": ["相信IG"],
+             "use": use(["加油"], "加油", "快输的时候刷相信加名字", "相信XX", "选手")},
+    "ggg": {"meaning": "刷一串 g，想让这局快点结束。", "games": ["lol"], "examples": ["gggggg"],
+            "use": use(["输了"], "无奈")},
 }
 THESHY = "TheShy 一级被抓，送了两个"
 JUDGED = {"when": ["打得烂", "要输了"], "game": "lol", "names": [{"name": "TheShy", "who": "选手"}]}
@@ -241,8 +249,8 @@ class SayingTest(unittest.TestCase):
 
     def says(self, line, phrase, situation=THESHY, judged=JUDGED):
         memes = store.load()["memes"]
-        said, why = saying.says(store.normal(line), phrase, memes[phrase],
-                                self.moment(situation, judged), situation)
+        said, why = saying.says(line, phrase, memes[phrase], self.moment(situation, judged),
+                                situation, saying._named(memes))
         return said if said else why
 
     def test_a_line_must_say_its_meme_as_learned_or_on_its_template(self):
@@ -271,6 +279,43 @@ class SayingTest(unittest.TestCase):
         self.assertIn("没有照原样说", self.says("复刻s9", "复刻s7", "像 S8 那年一样", old))
         self.assertEqual(self.says("41中", "41翻", "解说在吹", old),
                          {"template": "41XX", "name": "中"})
+
+    def test_a_name_where_xx_goes_must_be_someone_in_it_next_to_a_phrase_as_it_is_too(self):
+        # The names the bot knows: the table's, and the ones two memes put where XX goes
+        # (wei: wei出 and 相信wei; 多兰: 多兰好兄弟 and 相信多兰; ig: 把光借给ig and 相信ig)
+        self.assertEqual(saying._named(store.load()["memes"]),
+                         {"chovy", "超威", "大超", "chooovy", "canyon", "三叔", "三姆斯",
+                          "wei", "多兰", "ig"})
+        chovy = {"when": ["输了"], "game": "lol", "names": [{"name": "Chovy", "who": "选手"}]}
+        nobody = dict(chovy, names=[])
+
+        def says(line, judged=chovy, situation="Chovy 又输了"):
+            return self.says(line, "好兄弟", situation, judged)
+
+        self.assertEqual(says("好兄弟啊"), {"template": "", "name": ""})
+        self.assertEqual(says("这波好兄弟"), {"template": "", "name": ""})  # 这波 is no name
+        self.assertEqual(says("大超 好兄弟"), {"template": "XX好兄弟", "name": "大超"})
+        for line, name in (("多兰好兄弟", "多兰"),  # its own variant: someone else
+                           ("三叔好兄弟", "三叔"),  # the table's
+                           ("wei 好兄弟", "wei")):  # two memes'
+            self.assertEqual(says(line), f"「好兄弟」里的 {name} 不在场面里：XX 要换成 names 里的名字")
+        # Nobody in it: as it was learned, but no other name the bot knows
+        self.assertEqual(says("多兰好兄弟", nobody, "又输了"), {"template": "", "name": ""})
+        self.assertIn("wei 不在场面里", says("wei好兄弟", nobody, "又输了"))
+        # A letter written more times is the same meme, as a word of its own
+        self.assertEqual(self.says("gggggg下一把", "ggg"), {"template": "", "name": ""})
+        self.assertEqual(self.says("TheShy ggg", "ggg"), {"template": "", "name": ""})
+        for line in ("gg", "ggggx", "TheShyggg"):
+            self.assertIn("没有照原样说「ggg」", self.says(line, "ggg"), line)
+        # What the model writes is checked that way
+        result = self.say("Chovy 又输了", judged=chovy, count=2, written=[
+            {"lines": [{"meme": "好兄弟", "line": "三叔好兄弟"},
+                       {"meme": "ggg", "line": "gggggg 下一把"}]}, {"lines": []}])
+        self.assertEqual(result["lines"], [{"line": "gggggg 下一把", "meme": "ggg",
+                                            "template": "", "name": ""}])
+        self.assertEqual(result["rejected"], [{"line": "三叔好兄弟", "meme": "好兄弟",
+                                               "why": "「好兄弟」里的 三叔 不在场面里：XX 要换成 "
+                                                      "names 里的名字"}])
 
     def test_lines_are_checked_and_the_model_is_asked_again_for_the_ones_that_failed(self):
         written = [{"lines": [

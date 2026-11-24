@@ -31,7 +31,10 @@ memes the bot learned only, never one it makes up:
     4. Check   A line must say its meme (says()): its phrase or a variant, or its template
                with a name for XX. When people are in what's going on, a name for a player,
                team or champion must be one of them (or a nickname of one); else one the
-               meme has itself (wei, in wei出). At most LINE_LENGTH characters, and another
+               meme has itself (wei, in wei出). That goes for a name where XX goes next to a
+               phrase said as it is too (多兰好兄弟 doesn't say 好兄弟 for Chovy), when the
+               bot knows it is a name (_named()). A letter written more times in a row is
+               the same meme (gggggg says ggg). At most LINE_LENGTH characters, and another
                meme than the lines before. The model is asked once more for as many lines as
                didn't pass, told why they didn't.
 
@@ -45,10 +48,11 @@ import collections
 import json
 import os
 import random
+import re
 import time
 import unicodedata
 
-from . import judging, meanings, nicknames, review, store, uses, variants
+from . import judging, meanings, nicknames, review, store, uses
 
 SAID_FILE = os.path.join(store.HERE, "data", "said.json")
 VERSION = 1  # said.json's format
@@ -67,6 +71,7 @@ RATINGS = ("funny", "wrong")  # 好笑, 用错了
 NAMES = ("选手", "战队", "英雄", "位置")  # who a name in a moment is
 NAMED = ("选手", "战队", "英雄")  # what a template takes that must be someone in the moment
 POSITIONS = ("上", "中", "野", "下", "辅", "ad", "adc", "上单", "中单", "打野", "射手", "辅助")
+RUN = re.compile(r"([0-9a-z])\1+")  # a letter or digit more than once in a row: ggg, 666
 # How much a meme weighs (weigh()): times its weight when ...
 ABOUT = 5  # ... it is about someone in the moment
 UNFIT_ABOUT = 0.15  # (its weight when it is, but its occasions don't fit)
@@ -112,7 +117,7 @@ WRITE = """你在帮一个只读的机器人看比赛的时候自己说梗，像
 
 写最多 count 句弹幕：
 - 每句用 memes 里的一个梗，每句用不同的梗。只挑贴合 situation 的梗：意思、how 和场面都要对得上；对不上的梗不要用，宁可少写几句。
-- 梗照 phrase 或 variants 原样写，或者照 template 写，把 XX 换成 names 里的名字或外号。不要改梗里的字，XX 里也不要放 situation 里没有的人。
+- 梗照 phrase 或 variants 原样写，或者照 template 写，把 XX 换成 names 里的名字或外号。不要改梗里的字，XX 里也不要放 situation 里没有的人；照原样写梗的时候，放 XX 的地方也不要加 situation 里没有的人。
 - 照 lines 和 funny 里那样说：短，一般不超过 15 个字，像看比赛的人随手发的弹幕；可以在梗的前后加几个字，但不要解释梗。
 - lines 是大家在别的时候发的：学它们怎么说，但要说现在 situation 里的人和事，不要整句照抄。
 - 不要像 wrong 里那样用，也不要再犯 rejected 里的错。
@@ -215,14 +220,59 @@ def _keys(names):
 
 
 def _has(text, piece):
-    """Whether text (as store.normal() writes it) has piece in it, a whole word when it
-    starts or ends with letters or digits (shy出 isn't in theshy出)."""
-    at = text.find(piece) if piece else -1
+    """Whether text (as store.normal() or _texts() writes it) has piece in it, a whole word
+    when it starts or ends with letters or digits (shy出 isn't in theshy出). A letter or
+    digit that piece has more than once in a row may come more times (gggggg has ggg)."""
+    if not piece:
+        return False
+    if RUN.search(piece):
+        stretched, at = [], 0
+        for run in RUN.finditer(piece):
+            stretched += [re.escape(piece[at:run.start()]),
+                          f"{re.escape(run.group(1))}{{{len(run.group())},}}"]
+            at = run.end()
+        pattern = re.compile("".join(stretched) + re.escape(piece[at:]))
+        found = pattern.search(text)
+        while found:
+            if store._whole(text, found.start(), found.end()):
+                return True
+            found = pattern.search(text, found.start() + 1)
+        return False
+    at = text.find(piece)
     while at >= 0:
         if store._whole(text, at, at + len(piece)):
             return True
         at = text.find(piece, at + 1)
     return False
+
+
+def _texts(line):
+    """A line the two ways memes are looked for in it: as store.normal() writes it (TheShy 出
+    -> theshy出, which says XX出), and with a space between its words (faker yyds, which
+    has yyds as a word)."""
+    words = store.NOT_TEXT.split(unicodedata.normalize("NFKC", line or "").lower())
+    return store.normal(line), " ".join(word for word in words if word)
+
+
+def _said(texts, piece):
+    return any(_has(text, piece) for text in texts)
+
+
+def _named(memes):
+    """The names the bot knows, who may be in a moment or not, as store.normal() writes
+    them: the nickname table's, and the ones two learned memes or more put where XX goes in
+    a template that takes a player, team or champion (多兰: 相信多兰, 多兰同意了); each of two
+    characters or more (兰 is in too many words)."""
+    seen = collections.Counter()
+    for phrase, entry in memes.items():
+        use = entry.get("use") or {}
+        if use.get("template") and use.get("who") in NAMED:
+            seen.update({_fill(use["template"], way)
+                         for way in [phrase, *(entry.get("variants") or [])]} - {None})
+    names = {name for name, memes_with_it in seen.items() if memes_with_it > 1}
+    for player, its in nicknames.load().items():
+        names.update(store.normal(name) for name in [player, *its])
+    return {name for name in names if len(name) > 1}
 
 
 def _mentions(texts, keys):
@@ -316,42 +366,58 @@ def _may_fill(fill, who, keys, own, situation):
     return who not in NAMED and fill in situation  # 复刻s8 when it's about s8
 
 
-def says(text, phrase, entry, moment, situation):
+def _on(template, name):
+    """A template with name where XX goes, as store.normal() writes it (XX出, theshy ->
+    theshy出)."""
+    return store.normal(meanings.PLACEHOLDER.sub(lambda _: name,
+                                                 unicodedata.normalize("NFKC", template)))
+
+
+def says(line, phrase, entry, moment, situation, others=()):
     """Step 4 for one line and the meme it says it has: ({"template", "name"}, "") when the
-    line (as store.normal() writes it) says it, "" for both when it has the phrase or a
-    variant as it is; (None, why not) when it doesn't, in Chinese for the model."""
+    line says it, "" for both when it has the phrase or a variant as it is; (None, why not)
+    when it doesn't, in Chinese for the model. others: the names the bot knows (_named()),
+    for one where XX goes next to a phrase said as it is (多兰好兄弟 on XX好兄弟)."""
     use = entry.get("use") or {}
     template, who = use.get("template") or "", use.get("who") or ""
-    keys, situation = _keys(moment["names"]), store.normal(situation)
+    texts, keys, situation = _texts(line), _keys(moment["names"]), store.normal(situation)
     ways = [phrase, *(entry.get("variants") or [])]
     own = {fill for fill in (_fill(template, way) for way in ways) if fill} if template else set()
-    someone_else = ""
+    someone_else, bare = "", False  # bare: a way with no name in it (好兄弟) is in the line
     for way in ways:
-        if _has(text, store.normal(way)):
+        if _said(texts, store.normal(way)):
             fill = _fill(template, way) if template else None
-            if fill is None or _may_fill(fill, who, keys, own, situation):
+            if fill is not None and _may_fill(fill, who, keys, own, situation):
                 return {"template": "", "name": ""}, ""
-            someone_else = someone_else or fill
+            bare = bare or fill is None
+            someone_else = someone_else or fill or ""
     if template:
         tried = keys + sorted(own) + (list(POSITIONS) if who == "位置" else [])
         if who not in NAMED:  # anything of what's going on: 复刻s8
             tried += [situation[start:end] for start in range(len(situation))
                       for end in range(start + 1, min(len(situation), start + meanings.NAME) + 1)]
         for fill in dict.fromkeys(tried):
-            if _may_fill(fill, who, keys, own, situation) and \
-                    _has(text, template.replace(variants.PATTERN_NAME, fill)):
+            if _may_fill(fill, who, keys, own, situation) and _said(texts, _on(template, fill)):
                 return {"template": template, "name": fill}, ""
+        if bare and who in NAMED and not someone_else:  # 多兰好兄弟, when it's about Chovy
+            someone_else = next((name for name in sorted(own | set(others),
+                                                         key=lambda name: (-len(name), name))
+                                 if len(name) > 1 and
+                                 not _may_fill(name, who, keys, own, situation) and
+                                 _said(texts, _on(template, name))), "")
+    if bare and not someone_else:
+        return {"template": "", "name": ""}, ""
     if someone_else:
         return None, f"「{phrase}」里的 {someone_else} 不在场面里：XX 要换成 names 里的名字"
     shapes = "」或「".join(ways[:3] + ([template] if template else []))
     return None, f"没有照原样说「{shapes}」"
 
 
-def check(item, drawn, memes, moment, situation, used):
+def check(item, drawn, memes, moment, situation, used, others=()):
     """Step 4 for one line the model wrote ({"meme", "line"}): ({"line", "meme", "template",
     "name"}, "") when it passes, else (None, why not). drawn: the memes it could say; used:
-    the ones said already. A line that names one meme but says another one drawn counts as
-    that one's."""
+    the ones said already; others: as for says(). A line that names one meme but says
+    another one drawn counts as that one's."""
     line = item.get("line") if isinstance(item, dict) else None
     line = " ".join(line.split()) if isinstance(line, str) else ""
     text = store.normal(line)
@@ -366,7 +432,7 @@ def check(item, drawn, memes, moment, situation, used):
         if phrase in used:
             why = f"「{phrase}」前面一句用过了" if phrase == meme else why
             continue
-        said, why_not = says(text, phrase, memes[phrase], moment, situation)
+        said, why_not = says(line, phrase, memes[phrase], moment, situation, others)
         if said:
             return dict({"line": line, "meme": phrase}, **said), ""
         why = why_not if phrase == meme else why
@@ -381,7 +447,7 @@ def write(situation, moment, drawn, memes, said, ask, count):
                            "nicknames": name["nicknames"]} for name in moment["names"]],
                 "memes": [_shown(phrase, memes[phrase], said) for phrase in drawn],
                 "count": count}
-    kept, rejected, used = [], [], set()
+    kept, rejected, used, others = [], [], set(), _named(memes)
     for _ in range(TRIES):
         answer = ask(question, WRITE, WRITE_TEMPERATURE)
         lines = answer.get("lines")
@@ -389,7 +455,7 @@ def write(situation, moment, drawn, memes, said, ask, count):
         for item in lines if isinstance(lines, list) else []:
             if len(kept) >= count:
                 break
-            line, why = check(item, drawn, memes, moment, situation, used)
+            line, why = check(item, drawn, memes, moment, situation, used, others)
             if line:
                 kept.append(line)
                 used.add(line["meme"])

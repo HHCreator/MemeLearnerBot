@@ -676,7 +676,11 @@ TheShy 一级被抓，送了两个  ->  打得烂、要输了 · 英雄联盟（
 4. **Check.** A line must say its meme: its phrase or a variant, or its template with a
    name for XX. When someone is in the moment, the name for a player, team or champion must
    be one of them or one of their nicknames (wei出 isn't about TheShy); else one the meme
-   has itself. At most 30 characters, and each line another meme. The model is asked once
+   has itself. The same goes for a name where XX goes next to a meme said as it is: when
+   Chovy is in the moment, 多兰好兄弟 doesn't pass for 好兄弟 (XX好兄弟). The bot knows a
+   name there by the nickname table and by the names two learned memes or more put in
+   their XX. A letter typed more times is the same meme (gggggg says ggg). At most 30
+   characters, and each line another meme. The model is asked once
    more for the lines that don't pass, told why, and what still doesn't pass is left out
    (`rejected`, with why). So a line never has a meme the bot didn't learn.
 
