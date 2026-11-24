@@ -15,6 +15,8 @@ apps learn them from it. Other apps only need what is in this file.
     memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
     memelearner.reject("下路")              # not a meme: never list it again
     memelearner.write_uses()                # a model writes when and how each meme is said
+    memelearner.say("TheShy 一级被抓送了两个")  # a few danmu lines with the memes that fit it
+    memelearner.rate(said, 0, "funny")      # its first line was funny: say more like it
 
 A meme is a dict:
 
@@ -56,7 +58,8 @@ API_VERSION = 3  # 2: a candidate is a phrase people send on their own, new or n
 #                 3: a meme written in more than one way is one meme, with its "variants"
 
 __all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "explain", "watching",
-           "accept", "reject", "forget", "write_uses", "ModelUnavailable", "API_VERSION"]
+           "accept", "reject", "forget", "write_uses", "say", "rate", "ModelUnavailable",
+           "API_VERSION"]
 
 
 def candidates(game=None):
@@ -190,3 +193,37 @@ def write_uses(phrases=None, again=False, model=None, quiet=False):
     from . import uses
     with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
         return uses.write(phrases, again, model)
+
+
+def say(situation, count=5, game=None, model=None, quiet=False):
+    """A few danmu lines that say the learned memes fitting what is going on in a match
+    (situation, a sentence like "TheShy 一级被抓送了两个"), the way people in the danmu would.
+    A model judges the moment (its occasions, its game and the people in it); the memes whose
+    use fits it are drawn, those about someone in it most; the model writes up to count
+    short lines with them; and each line is checked to say its meme as learned, or on its
+    template with a name from the moment (see saying.py). Nothing is made up: a line that
+    doesn't say a learned meme is left out. It takes a few seconds, and the same moment gets
+    other lines next time.
+
+    game: the game it is in (lol, valorant ...), when the model mustn't judge that; model:
+    as for judge(), with qwen3:14b standing in when an online one can't be reached. Returns
+    {"situation", "when": its occasions, "game", "names": the people in it, "lines": [{"line",
+    "meme", "template", "name"}], "rejected": the lines left out and why, "drawn", "model",
+    "spent", "why": why there are no lines, or ""} (saying.say()). Raises ModelUnavailable
+    when no model can be asked, and ValueError when situation is empty or
+    data/occasions.txt can't be read. quiet: print nothing (it says so when a model stands
+    in for another).
+    """
+    from . import saying
+    with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
+        return saying.say(situation, count, game, model)
+
+
+def rate(said, index, rating):
+    """Rate line number index (from 0) of what say() returned (said): "funny" (好笑) or
+    "wrong" (用错了), or "" to take your rating back. say() goes by your ratings from then
+    on: the memes you rated funny in such moments come more often, with those lines for the
+    model to go by, and the ones you said were wrong less, with those lines not to. They are
+    kept in data/said.json. Returns the line as kept, or None when taken back."""
+    from . import saying
+    return saying.rate(said, index, rating)
