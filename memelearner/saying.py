@@ -81,6 +81,7 @@ NAMELESS = 0.5  # ... its template takes one, and nobody is in the moment
 FUNNY = 1.5  # ... for each of its lines you rated funny in such a moment (RATED at most)
 WRONG = 0.5  # ... for each you said was wrong in one
 RATED = 3
+AGAIN = 0.2  # ... when it was said a moment ago (livesay.py): other memes come first
 DRAW_POWER = 2  # weights count squared when drawing: the memes that fit best come most
 #                times (a meme about someone in the moment 9 times in 10), the others now
 #                and then
@@ -128,11 +129,11 @@ WRITE = """你在帮一个只读的机器人看比赛的时候自己说梗，像
 """
 
 
-def instructions(table):
-    """What the model is told when it judges a moment (JUDGE), with the occasions to pick
-    from and the games. They come last, the same every time, so an online API reads them
-    from its cache."""
-    lines = [JUDGE, "场面（名字 = 什么样的场面）："]
+def instructions(table, judge=JUDGE):
+    """What the model is told when it judges a moment (judge: JUDGE, or livesay.JUDGE for a
+    live room's danmu), with the occasions to pick from and the games. They come last, the
+    same every time, so an online API reads them from its cache."""
+    lines = [judge, "场面（名字 = 什么样的场面）："]
     lines += [f"- {name} = {what}" for name, what in table.items()]
     lines += ["", "游戏："] + [f"- {key} = {name}" for key, name in judging.GAMES.items()]
     return "\n".join(lines)
@@ -313,12 +314,14 @@ def weigh(phrase, entry, moment, said=()):
     return weight * FUNNY ** min(rated["funny"], RATED) * WRONG ** min(rated["wrong"], RATED)
 
 
-def draw(memes, moment, said=(), rng=random, limit=CANDIDATES):
+def draw(memes, moment, said=(), rng=random, limit=CANDIDATES, recent=()):
     """Step 2: up to limit learned memes (memes: memes.json's) for a moment, drawn by their
-    weight (weigh()) without drawing one twice; the first drawn first."""
+    weight (weigh()) without drawing one twice; the first drawn first. recent: memes said a
+    moment ago, which weigh AGAIN times as much."""
     keyed = []  # Efraimidis and Spirakis: the ones with the highest random ** (1 / weight)
     for phrase, entry in memes.items():
-        weight = weigh(phrase, entry, moment, said) ** DRAW_POWER
+        weight = (weigh(phrase, entry, moment, said) *
+                  (AGAIN if phrase in recent else 1)) ** DRAW_POWER
         if weight > 0:
             keyed.append((rng.random() ** (1 / weight), phrase))
     return [phrase for _, phrase in sorted(keyed, reverse=True)[:limit]]
@@ -501,18 +504,11 @@ def say(situation, count=COUNT, game=None, model=None, ask=None, rng=None):
     situation = " ".join(str(situation or "").split())[:SITUATION_LENGTH]
     if not store.normal(situation):
         raise ValueError("先说说比赛里现在发生了什么")
-    if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= CANDIDATES:
-        raise ValueError(f"count: a whole number from 1 to {CANDIDATES}")
-    if game and game not in judging.GAMES:
-        raise ValueError(f"no such game: {game} (it's one of {', '.join(judging.GAMES)})")
-    table = uses.occasions()
-    if not table:
-        raise uses.TableError(f"{uses.OCCASIONS_FILE} has no occasions: write one a line, "
-                              "like 打得烂 = 选手或战队失误、送人头")
-    memes, said = store.load()["memes"], rated()
+    check_options(count, game)
+    table = occasions()
+    rated()  # a broken said.json stops it before the model is asked
     ask = ask or meanings._Asker(model, instructions(table), "says", "memes")
-    asked_for = ask.model
-    spent_before = collections.Counter(judging.usage[asked_for])
+    spent = spender(ask)
     moment = judge(situation, ask, table)
     if game:
         moment["game"] = game
@@ -521,19 +517,54 @@ def say(situation, count=COUNT, game=None, model=None, ask=None, rng=None):
     if not moment["when"]:
         result["why"] = "看不出这是比赛里的什么场面：换个说法，多说一点发生了什么"
     else:
-        result["drawn"] = drawn = draw(memes, moment, said, rng or random)
-        if not drawn:
-            result["why"] = f"学过的梗里，没有{'、'.join(moment['when'])}的时候说的"
-        else:
-            result["lines"], result["rejected"] = write(situation, moment, drawn, memes, said,
-                                                        ask, min(count, len(drawn)))
-            if not result["lines"]:
-                result["why"] = "模型写的弹幕都没过检查（见 rejected）"
-    result["model"] = ask.model
-    spent = judging.usage[asked_for] - spent_before
-    if judging.online(asked_for) and spent:
-        result["spent"] = judging._spent(asked_for, spent)
+        result.update(speak(situation, moment, ask, count, rng))
+    result.update(model=ask.model, spent=spent())
     return result
+
+
+def check_options(count, game):
+    """Raises ValueError when count isn't a whole number from 1 to CANDIDATES, or game isn't
+    one of judging.GAMES (None and "" are no game)."""
+    if isinstance(count, bool) or not isinstance(count, int) or not 1 <= count <= CANDIDATES:
+        raise ValueError(f"count: a whole number from 1 to {CANDIDATES}")
+    if game and game not in judging.GAMES:
+        raise ValueError(f"no such game: {game} (it's one of {', '.join(judging.GAMES)})")
+
+
+def occasions():
+    """data/occasions.txt's occasions (uses.occasions()); raises uses.TableError (a
+    ValueError) when it can't be read or has none."""
+    table = uses.occasions()
+    if not table:
+        raise uses.TableError(f"{uses.OCCASIONS_FILE} has no occasions: write one a line, "
+                              "like 打得烂 = 选手或战队失误、送人头")
+    return table
+
+
+def spender(ask):
+    """A function that says what ask's model read and wrote from now on, in a sentence
+    (judging._spent()); "" for a local model, or when it was asked nothing."""
+    asked_for = ask.model
+    before = collections.Counter(judging.usage[asked_for])
+
+    def spent():
+        used = judging.usage[asked_for] - before
+        return judging._spent(asked_for, used) if judging.online(asked_for) and used else ""
+    return spent
+
+
+def speak(situation, moment, ask, count=COUNT, rng=None, recent=()):
+    """Steps 2 to 4 for a moment judged from situation (judge(), with occasions): {"drawn",
+    "lines", "rejected", "why"} as say() returns them. recent: memes said a moment ago, drawn
+    less (draw())."""
+    memes, said = store.load()["memes"], rated()
+    drawn = draw(memes, moment, said, rng or random, recent=recent)
+    if not drawn:
+        return {"drawn": [], "lines": [], "rejected": [],
+                "why": f"学过的梗里，没有{'、'.join(moment['when'])}的时候说的"}
+    lines, rejected = write(situation, moment, drawn, memes, said, ask, min(count, len(drawn)))
+    return {"drawn": drawn, "lines": lines, "rejected": rejected,
+            "why": "" if lines else "模型写的弹幕都没过检查（见 rejected）"}
 
 
 def show(result):

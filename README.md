@@ -36,6 +36,7 @@ py -m memelearner memes                             # the memes learned so far
 py -m memelearner report                            # or mark, decide and learn in your browser
 py -m memelearner uses                              # when and how each learned meme is said
 py -m memelearner say "TheShy 一级被抓送了两个"        # the bot says memes that fit, by itself
+py -m memelearner live-say https://live.bilibili.com/6   # ... and as a live room goes on
 ```
 
 `accept` takes the games, a few example lines and their videos from the last run, and the
@@ -697,6 +698,45 @@ why there are no lines, when there are none), and `memelearner.rate(said, index,
 rates line `index` of it. The model and the fallback to qwen3:14b are the judge's; it writes
 the lines a little more freely (temperature 1.0) than it judges, so they vary.
 
+### While a live room is on
+
+`live-say` does that by itself while you watch a match: it listens to a Bilibili live room's
+danmu and, every 30 seconds, tells what is going on from them and says a few lines. The
+translator's overlay window ([StupidTransilator](https://github.com/HHCreator/StupidTransilator))
+shows the lines in its 梗 panel; click one to copy it, then send it yourself:
+
+```
+py -m memelearner live-say https://live.bilibili.com/6      # until you press Ctrl+C
+py -m memelearner live-say 6 -n 5 --every 45 --until 22:55   # 5 lines every 45 seconds
+py -m memelearner live-say 6 --game lol --port 8766          # the game, and where the lines go
+```
+
+`看直播出梗.bat` asks for the room, to double-click. Like `live`, it only reads (a visitor:
+no login, nothing is sent), and the room's danmu are recorded in `surf/live/` as they come,
+for finding phrases later. Every 30 seconds, when at least 8 danmu came from people since it
+last looked (gifts and stickers don't count):
+
+1. **Judge.** The model gets the room's title and the danmu of the last 45 seconds: each line
+   once, with how many people sent it (下雨了 ×12), the most sent first. It says in a
+   sentence what is going on in the match, which occasions that is, the game and the names
+   (a name must be in the danmu or the title). When the danmu don't tell (people say hello,
+   talk about something else, send gifts), it says nothing that time.
+2. **Steps 2 to 4 above,** for that sentence: 3 lines at most, checked the same way. Memes it
+   said in the last 5 minutes are drawn less, so the lines change.
+
+```
+22:31:05  TheShy 一级被抓，送了两个  ->  打得烂、要输了 · 英雄联盟（LOL） · TheShy（选手）
+  1. theshy出    （wei出，XX出）
+  2. 阿一古，一级就送两个    （阿一古）
+```
+
+Other programs on this computer get the lines from `http://127.0.0.1:8766/lines?after=N`:
+`{"room": {"name", "title", "link"}, "every", "heard": danmu from people in the last minute,
+"rounds": [...]}`, each round after round N being `{"id", "at", "situation", "when", "game",
+"names", "lines": [{"line", "meme", "meaning", "template", "name"}], "why", "model",
+"spent"}`. Each look asks the model twice, about as much as one `say`; with DeepSeek that is
+a few thousand tokens every 30 seconds while the room is busy, and nothing while it is quiet.
+
 ## Running by itself for days
 
 On Windows, the bot can run by itself for some days with Task Scheduler while you're away,
@@ -770,6 +810,7 @@ found, how many memes were explained, and the problems.
 | `memelearner/data/occasions.txt` | the moments of a match a meme can be said in, which you edit (`uses.py` reads it) |
 | `memelearner/saying.py` | says memes by itself from what is going on in a match, and the page to rate its lines (`say`) |
 | `memelearner/data/said.json` | the lines you rated on that page (`saying.py` writes it; not there before your first rating) |
+| `memelearner/livesay.py` | says memes by itself as a live room goes on, for the translator's overlay (`live-say`) |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
@@ -780,6 +821,7 @@ found, how many memes were explained, and the problems.
 | `开始自动跑.bat` and the three beside it | `auto start`, `stop`, `status` and `report`, to double-click |
 | `梗的用法.bat` | `uses`, to double-click |
 | `说梗.bat` | `say`, to double-click: opens the page |
+| `看直播出梗.bat` | `live-say`, to double-click: asks for the room |
 
 The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs/DESIGN.md).
 

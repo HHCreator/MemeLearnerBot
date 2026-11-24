@@ -20,6 +20,7 @@
     py -m memelearner uses                     a model writes when and how each meme is said
     py -m memelearner say "TheShy 一级被抓送了两个"   a few danmu lines with the memes that fit
     py -m memelearner say                      the page: say what's going on, rate the lines
+    py -m memelearner live-say https://live.bilibili.com/6   say lines by itself as a room goes on
     py -m memelearner sources 阿一古 --explain   which search engines and wikis explain some memes
     py -m memelearner auto start               run by itself for days (Windows Task Scheduler)
     py -m memelearner auto extend --days 4     ... for 4 days from its start instead
@@ -41,7 +42,7 @@ import sys
 import time
 
 from . import (ModelUnavailable, accept, auto, candidates, explainers, find, forget, judging,
-               lookup, meanings, memes, nicknames, reject, store, surf, watching, web)
+               livesay, lookup, meanings, memes, nicknames, reject, store, surf, watching, web)
 
 
 def _print_json(value):
@@ -375,6 +376,23 @@ def _say(args):
         _print_json(result)
     else:
         print(saying.show(result))
+
+
+def _live_say(args):
+    """Listen to a live room and say lines that fit what is going on, until Ctrl+C."""
+    from . import bilibili, live
+    try:
+        until = live.end_time(args.until, args.hours)
+        livesay.run(args.room, args.count, args.every, args.port, args.model, args.game, until)
+    except ValueError as error:  # the room, the time, the count, occasions.txt, said.json
+        sys.exit(str(error))
+    except live.NeedBrotli as error:
+        sys.exit(str(error))
+    except (bilibili.Error, bilibili.Blocked, KeyError, TypeError) as error:
+        sys.exit(f"Couldn't open the live room: {error!r}")
+    except OSError as error:
+        sys.exit(f"Couldn't listen on port {args.port} ({error}): is it saying lines in another "
+                 "window already? Close that one, or give another --port")
 
 
 def _live_report(args):
@@ -743,6 +761,28 @@ def parser():
     _report_options(speak, "the model that judges what's going on and writes the lines "
                     f"(default %(default)s; {judging.LOCAL_MODEL} when it can't be reached)")
     speak.set_defaults(run=_say)
+
+    chime = sub.add_parser("live-say", help="listen to a live room and say a few lines that "
+                           "fit what is going on every so often, for the translator's overlay "
+                           "to show (only reads: sends nothing)")
+    chime.add_argument("room", help="the room's link or number, like "
+                       "https://live.bilibili.com/6")
+    chime.add_argument("-n", "--count", type=int, default=livesay.COUNT, metavar="N",
+                       help="lines to say each time, at most (default %(default)s)")
+    chime.add_argument("--every", type=float, default=livesay.EVERY, metavar="S",
+                       help="seconds between two looks at the danmu (default %(default)s)")
+    chime.add_argument("--port", type=int, default=livesay.PORT, metavar="N",
+                       help="where the overlay asks for the lines, on this computer only "
+                       "(default %(default)s)")
+    chime.add_argument("--game", choices=sorted(judging.GAMES),
+                       help="the game the room shows (default: the model tells from the danmu)")
+    chime.add_argument("--until", metavar="HH:MM",
+                       help="stop at this time on this computer's clock, like 22:55")
+    chime.add_argument("--hours", type=float, metavar="N", help="stop after N hours")
+    chime.add_argument("--model", default=judging.MODEL,
+                       help="the model that tells what is going on and writes the lines "
+                       f"(default %(default)s; {judging.LOCAL_MODEL} when it can't be reached)")
+    chime.set_defaults(run=_live_say)
 
     look = sub.add_parser("sources", help="ask every search engine and wiki about some "
                           "phrases, to see which ones explain memes from this computer")
