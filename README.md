@@ -34,6 +34,7 @@ py -m memelearner reject 笑死 --reason "everyday"    # not a meme: never list 
 py -m memelearner forget 笑死                        # undo accept or reject
 py -m memelearner memes                             # the memes learned so far
 py -m memelearner report                            # or mark, decide and learn in your browser
+py -m memelearner uses                              # when and how each learned meme is said
 ```
 
 `accept` takes the games, a few example lines and their videos from the last run, and the
@@ -570,6 +571,66 @@ that need it most (`--explain-top`, `--no-explain`, `--no-audio`) and then `repo
 is the model for all of it (deepseek-flash, with qwen3:14b standing in when it can't be
 reached).
 
+## When and how memes are said
+
+The translator turns what you type into memes. The next step is a bot that says memes by
+itself, from what is going on in a match, without being told what to say. For that it
+must know more than what a meme means: in which moments people say it, in what tone, and
+where a name goes in it. `uses` has the model write that for each learned meme, its
+**use**, and opens a page to look through them:
+
+```
+py -m memelearner uses                # write the uses the memes need, then open the page
+py -m memelearner uses --again        # write again every use the model wrote
+py -m memelearner uses wei出 阿一古    # only these memes', written again
+py -m memelearner uses --no-model     # only the page
+py -m memelearner uses --no-page      # only the model
+```
+
+`梗的用法.bat` runs `uses`, to double-click. A use is kept in `memes.json` with the meme:
+
+```json
+"use": {"when": ["打得烂", "要输了"], "tone": "骂",
+        "how": "选手打得很烂、一直送的时候，刷他的名字或外号加“出”骂他。",
+        "template": "XX出", "who": "选手",
+        "by": "deepseek/deepseek-flash", "of": "9c1d2e3f4a", "checked": false}
+```
+
+- `when`: the moments of a match it fits, the best first, from
+  `memelearner/data/occasions.txt`: 秀了, 打得烂, 翻盘, 要输了, BP, 回看 (people who know
+  the result watching again) and more. That table is yours to edit in Notepad, like the
+  nickname table: one occasion a line, `打得烂 = 选手或战队失误、送人头`; the model goes by
+  what the right side says.
+- `tone`: 夸, 加油, 骂, 嘲讽, 反讽, 调侃, 惊叹, 无奈 or 起哄.
+- `how`: when, about whom and how it's said, in one Chinese sentence.
+- `template` and `who`: where a name goes (XX出, XX同意了, 把光借给XX), and what goes there:
+  a player, a team, a champion, a position (41XX) or something else. Empty when no other
+  name goes in it.
+
+The model gets the meme's meaning, English gloss, your notes, its variants, where it comes
+from, a few of its lines, and the names in it with who they are (by the nickname table),
+and writes the use from those only, as the judge writes meanings. The bot keeps only what
+fits: occasions of the table (at most 3), a tone and a who of the lists, a template that
+is the meme, or one of its variants, with a name for XX (XX出 is wei出; XX进 isn't). A
+use without an occasion or a sentence in Chinese is asked for once more, then left for the
+next run. Only the memes that need a use are asked: the ones without one, and the ones
+whose meaning, English gloss, notes, variants or source changed since theirs was written
+(after `accept --note`, say), or none of whose occasions is in the table any more. That is
+about 200 answers for the 205 memes learned by 2026-11-24, a few cents with deepseek-flash;
+the model and the fallback to qwen3:14b are the judge's (`--model` picks another).
+
+The page lists every meme with its meaning and use, the ones you haven't looked at first.
+Click an occasion to take it out, add one with + 场面, change the tone, how or the template
+(XX 是… says what goes there), or tick 对 when it's right. Each change is saved in
+`memes.json` at once, and makes the use **checked**: the model never writes a checked use
+again, not even with `--again`, so what you fixed stays fixed. 只看没打勾的 hides the ones
+you checked. Click 完成 when you're done, or close the window: nothing is lost. Like the
+report, the page is only served to this computer, through a link with a random token.
+
+Apps get the use with each meme (`memelearner.memes()`, `lookup()`, the `--json` output and
+`memes.json`; `None` before it is written), and `memelearner.write_uses()` writes them from
+Python.
+
 ## Running by itself for days
 
 On Windows, the bot can run by itself for some days with Task Scheduler while you're away,
@@ -639,6 +700,8 @@ found, how many memes were explained, and the problems.
 | `memelearner/auto.py` | runs by itself for days with Windows Task Scheduler (`auto`) |
 | `memelearner/meanings.py` | merges your notes with the model's meanings |
 | `memelearner/review.py` | the report in your browser: your marks and decisions, and what 完成 learns |
+| `memelearner/uses.py` | when and how each learned meme is said: the model writes it, you check it on a page |
+| `memelearner/data/occasions.txt` | the moments of a match a meme can be said in, which you edit (`uses.py` reads it) |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
@@ -647,6 +710,7 @@ found, how many memes were explained, and the problems.
 | `memelearner/variants.py` | tells the variants of one meme (XX同意了) |
 | `surf.py` | `py surf.py`, short for `py -m memelearner learn` |
 | `开始自动跑.bat` and the three beside it | `auto start`, `stop`, `status` and `report`, to double-click |
+| `梗的用法.bat` | `uses`, to double-click |
 
 The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs/DESIGN.md).
 

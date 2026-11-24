@@ -14,6 +14,7 @@ apps learn them from it. Other apps only need what is in this file.
     memelearner.watching()                  # what the model wasn't sure of yet
     memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
     memelearner.reject("下路")              # not a meme: never list it again
+    memelearner.write_uses()                # a model writes when and how each meme is said
 
 A meme is a dict:
 
@@ -26,9 +27,13 @@ A meme is a dict:
      "sources": ["https://www.bilibili.com/video/BV17XxP6CE7n"],   videos those came from
      "variants": [],                   other ways the same meme is written: lookup() and
                                        find() find it by any (超威同意了: chovy同意了 ...)
-     "source": None}                   the meme it comes from, and how the judge knows:
+     "source": None,                   the meme it comes from, and how the judge knows:
                                        {"phrase": "我们是冠军", "how": "learned"} for
                                        我们是路边 (see store.py), or None
+     "use": None}                      when and how it is said, once write_uses() did:
+                                       {"when": ["打得烂"], "tone": "骂", "how": "...",
+                                       "template": "XX出", "who": "选手", "by": "...",
+                                       "of": "...", "checked": False} (see uses.py), or None
 
 A candidate is a short danmu that many people send on their own, with how new it is, its
 numbers, its variants (the same meme written differently: variants.py), its pattern
@@ -51,7 +56,7 @@ API_VERSION = 3  # 2: a candidate is a phrase people send on their own, new or n
 #                 3: a meme written in more than one way is one meme, with its "variants"
 
 __all__ = ["memes", "lookup", "find", "candidates", "learn", "judge", "explain", "watching",
-           "accept", "reject", "forget", "ModelUnavailable", "API_VERSION"]
+           "accept", "reject", "forget", "write_uses", "ModelUnavailable", "API_VERSION"]
 
 
 def candidates(game=None):
@@ -166,3 +171,22 @@ def accept(phrase, meaning="", english="", game=None, note="", model=None):
                         examples=[example["text"] for example in examples],
                         sources=[urls[e["video"]] for e in examples if urls.get(e["video"])],
                         note=note)
+
+
+def write_uses(phrases=None, again=False, model=None, quiet=False):
+    """Have a model write when and how each learned meme is said, and where a name goes in
+    it: the "use" of a meme (see uses.py), which a bot that says memes by itself picks memes
+    by. Only the memes that need one get one: those without a use, and those whose meaning,
+    notes or variants changed since; again=True writes again every use the model wrote, and
+    phrases only those memes' (again, too). A use you changed or ticked on the page
+    (py -m memelearner uses) is never written again. It takes a few seconds per meme.
+
+    model: as for judge(), with qwen3:14b standing in when an online one can't be reached.
+    Returns {"written": [phrase, ...], "failed": [phrase, ...], "kept": the number that
+    needed none, "model", "spent"} (uses.write()). Raises ModelUnavailable when no model can
+    be asked (the uses written until then are kept), and ValueError when data/occasions.txt
+    can't be read or a phrase isn't a learned meme. quiet: print nothing.
+    """
+    from . import uses
+    with contextlib.redirect_stdout(io.StringIO()) if quiet else contextlib.nullcontext():
+        return uses.write(phrases, again, model)

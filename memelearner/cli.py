@@ -17,6 +17,7 @@
     py -m memelearner live-phrases             the phrases in the last recording, and which are new
     py -m memelearner report                   the report in your browser: mark, decide, then 完成
     py -m memelearner live-report              live-phrases, judge and explain, then the report
+    py -m memelearner uses                     a model writes when and how each meme is said
     py -m memelearner sources 阿一古 --explain   which search engines and wikis explain some memes
     py -m memelearner auto start               run by itself for days (Windows Task Scheduler)
     py -m memelearner auto extend --days 4     ... for 4 days from its start instead
@@ -315,6 +316,35 @@ def _report(args):
     result = report.run(not args.no_browser)
     if result:
         print("\n".join(review.summary(result)))
+
+
+def _uses(args):
+    """The model writes the uses of the memes that need one, then the page opens."""
+    from . import uses
+    if not args.no_model:
+        try:
+            with judging.awake():  # a few seconds a meme: Windows mustn't sleep meanwhile
+                result = uses.write(args.phrases or None, args.again, args.model)
+        except ValueError as error:  # occasions.txt, or a phrase that isn't learned
+            sys.exit(str(error))
+        except ModelUnavailable as error:
+            print(f"Couldn't ask a model: {error}.")
+            if args.no_page:
+                sys.exit(1)
+            print("So the page shows the uses written before.")
+        else:
+            print(uses.summary(result))
+    if args.no_page:
+        return
+    print()
+    try:
+        page = uses.UsesPage(args.port)
+    except OSError as error:
+        sys.exit(f"Couldn't open the page on port {args.port}: {error}")
+    result = page.run(not args.no_browser)
+    if result:
+        print(f"Of {result['memes']} memes, {result['uses']} have a use, and you checked "
+              f"{result['checked']}.")
 
 
 def _live_report(args):
@@ -653,6 +683,21 @@ def parser():
     whole.add_argument("--no-audio", action="store_true",
                        help="don't hear the videos, even with Whisper installed")
     whole.set_defaults(run=_live_report)
+
+    said = sub.add_parser("uses", help="a model writes when and how each learned meme is "
+                          "said, then a page opens to look through them")
+    said.add_argument("phrases", nargs="*", metavar="PHRASE",
+                      help="only these memes, written again (default: every meme that needs "
+                      "a use)")
+    said.add_argument("--again", action="store_true",
+                      help="write again every use the model wrote (the ones you checked stay)")
+    said.add_argument("--no-model", action="store_true",
+                      help="ask no model: only open the page")
+    said.add_argument("--no-page", action="store_true",
+                      help="only write the uses: don't open the page")
+    _report_options(said, "the model that writes the uses (default %(default)s; "
+                    f"{judging.LOCAL_MODEL} when it can't be reached)")
+    said.set_defaults(run=_uses)
 
     look = sub.add_parser("sources", help="ask every search engine and wiki about some "
                           "phrases, to see which ones explain memes from this computer")

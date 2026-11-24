@@ -10,20 +10,22 @@
 MemeLearnerBot/
 ├── surf.py            根目录的入口：py surf.py，等于 py -m memelearner learn
 ├── 开始自动跑.bat、停止自动跑.bat、看看进度.bat、打开报告.bat   双击用的 auto start、stop、status、report（第 3.7 节）
+├── 梗的用法.bat       双击用的 uses：模型写每个梗什么时候说，再打开页面（第 3.8 节）
 ├── pyproject.toml     pip 安装配置，定义 memelearner 命令
 ├── tests/             离线测试：py -m unittest（不上网）
 ├── docs/DESIGN.md     这份文档
 ├── .github/workflows/tests.yml   每次推送和 PR 在 Windows 和 Linux 上跑测试
 └── memelearner/       真正的代码（一个 Python 包）
-    ├── __init__.py    门面：memes()、lookup()、find()、candidates()、learn()、judge()、explain()、watching()、accept()、reject()，别的程序只调用它
+    ├── __init__.py    门面：memes()、lookup()、find()、candidates()、learn()、judge()、explain()、watching()、accept()、reject()、write_uses()，别的程序只调用它
     ├── __main__.py    py -m memelearner
-    ├── cli.py         命令行：learn、judge、explain、compare、candidates、watching、accept、reject、forget、memes、lookup、find、live、live-phrases、report、live-report、sources、auto
+    ├── cli.py         命令行：learn、judge、explain、compare、candidates、watching、accept、reject、forget、memes、lookup、find、live、live-phrases、report、live-report、uses、sources、auto
     ├── surf.py        梗机器人：找 B 站上很多人单独发的说法
     ├── judging.py     模型（本地的或在线的）判断候选：是梗、名字、游戏术语还是普通的话，梗是什么意思；比较几个模型（第 3 节）
     ├── explainers.py  找、看、总结讲梗的视频（「XX是什么梗」）和网页，给模型判断用（第 3.5 节）
     ├── web.py         B 站以外：搜索引擎（Bing、DuckDuckGo、百度）和百科（萌娘百科、百度百科、小鸡词典），只读（第 3.5 节）
     ├── meanings.py    把 Hao 的补充和模型的解释合成一句完整的含义（第 4 节）
-    ├── review.py      浏览器里的报告：标记、决定，点「完成」就学（第 3.6 节）
+    ├── review.py      浏览器里的报告：标记、决定，点「完成」就学（第 3.6 节）；Page 是这种只给这台电脑看的网页的底子
+    ├── uses.py        每个学到的梗什么时候说、什么语气、怎么说、哪里能换名字：模型写，你在网页上看和改（第 3.8 节）
     ├── live.py        录直播间的弹幕，找里面单独发的说法
     ├── auto.py        用 Windows 任务计划程序自己跑几天（第 3.7 节）
     ├── bilibili.py    读 B 站：搜视频、相关推荐、弹幕和热评、视频页、字幕和音频（只读）
@@ -134,6 +136,16 @@ flowchart TD
 - **新代码**（`--pull`）。daily 先在代码的文件夹里 `git pull --ff-only`，拉到新的就用新代码另开一个 Python 跑这一次（`--no-pull`），这样 3 天里推上去的修复第二天就用上了；拉不下来就用原来的代码跑。
 - **报告**（`report()`、`overview()`）。`auto report`（`打开报告.bat`）把 pool 里还没学、没拒的说法交给第 3.6 节的报告（`review.rows(pool)`），第一行是这几天的总结：跑了几次（每天的、直播的）、找到几个说法几个梗、几个查到了解释、出过哪些问题。
 
+## 3.8 梗的用法（`uses.py`）
+
+2026-11-24 Hao 定的方向：翻译器是你先想好一句话再把它翻成梗；接下来要做的是 bot 自己看比赛、自己说梗。第一步是让它知道每个梗什么时候说：光知道意思不够，还要知道在比赛的什么场面说、什么语气、对谁说、哪里能换上别人的名字。`py -m memelearner uses`（`梗的用法.bat`）让模型给每个学到的梗写一个 `use`，再打开网页给 Hao 看和改。
+
+- **场面表**（`data/occasions.txt`，`occasions()`）。一行一个场面，`打得烂 = 选手或战队失误、送人头`：秀了、打得烂、碾压、翻盘、要输了、赢了、输了、要打团、离谱、BP、开局、加油、预测、回看、名场面、解说、现场、吵架、叫人。Hao 用记事本改，模型照等号右边的说明挑。语气（`TONES`）和 XX 能换成什么（`WHO`：选手、战队、英雄、位置、别的）是固定的。
+- **问**（`USE`、`question()`）。模型拿到梗的意思、英文解释、Hao 的补充、变体、来源、最多 `LINES` 句例句、程序认出的句式和里面的名字是谁（`variants.py`、外号表），场面表、语气和 WHO 放在说明的最后（每个梗都一样，在线模型的缓存能用上）。它只照这些写：when（1 到 3 个场面）、tone、how（一句中文：什么时候、对谁、怎么说）、template（能换名字的句式，XX 是名字）和 who。
+- **检查**（`check()`）。场面只留表里有的，最多 `MAX_WHEN` 个；语气和 who 不在单子里就不要；how 要有中文，最多 `HOW_LENGTH` 个字；template 要是这个梗或它的一个变体把名字换成 XX（`fits()`：XX出 对得上 wei出，XX进 对不上），不然就当没有。没有场面或者没有中文的 how，再问一次，还不行就留到下次。
+- **存**（`_keep()`）。每写好一个就存进 memes.json（先重新读一遍，不会盖掉别人刚改的），带着写它的模型（`by`）和它照什么写的（`of`：意思、英文解释、补充、变体、来源的哈希）。下次只问需要的（`needs()`）：没有 use 的；`of` 变了的（比如 `accept --note` 改了意思）；场面全都不在表里了的。`--again` 重写模型写的全部，给了说法就只重写那几个。模型用判断用的那个，在线的连不上就换 `LOCAL_MODEL`。
+- **网页**（`UsesPage`，和报告一样用 `review.Page`：只给这台电脑看，链接里有随机令牌）。一行一个梗：说法、变体、游戏、谁写的，意思，场面（点一下去掉，「+ 场面」加），语气，怎么说，句式和 XX 是什么，「对」的勾。没打勾的在前，然后是还没写的，最后是打了勾的。每改一次马上存进 memes.json（`change()`），改过的和打了勾的算 `checked`：模型以后再也不改它，`--again` 也不改。
+
 ## 4. 学到的梗（`store.py`、`data/memes.json`）
 
 ```
@@ -149,6 +161,7 @@ flowchart TD
 ```
 
 - `memes`：学到的梗，键是说法。衍生梗有 `source`：`{"phrase": "我们是冠军", "how": "learned"}`，来自哪个梗，和怎么知道的（video、explanation、learned 是 judge 查到的，guess 是猜的，note 是你在报告的补充里写的）。同一个梗的不同写法是一条（`variants.py` 认的：超威同意了、chovy同意了、三叔不同意），键是发得最多的那个，别的写法在 `variants` 里；`lookup()` 和 `find()` 用哪个写法都找得到；每个写法最多留 3 句例句。`apart` 是报告里你点掉的、样子像但不是这个梗的说法，以后不再当成它。`accept` 的时候给了变体，已经学过的梗也会并进来（它的补充、例句、来源、变体都留着），一个梗只有一条。`meaning` 是中文意思，`english` 是英文解释，没人填的时候是空字符串；`games` 是在哪些游戏里看到的；`examples` 和 `sources` 是最多 3 句例句和它们来自的视频，`accept` 的时候从上一次运行的候选里拿。
+- `use`：这个梗什么时候说、怎么说（第 3.8 节）：`{"when": ["打得烂"], "tone": "骂", "how": "...", "template": "XX出", "who": "选手", "by": "deepseek/deepseek-flash", "of": "...", "checked": false}`。`uses` 写之前没有这个字段；别的程序拿到的梗里没有的时候是 `None`。
 - `rejected`：不要的说法（人名、队名、英雄名、日常说法），以后不再列成候选。`forget` 可以撤销 accept 或 reject。
 - 说法都按机器人找到的样子写（`store.normal()`）：小写、半角，只留字母、数字和汉字，所以 `lookup("ＹＹＤＳ")` 也能找到 yyds。
 - 这个文件是机器人的成果，跟代码一起进 git（读到的弹幕在 `.cache/` 里，不进 git）。Hao accept 完推送上去，用 pip 装机器人的程序升级一下就拿到新的梗，别的程序也可以直接从 GitHub 读这个文件。
@@ -165,7 +178,7 @@ flowchart TD
 
 | 方式 | 给谁用 | 怎么用 |
 |---|---|---|
-| Python 包 | 翻译器这种 Python 程序 | `pip install git+https://github.com/HHCreator/MemeLearnerBot`，然后 `import memelearner`，用 `memes()`、`lookup()`、`find()`、`candidates()`、`learn()`、`judge()`、`watching()`、`accept()`、`reject()`、`forget()` |
+| Python 包 | 翻译器这种 Python 程序 | `pip install git+https://github.com/HHCreator/MemeLearnerBot`，然后 `import memelearner`，用 `memes()`、`lookup()`、`find()`、`candidates()`、`learn()`、`judge()`、`watching()`、`accept()`、`reject()`、`forget()`、`write_uses()` |
 | 命令行 | 别的语言写的程序 | `py -m memelearner memes --json`、`lookup 绷不住了 --json`、`find "文字" --json`、`candidates --json`、`watching --json`：输出 UTF-8 的 JSON，跟 Python 函数返回的一样；`lookup` 找不到时退出码是 1 |
 | 文件 | 不想调用代码的程序 | 直接读 `memelearner/data/memes.json`（格式见第 4 节），也可以从 GitHub 读：`https://raw.githubusercontent.com/HHCreator/MemeLearnerBot/main/memelearner/data/memes.json` |
 
@@ -183,6 +196,7 @@ flowchart TD
 | `data/surf_sources.json` | 每个游戏的标题词（words）和起点视频（seeds） | 你写，surf.py 读 |
 | `data/surf_common.txt` | 永远不列的日常说法（哈哈哈、加油、比赛） | 你写，surf.py 读 |
 | `data/nicknames.txt` | 选手外号表：一行一个选手，`Chovy = 超威, 大超, chooovy`；大小写、全角半角、重复的字母（chooooovy）都不算不同 | 你写，nicknames.py 读，进 git |
+| `data/occasions.txt` | 比赛里的场面：一行一个，`打得烂 = 选手或战队失误、送人头`；模型照右边的说明给梗挑场面（第 3.8 节） | 你写，uses.py 读，进 git |
 | `data/words/common_english.txt` | 1 万个常用英文单词，用来分开英文单词（nice）和字母梗（yyds） | surf.py 读 |
 | `.cache/surf/` | 读到的弹幕和评论（每个视频一个 `.jsonl`，发送者是短哈希）、`videos.json`、`candidates.json`；`judge.json`：模型的结论；`explainers.json`：见过的讲梗视频和每个说法的视频总结，`explainers/`：看过的讲梗视频（每个一个 `.json`）；`review.json`：报告里的选择、算过分的回答和每次「完成」的结果 | surf.py、judging.py、explainers.py 和 review.py 读写，不进 git；环境变量 `MEMELEARNER_HOME` 可以换地方，exe 里放在 `%LOCALAPPDATA%\MemeLearnerBot` |
 | `.cache/whisper/` | Whisper 模型（装了 faster-whisper、第一次听视频的时候下载） | explainers.py 读，不进 git |
@@ -210,6 +224,8 @@ flowchart TD
 | 机器人更敏感或更保守 | `surf.py` 开头的 `MIN_PEOPLE`、`MIN_VIDEOS`、`MIN_ALONE`、`MAX_SHORT`、`RISE`、`SURE` |
 | 不要列别的程序已经知道的词 | `--known 词表文件或文件夹`，或环境变量 `MEMELEARNER_KNOWN` |
 | 每个梗多存几句例句 | `store.py` 的 `EXAMPLES` |
+| 梗的场面不够细或者不对 | 改 `data/occasions.txt`（加场面、改说明），再运行 `py -m memelearner uses`：场面全被去掉的梗会重新标；要全部重标就加 `--again`（打了勾的不改） |
+| 梗的用法写得更多或更少 | `uses.py` 开头的 `MAX_WHEN`（最多几个场面）、`HOW_LENGTH`（how 最多几个字）、`LINES`（给模型看几句例句）、`TONES`、`WHO` |
 | 模型判断更严或更松 | `judging.py` 开头的 `LINES`、`EXPLANATIONS`、`MIN_FITS`、`FIT_SHARE`、`MIN_TEST_LINES`、`AGAIN_PEOPLE` |
 | 哪些句子算「在解释」 | `judging.py` 开头的 `EXPLAINS`（解释用的词）和 `ASKS`（问的词） |
 | 换一个模型 | 默认的是 `judging.py` 的 `DEFAULT_MODEL`（deepseek/deepseek-flash）；`judge --model 名字`（在线的 deepseek/deepseek-v4-pro，本地的 qwen3:14b）或者环境变量 `MEMELEARNER_MODEL` 可以换；先用 `compare` 比一比。连不上在线模型时换用的本地模型是 `LOCAL_MODEL`（qwen3:14b） |

@@ -21,7 +21,10 @@ lookup() and find() find it by any of them; it keeps EXAMPLES example lines for 
 holds the phrases you said aren't that meme, though they look like it (in the report). A
 meme made from another one has "source": {"phrase": "我们是冠军", "how": "learned"}: where it
 comes from, and how the judge knows ("video", "page", "explanation" or "learned" when one
-of them says so, "guess" when it only looks like it; see judging.judge()). Every
+of them says so, "guess" when it only looks like it; see judging.judge()). A meme the model
+wrote a use for has "use": when and how it is said, and where a name goes in it
+({"when": ["打得烂"], "tone": "骂", "how": "...", "template": "XX出", "who": "选手", ...};
+see uses.py). Every
 phrase is written the way the bot finds it (normal()): lowercase, half-width, only letters,
 digits and Chinese characters. "version" changes when a field changes meaning or goes away; a
 new field doesn't change it.
@@ -86,7 +89,8 @@ def _meme(phrase, entry):
             "added": entry.get("added", ""), "examples": list(entry.get("examples") or []),
             "sources": list(entry.get("sources") or []),
             "variants": list(entry.get("variants") or []),
-            "source": dict(entry["source"]) if entry.get("source") else None}
+            "source": dict(entry["source"]) if entry.get("source") else None,
+            "use": dict(entry["use"]) if entry.get("use") else None}
 
 
 def owners(memes):
@@ -243,7 +247,7 @@ def accept(phrase, meaning="", english="", games=(), examples=(), sources=(), no
 
 
 FIELDS = ("meaning", "english", "games", "added", "examples", "sources", "notes", "source",
-          "variants", "apart")  # the order of a meme's fields in the file
+          "variants", "apart", "use")  # the order of a meme's fields in the file
 
 
 def _drop_variant(entry, phrase):

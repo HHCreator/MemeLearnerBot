@@ -219,26 +219,33 @@ def _clean(value, length):
     return (text[:space] if space >= length // 2 else text[:length - 1]) + "…"
 
 
-def _stand_in(error, rest=False):
+def _stand_in(error, rest=False, doing="merges", what="meanings"):
     """judging.LOCAL_MODEL, which merges the meanings (the rest of them when rest is True)
-    instead of an online model that can't be reached (error), as it judges instead. Raises
-    judging.ModelUnavailable when it can't be asked either."""
+    instead of an online model that can't be reached (error), as it judges instead; doing
+    and what say what it does instead. Raises judging.ModelUnavailable when it can't be
+    asked either."""
     try:
         judging.check_model(judging.LOCAL_MODEL)
     except judging.ModelUnavailable as local:
         raise judging.ModelUnavailable(f"{error}; and {judging.LOCAL_MODEL}, which stands in "
                                        f"for it, can't be asked either: {local}") from local
-    print(f"{error}.\nSo {judging.LOCAL_MODEL}, the model on this computer, merges "
-          f"{'the rest of ' if rest else ''}the meanings instead.")
+    print(f"{error}.\nSo {judging.LOCAL_MODEL}, the model on this computer, {doing} "
+          f"{'the rest of ' if rest else ''}the {what} instead.")
     return judging.LOCAL_MODEL
 
 
 class _Asker:
-    """Asks a model the merging question; once an online model can't be reached,
-    judging.LOCAL_MODEL is asked instead, from then on."""
+    """Asks a model a question with the instructions it was made with (the merging question
+    by default); once an online model can't be reached, judging.LOCAL_MODEL is asked
+    instead, from then on. doing and what say what the model does, for the line that says
+    so (uses.py asks it what the uses of memes are)."""
 
-    def __init__(self, model=None):
+    def __init__(self, model=None, instructions=MERGE, doing="merges", what="meanings"):
         self.model, self.checked = model or judging.MODEL, False
+        self.instructions, self.doing, self.what = instructions, doing, what
+
+    def _stand_in(self, error, rest=False):
+        return _stand_in(error, rest, self.doing, self.what)
 
     def __call__(self, question):
         if not self.checked:
@@ -246,12 +253,12 @@ class _Asker:
             try:
                 judging.check_model(self.model)
             except judging._Unreachable as error:  # no key, no balance, no answer
-                self.model = _stand_in(error)
+                self.model = self._stand_in(error)
         try:
-            return judging._answer(MERGE, question, self.model)
+            return judging._answer(self.instructions, question, self.model)
         except judging._Unreachable as error:  # the online model stopped answering
-            self.model = _stand_in(error, rest=True)
-            return judging._answer(MERGE, question, self.model)
+            self.model = self._stand_in(error, rest=True)
+            return judging._answer(self.instructions, question, self.model)
 
 
 def _merge_one(item, known, ask):
