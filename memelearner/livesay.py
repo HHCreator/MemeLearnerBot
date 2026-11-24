@@ -143,7 +143,7 @@ class Watcher:
         self.new = 0  # danmu from people since it last looked
         self.rounds = collections.deque(maxlen=KEPT)
         self.said = collections.deque()  # (when, meme) of the last RECENT seconds
-        self.last = collections.deque(maxlen=LAST)  # the memes of the last looks that said any
+        self.last = collections.deque(maxlen=LAST)  # the memes of the last looks that spoke
         self.before = ("", 0.0)  # what it saw last, and when
         self.last_error = ""
         self.next_id = 1
@@ -196,6 +196,8 @@ class Watcher:
                 result.update(saying.speak(situation, moment, self.ask, self.count, self.rng,
                                            {meme for _, meme in self.said},
                                            {meme for memes in self.last for meme in memes}))
+                # A look that said nothing counts too, so those memes come back after it
+                self.last.append({line["meme"] for line in result["lines"]})
         except judging.ModelUnavailable as error:
             result["why"] = f"没有模型能用：{error}"
         except ValueError as error:  # occasions.txt or said.json went wrong while it ran
@@ -205,8 +207,6 @@ class Watcher:
         for line in result["lines"]:
             line["meaning"] = (memes.get(line["meme"]) or {}).get("meaning") or ""
             self.said.append((now, line["meme"]))
-        if result["lines"]:
-            self.last.append({line["meme"] for line in result["lines"]})
         with self.lock:
             self.rounds.append(result)
         self._show(result)
