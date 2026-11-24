@@ -357,10 +357,12 @@ def parse_combo(message, now=None):
 # -- recording ----------------------------------------------------------------------------
 
 class Recording:
-    """Writes what the feed sends to the .jsonl file, and keeps count."""
+    """Writes what the feed sends to the .jsonl file, and keeps count. heard: called with
+    each danmu as it is written (livesay.py)."""
 
-    def __init__(self, path, room, out=None, status_every=STATUS_EVERY):
+    def __init__(self, path, room, out=None, status_every=STATUS_EVERY, heard=None):
         self.path, self.room, self.out, self.status_every = path, room, out, status_every
+        self.heard = heard
         self.file = open(path, "a", encoding="utf-8")
         self.started = time.time()
         self.lines = self.auto = self.stickers = self.weak = self.combos = 0
@@ -408,6 +410,8 @@ class Recording:
         if len(self.seen) > 5000:
             self.seen.popitem(last=False)
         self.write(record)
+        if self.heard:
+            self.heard(record)
         self.lines += 1
         self.people.add(record["who"])
         self.auto += record.get("auto", 0)
@@ -579,7 +583,7 @@ def _stay_awake(on):
 
 
 def record(link, until=None, path=None, game="lol", out=None, stop=None,
-           status_every=STATUS_EVERY):
+           status_every=STATUS_EVERY, heard=None):
     """Record a live room's danmu until the unix time until (None: until Ctrl+C), or until
     stop() says to stop (asked every STOP_EVERY seconds: the room went offline, say);
     returns the .jsonl file's path. Joins again by itself when the connection drops. game is
@@ -587,14 +591,14 @@ def record(link, until=None, path=None, game="lol", out=None, stop=None,
     (None: sys.stdout, as it is then), with a status line every status_every seconds. While
     it records, the recording's .json is rewritten at least every STATUS_EVERY seconds (and
     a minute or two apart while it joins again), and says "ended" once it stopped, so others
-    can tell (auto.py)."""
+    can tell (auto.py). heard: called with each danmu as it comes (Recording)."""
     room = room_info(room_of(link))
     started = time.strftime("%Y%m%d-%H%M")
     name = room["short_id"] or room["room_id"]
     path = path or os.path.join(live_dir(), f"{name}-{started}.jsonl")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     link = f"https://live.bilibili.com/{name}"
-    recording = Recording(path, dict(room, link=link, game=game), out, status_every)
+    recording = Recording(path, dict(room, link=link, game=game), out, status_every, heard)
     say = recording.say
     say(f"Room {name} (room {room['room_id']}): {room['title'] or '(no title)'}"
         + ("" if room["live"] else "  - not live right now, listening anyway"))

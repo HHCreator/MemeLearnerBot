@@ -230,9 +230,10 @@ class RecordTest(unittest.TestCase):
                 raise KeyboardInterrupt
             return sockets.pop(0), b""
 
-        out = io.StringIO()
+        out, heard = io.StringIO(), []
         with mock.patch.object(live, "ws_open", ws_open):
-            path = live.record("https://live.bilibili.com/6?live_from=81001", out=out)
+            path = live.record("https://live.bilibili.com/6?live_from=81001", out=out,
+                               heard=heard.append)
 
         self.assertEqual(os.path.basename(path)[:2], "6-")
         with open(path, encoding="utf-8") as f:
@@ -240,6 +241,7 @@ class RecordTest(unittest.TestCase):
         self.assertEqual([(m["kind"], m["text"]) for m in lines],
                          [("live", "正义必胜"), ("combo", "ig牛逼"), ("live", "阿一古")])
         self.assertEqual(lines[2]["auto"], 1)
+        self.assertEqual(heard, [lines[0], lines[2]])  # each danmu once, as written (livesay)
         self.assertEqual(opened[0], ("a.chat.bilibili.com", 443, {"buvid3": "BUVID3"}))
         with open(os.path.splitext(path)[0] + ".json", encoding="utf-8") as f:
             info = json.load(f)
