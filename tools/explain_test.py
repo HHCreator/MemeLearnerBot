@@ -930,8 +930,10 @@ def read_videos(state, phrase, entry, hearing, materials):
 #
 # On 2026-11-23 the sound of every video was refused (HTTP 403 or 567) when the bot asked
 # for it as it does (bilibili.download(): the first address of the smallest stream, with the
-# API's headers and no Range). This tries the other ways a visitor has, writes down what
-# each one answered, and hears the video with the first way that works:
+# API's headers and no Range). The second run (2026-11-23 09:40) found that the player's
+# headers work, and the bot now sends them; so each video is fetched the bot's own way first,
+# and this tries the other ways a visitor has only when that fails, writes down what each
+# one answered, and hears the video with the first way that works:
 #   sources  page   the streams the video's page carries (window.__playinfo__), as the bot
 #            api    the player's API (/x/player/wbi/playurl), the sound alone
 #            html5  the same API as a phone's browser asks it: one small mp4, sound and
@@ -942,7 +944,7 @@ def read_videos(state, phrase, entry, hearing, materials):
 #                    Origin, Range
 #            plain   what most downloaders send: the site as Referer, Range
 #            bare    no Referer, Range
-#            bot     what the bot sends now
+#            bot     the API's headers: what the bot sent for a stream until 2026-11-24
 # Each try asks for the first PROBE_BYTES only. The first video tries every way, so the
 # results show them all; later videos try the ways that worked first, and every way only
 # when those fail. After GIVE_UP videos in a row that no way could fetch, the run stops
@@ -964,7 +966,8 @@ FETCH_FAILED = re.compile(r"the audio stream answered|/x/player/|no way fetched 
                           r"not trying")
 IP_LIKE = re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b|\b(?:[0-9a-f]{1,4}:){2,7}[0-9a-f]{0,4}\b",
                      re.I)
-_audio = {"state": None, "last": 0.0, "family": "", "opener": None}
+_audio = {"state": None, "last": 0.0, "family": "", "opener": None,
+          "bots": None}  # bots: explainers._hear_video as the bot has it
 
 
 def _host_kind(host):
@@ -1185,9 +1188,37 @@ def hear_video(video, phrase):
     audio.setdefault("proxy", bool(urllib.request.getproxies()))
     audio.setdefault("python", sys.version.split()[0])
     bvid = video["bvid"]
+    mine = audio["videos"][bvid] = {"sources": {}, "worked": None, "tries": 0, "bot": ""}
+    if _audio["bots"]:
+        # The bot's own way first (bilibili.download() with the player's headers, since
+        # 2026-11-24): the other ways only when it can't fetch the sound
+        fetched, real = {}, bilibili.download
+
+        def watched(*args, **kwargs):
+            fetched["bytes"] = real(*args, **kwargs)
+            return fetched["bytes"]
+
+        bilibili.download = watched
+        try:
+            said = _audio["bots"](video, phrase)
+        except bilibili.Blocked:
+            raise
+        except Exception as error:
+            if fetched:  # fetched, so it was Whisper: no other way would help
+                mine["bot"] = f"fetched {fetched['bytes']} bytes"
+                raise
+            mine["bot"] = _snippet(str(error) or repr(error))
+        else:
+            if fetched:
+                mine["bot"] = mine["worked"] = f"fetched {fetched['bytes']} bytes"
+                return said
+            mine["bot"] = video.pop("unheard", "") or "nothing"  # no stream: other ways
+        finally:
+            bilibili.download = real
+            save_state(state)
     if audio.get("stopped"):
-        raise bilibili.Error("not trying: no way fetched its sound for the videos before")
-    mine = audio["videos"][bvid] = {"sources": {}, "worked": None, "tries": 0}
+        raise bilibili.Error("not trying the other ways: none fetched the sound of the "
+                             f"videos before (the bot's own way: {mine['bot'] or 'not tried'})")
     asked = {}  # source: the addresses it gave this time
 
     def urls(source):
@@ -1470,7 +1501,12 @@ def sound_section(audio):
     if not tries and not audio.get("videos"):
         return []
     videos = audio.get("videos") or {}
+    bots = [video.get("bot") for video in videos.values() if video.get("bot")]
     out = ["## Ways to fetch the sound", "",
+           f"The bot's own way (bilibili.download() with the player's headers) fetched "
+           f"{sum(1 for bot in bots if bot.startswith('fetched'))} of {len(bots)} videos"
+           + (": " + "; ".join(sorted({bot for bot in bots if not bot.startswith('fetched')}))
+              if any(not bot.startswith("fetched") for bot in bots) else "") + ".", "",
            f"{len(tries)} tries for {len(videos)} videos "
            f"({sum(1 for v in videos.values() if v.get('worked'))} fetched); Python "
            f"{audio.get('python', '?')}, a proxy on this computer: "
@@ -1509,11 +1545,14 @@ def sound_section(audio):
         out += said[:20]
     out += ["", "Videos:", ""]
     for bvid, video in videos.items():
-        out.append(f"- {bvid}: " + (f"fetched {video['worked']}" if video.get("worked")
-                                     else "not fetched")
-                   + f" after {video.get('tries', 0)} tries; "
-                   + ", ".join(f"{source}: {note}"
-                               for source, note in (video.get("sources") or {}).items()))
+        worked = str(video.get("worked") or "")
+        out.append(f"- {bvid}: " + ("not fetched" if not worked else worked
+                                     if worked.startswith("fetched") else f"fetched {worked}")
+                   + (f" (the bot's own way: {video['bot']})"
+                      if video.get("bot") and video["bot"] != worked else "")
+                   + f" after {video.get('tries', 0)} other tries"
+                   + "".join(f"; {source}: {note}"
+                             for source, note in (video.get("sources") or {}).items()))
     if audio.get("stopped"):
         out.append(f"- Stopped trying after {GIVE_UP} videos in a row that no way fetched.")
     return out + [""]
@@ -1742,6 +1781,7 @@ def main(argv=None):
     # Fetch the sound the ways hear_video() tries, and try again the videos an earlier run
     # couldn't fetch
     _audio["state"] = state
+    _audio["bots"] = explainers._hear_video
     explainers._hear_video = hear_video
     if state.get("audio"):  # a new run: its first video tries every way again
         state["audio"].update(stopped=False, missed=0, swept=0)

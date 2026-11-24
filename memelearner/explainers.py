@@ -270,10 +270,43 @@ def _load_whisper(device):
                         compute_type="float16" if device == "cuda" else "int8")
 
 
+def _audio(path):
+    """The sound of a file as Whisper takes it: 16 kHz mono samples, float32. faster-whisper
+    decodes files itself, but 1.2.1 passes av.open() an option (metadata_errors) that PyAV
+    19 no longer takes, so it failed on every file (Hao's PC, 2026-11-23). This is its
+    decode_audio() without that option."""
+    import av
+    import numpy as np
+    resampler = av.audio.resampler.AudioResampler(format="s16", layout="mono", rate=16000)
+    fifo, parts = av.audio.fifo.AudioFifo(), []
+
+    def resample(frame):  # None: what the resampler still holds
+        parts.extend(out.to_ndarray().reshape(-1) for out in resampler.resample(frame))
+
+    with av.open(path, mode="r") as container:
+        frames = container.decode(audio=0)
+        while True:
+            try:
+                frame = next(frames)
+            except StopIteration:
+                break
+            except av.error.InvalidDataError:
+                continue  # a broken frame ends the stream here, as in faster-whisper
+            frame.pts = None  # the queue would check the times otherwise
+            fifo.write(frame)
+            if fifo.samples >= 500_000:
+                resample(fifo.read())
+    if fifo.samples:
+        resample(fifo.read())
+    resample(None)
+    samples = np.concatenate(parts) if parts else np.zeros(0, dtype=np.int16)
+    return samples.astype(np.float32) / 32768.0
+
+
 def _transcribe(model, path, prompt):
     # vad_filter skips the music and the silence, where Whisper would make words up
-    segments, _ = model.transcribe(path, language="zh", initial_prompt=prompt, vad_filter=True,
-                                   beam_size=5)
+    segments, _ = model.transcribe(_audio(path), language="zh", initial_prompt=prompt,
+                                   vad_filter=True, beam_size=5)
     return " ".join(segment.text.strip() for segment in segments).strip()
 
 
@@ -311,15 +344,15 @@ def hear(path, phrase=""):
 def _hear_video(video, phrase):
     """Save the smallest audio stream of a video, hear it, and delete it: what is said, or
     "" (with the reason in video["unheard"] when trying again won't help)."""
-    address = bilibili.audio_url(video["bvid"], video["cid"])
-    if not address:
+    addresses = bilibili.audio_urls(video["bvid"], video["cid"])
+    if not addresses:
         video["unheard"] = "no audio stream"
         return ""
     folder = os.path.join(surf.SURF_DIR, "explainers", "audio")
     os.makedirs(folder, exist_ok=True)
     path = os.path.join(folder, f"{video['bvid']}.m4a")
     try:
-        bilibili.download(address, path)
+        bilibili.download(addresses, path, bvid=video["bvid"])
         return hear(path, phrase)
     finally:
         if os.path.exists(path):

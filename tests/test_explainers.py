@@ -162,6 +162,8 @@ class BilibiliTest(Folder):
         page = ("<html><script>window.__playinfo__=" + json.dumps(playinfo) +
                 "</script><script>window.__INITIAL_STATE__={}</script></html>").encode()
         fake = self.site({"www.bilibili.com/video/BV1explain01/": page})
+        self.assertEqual(bilibili.audio_urls("BV1explain01", 7),
+                         ["https://upos.example/64.m4s", "https://backup.example/64.m4s"])
         self.assertEqual(bilibili.audio_url("BV1explain01", 7), "https://upos.example/64.m4s")
         self.assertEqual(fake.calls[-1][2]["buvid3"], "BUVID3")  # the page, as a visitor
         # A page without the player's streams: the player's API, signed
@@ -176,6 +178,7 @@ class BilibiliTest(Folder):
         self.site({"www.bilibili.com/video/BV1explain01/": b"<html></html>",
                    "/x/player/wbi/playurl": {"code": 0, "data": {"durl": [{"url": "x"}]}}})
         self.assertIsNone(bilibili.audio_url("BV1explain01", 7))
+        self.assertEqual(bilibili.audio_urls("BV1explain01", 7), [])
 
     def test_an_audio_stream_is_saved_only_up_to_a_size(self):
         class Response(io.BytesIO):
@@ -189,13 +192,41 @@ class BilibiliTest(Folder):
         with mock.patch.object(bilibili, "_fetch_file", self.fetch_file), \
                 mock.patch.object(bilibili.urllib.request, "urlopen",
                                   side_effect=lambda *a, **k: Response(b"x" * 1000)) as urlopen:
-            self.assertEqual(bilibili.download("https://upos.example/64.m4s", path), 1000)
+            self.assertEqual(bilibili.download("https://upos.example/64.m4s", path,
+                                               bvid="BV1explain01"), 1000)
             self.assertEqual(os.path.getsize(path), 1000)
-            self.assertEqual(urlopen.call_args.args[0].headers["Referer"],
-                             "https://www.bilibili.com/")
+            # As the player in a browser asks: the servers refuse the API's headers
+            headers = urlopen.call_args.args[0].headers
+            self.assertEqual((headers["Referer"], headers["Range"], headers["Accept"]),
+                             ("https://www.bilibili.com/video/BV1explain01/", "bytes=0-", "*/*"))
             with self.assertRaisesRegex(bilibili.Error, "bigger than"):
                 bilibili.download("https://upos.example/64.m4s", path, limit=999)
         self.assertFalse(os.path.exists(path))  # nothing half-saved is left behind
+
+    def test_when_a_server_refuses_the_stream_its_spare_ones_are_asked(self):
+        path = os.path.join(self.folder, "a.m4a")
+        asked = []
+
+        def fetch(url, path, limit, headers):
+            asked.append(url)
+            if "upos" in url:
+                raise bilibili.urllib.error.HTTPError(url, 567, "x", {}, io.BytesIO(b""))
+            if "pcdn" in url:
+                raise bilibili.urllib.error.URLError("timed out")
+            with open(path, "wb") as f:
+                return f.write(b"sound")
+
+        urls = ["https://upos.example/64.m4s", "https://pcdn.example/64.m4s",
+                "https://akamai.example/64.m4s"]
+        with mock.patch.object(bilibili, "_fetch_file", side_effect=fetch):
+            self.assertEqual(bilibili.download(urls, path, bvid="BV1explain01"), 5)
+            self.assertEqual(asked, urls)
+            # Every server refused: why, for each; none answered: the network, tried again later
+            with self.assertRaisesRegex(bilibili.Error, "HTTP 567 from upos.example"):
+                bilibili.download(urls[:2], path)
+            with self.assertRaises(bilibili.urllib.error.URLError):
+                bilibili.download(urls[1:2], path)
+        self.assertFalse(os.path.exists(path))
 
     def test_a_search_with_no_time_range_sends_none(self):
         fake = self.site({"/x/web-interface/wbi/search/type": {"code": 0, "data": {"result": [
@@ -330,8 +361,9 @@ class ReadTest(Folder):
             "comments": lambda aid, pages=3: asked.append("comments") or [
                 {"text": "前排", "likes": 3}, {"text": "正义必胜的意思是  打气", "likes": 90},
                 {"text": "前排", "likes": 1}],
-            "audio_url": lambda bvid, cid: asked.append("audio") or "https://upos.example/64.m4s",
-            "download": lambda url, path: asked.append("download") or save(path),
+            "audio_urls": lambda bvid, cid: asked.append("audio") or [
+                "https://upos.example/64.m4s"],
+            "download": lambda urls, path, bvid=None: asked.append("download") or save(path),
         }
         for name, fake in fakes.items():
             patcher = mock.patch.object(bilibili, name, side_effect=fake)
@@ -711,12 +743,43 @@ class HearTest(unittest.TestCase):
 
         with mock.patch.object(explainers, "_whisper", None), \
                 mock.patch.object(explainers, "_load_whisper", side_effect=load), \
+                mock.patch.object(explainers, "_audio", side_effect=lambda path: path), \
                 mock.patch("builtins.print"):
             self.assertEqual(explainers.hear("a.m4a", "正义必胜"), "正义必胜 正义必胜")
             self.assertEqual(explainers._whisper[1], "cpu")
             self.assertEqual(explainers._whisper[0].options["language"], "zh")
             self.assertIn("正义必胜", explainers._whisper[0].options["initial_prompt"])
         self.assertEqual(loaded, ["cuda", "cpu"])
+
+    def test_a_sound_file_becomes_16_khz_samples_without_faster_whispers_decoder(self):
+        try:
+            import av
+            import numpy as np
+        except ImportError:
+            self.skipTest("PyAV isn't installed (it comes with faster-whisper)")
+        import fractions
+        import math
+        with tempfile.TemporaryDirectory() as folder:
+            path = os.path.join(folder, "a.m4a")
+            with av.open(path, "w") as container:  # 2.5 s of a tone, in AAC as Bilibili's
+                stream = container.add_stream("aac", rate=44100)
+                stream.layout = "stereo"
+                for start in range(0, 110250, 1024):
+                    count = min(1024, 110250 - start)
+                    tone = 0.3 * np.sin(2 * math.pi * 440 * np.arange(start, start + count)
+                                        / 44100)
+                    frame = av.AudioFrame.from_ndarray(
+                        np.tile(tone.astype(np.float32), (2, 1)), format="fltp", layout="stereo")
+                    frame.sample_rate, frame.pts = 44100, start
+                    frame.time_base = fractions.Fraction(1, 44100)
+                    for packet in stream.encode(frame):
+                        container.mux(packet)
+                for packet in stream.encode(None):
+                    container.mux(packet)
+            samples = explainers._audio(path)
+        self.assertEqual(samples.dtype, np.float32)
+        self.assertAlmostEqual(len(samples) / 16000, 2.5, delta=0.05)
+        self.assertAlmostEqual(float(abs(samples[10000:30000]).max()), 0.3, delta=0.05)
 
 
 if __name__ == "__main__":

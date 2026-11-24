@@ -12,8 +12,8 @@ is used. The bot sees what anyone sees on a video page without logging in.
     video_detail(bvid)                     a video's page: info, description, tags, subtitles
                                            and related videos, in one request
     subtitle_text(url)                     the text of one of a video's subtitle tracks
-    audio_url(bvid, cid)                   where the smallest audio stream of a video is
-    download(url, path)                    save an audio stream to a file
+    audio_urls(bvid, cid)                  where the smallest audio stream of a video is
+    download(urls, path, bvid=bvid)        save an audio stream to a file, as the player does
 
 The last four are for the videos that explain memes (explainers.py).
 
@@ -444,10 +444,22 @@ PLAYINFO = re.compile(r"window\.__playinfo__\s*=\s*(\{.*?\})\s*</script>", re.S)
 MAX_DOWNLOAD = 20_000_000  # bytes of audio saved at most: 64 kbit/s is 0.5 MB a minute
 
 
-def _fetch_file(url, path, limit):
+def stream_headers(bvid=None):
+    """What the player in a browser sends for a video's stream. The servers that hold the
+    sound refuse the API's headers: from Hao's PC on 2026-11-23 every video's sound got
+    HTTP 403 (Akamai) or 567 (Tencent EdgeOne) with them, and came with these (any Accept,
+    a Range, the video's page as Referer)."""
+    return {"User-Agent": HEADERS["User-Agent"], "Accept": "*/*",
+            "Accept-Encoding": "identity", "Accept-Language": HEADERS["Accept-Language"],
+            "Origin": "https://www.bilibili.com",
+            "Referer": PAGE.format(bvid=bvid) if bvid else "https://www.bilibili.com/",
+            "Range": "bytes=0-"}
+
+
+def _fetch_file(url, path, limit, headers=None):
     """Save what an address holds to a file, at most limit bytes; return how many it saved,
     or None when there was more. Tests replace this."""
-    request = urllib.request.Request(url, headers=HEADERS)
+    request = urllib.request.Request(url, headers=headers or stream_headers())
     saved = 0
     with urllib.request.urlopen(request, timeout=30) as response, open(path, "wb") as f:
         while True:
@@ -532,30 +544,30 @@ def subtitle_text(url):
 
 
 def _smallest_audio(dash):
-    """The address of the audio stream with the fewest bits per second in a player answer's
-    "dash" part, or None."""
+    """The addresses of the audio stream with the fewest bits per second in a player
+    answer's "dash" part: its own, then its spare ones on other servers ([] for none)."""
     streams = [stream for stream in (dash or {}).get("audio") or [] if isinstance(stream, dict)]
     for stream in sorted(streams, key=lambda stream: stream.get("bandwidth") or 10 ** 9):
         urls = ([stream.get("baseUrl") or stream.get("base_url")] +
                 list(stream.get("backupUrl") or stream.get("backup_url") or []))
-        found = next((url for url in urls if url), None)
-        if found:
-            return found
-    return None
+        urls = [url for url in dict.fromkeys(urls) if url]
+        if urls:
+            return urls
+    return []
 
 
-def audio_url(bvid, cid):
+def audio_urls(bvid, cid):
     """Where the smallest audio stream of a video is (cid is the part, usually the first),
-    so the bot can hear what the video says without its pictures. It reads the video's page
-    the way a browser does, which carries the player's streams (window.__playinfo__), and
-    asks the player's API when the page doesn't. None when the video has no separate audio
-    (some old ones)."""
+    so the bot can hear what the video says without its pictures: its address, then the
+    spare ones. It reads the video's page the way a browser does, which carries the
+    player's streams (window.__playinfo__), and asks the player's API when the page doesn't.
+    [] when the video has no separate audio (some old ones)."""
     try:
         found = PLAYINFO.search(_get(PAGE.format(bvid=bvid), cookies=_visitor_cookies()))
-        address = _smallest_audio((json.loads(found.group(1)).get("data") or {}).get("dash")
-                                  if found else None)
-        if address:
-            return address
+        addresses = _smallest_audio((json.loads(found.group(1)).get("data") or {}).get("dash")
+                                    if found else None)
+        if addresses:
+            return addresses
     except (Error, Blocked, ValueError, AttributeError, OSError):
         pass  # the page changed, refused or didn't answer: the API is the other way
     data = _request("/x/player/wbi/playurl", {"bvid": bvid, "cid": cid, "qn": 16, "fnval": 16,
@@ -563,18 +575,46 @@ def audio_url(bvid, cid):
     return _smallest_audio(data.get("dash"))
 
 
-def download(url, path, limit=MAX_DOWNLOAD):
-    """Save an audio stream to a file, waiting its turn like every request; raises Error
-    when it is bigger than limit bytes (the file is then removed)."""
-    _wait_turn()
-    try:
-        saved = _fetch_file(url, path, limit)
-    except urllib.error.HTTPError as error:
-        raise Error(f"the audio stream answered HTTP {error.code}") from None
-    if saved is None:
+def audio_url(bvid, cid):
+    """The first of audio_urls(), or None."""
+    return next(iter(audio_urls(bvid, cid)), None)
+
+
+def _server(url):
+    """The server of a stream's address, to say which one refused. The first part of a home
+    server's name (PCDN: *.mcdn.bilivideo.cn) is that home's address, so it is left out."""
+    host = urllib.parse.urlsplit(url).hostname or "?"
+    return "*." + host.split(".", 1)[1] if ".mcdn." in host else host
+
+
+def download(urls, path, limit=MAX_DOWNLOAD, bvid=None):
+    """Save an audio stream to a file as the player in a browser asks for it (bvid: the
+    video it plays in), waiting its turn like every request. urls is its address or a list
+    of them: when one server refuses, the next is asked. Raises Error when none gives it,
+    or when it is bigger than limit bytes (the file is then removed)."""
+    refused, trouble, big = [], None, False
+    for url in [urls] if isinstance(urls, str) else list(urls):
+        _wait_turn()
         try:
-            os.remove(path)
-        except OSError:
-            pass
+            saved = _fetch_file(url, path, limit, stream_headers(bvid))
+        except urllib.error.HTTPError as error:
+            refused.append(f"HTTP {error.code} from {_server(url)}")
+            continue
+        except (urllib.error.URLError, OSError) as error:  # that server didn't answer
+            trouble = error
+            continue
+        if saved is not None:
+            return saved
+        big = True  # the same stream on another server is as big
+        break
+    try:
+        os.remove(path)  # what a refused or cut request left, or the part of a big one
+    except OSError:
+        pass
+    if big:
         raise Error(f"the audio stream is bigger than {limit // 1_000_000} MB")
-    return saved
+    if refused:
+        raise Error("the audio stream answered " + "; ".join(refused))
+    if trouble:
+        raise trouble  # no server answered: the network, most likely; worth another try
+    raise Error("no address for the audio stream")
