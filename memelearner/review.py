@@ -482,12 +482,27 @@ def page(rows, picked, token, line=""):
     return PAGE.replace("__DATA__", text)
 
 
-class Report:
-    """The page, served on this computer until 完成 is clicked: report.url is its link."""
+class Refused(Exception):
+    """What a page's save() or done() raises to answer with an error: the HTTP code, and the
+    text the page shows."""
 
-    def __init__(self, rows, model=None, port=0, line="", again="py -m memelearner report"):
-        """again: what to run to open the report again later (it says so when it starts)."""
-        self.rows, self.model, self.line, self.again = rows, model, line, again
+    def __init__(self, code, text):
+        super().__init__(text)
+        self.code = code
+
+
+class Page:
+    """A page served on this computer (127.0.0.1) until 完成 is clicked, and only through its
+    link (page.url), which holds a random token, so another web page can't change anything.
+    A subclass says what it shows (html()), what a change does (save(), for POST /save) and
+    what 完成 does (done(), for POST /done; the bot stops after it). They run one at a time,
+    and raise Refused to answer with an error (ValueError: 400, a change that can't be)."""
+
+    name = "page"  # what run() calls it
+    again = ""  # what to run to open it again later
+    finished = "完成过了"  # what a change after 完成 is told
+
+    def __init__(self, port=0):
         self.token, self.result, self.lock = secrets.token_urlsafe(16), None, threading.Lock()
         self.server = http.server.ThreadingHTTPServer(("127.0.0.1", port), self._handler())
         self.server.daemon_threads = True
@@ -495,24 +510,40 @@ class Report:
         self.hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
         self.url = f"http://127.0.0.1:{port}/?t={self.token}"
 
+    def html(self):
+        raise NotImplementedError
+
+    def save(self, asked):
+        """A change the page sent (a dict); what to answer (a dict, {"saved": true} for
+        None)."""
+        raise NotImplementedError
+
+    def done(self):
+        """What 完成 does; its result (a dict) is the answer, and what run() returns."""
+        raise NotImplementedError
+
+    def stopped(self):
+        """What run() says when it is stopped with Ctrl+C."""
+        return "Stopped. Your choices so far are saved."
+
     def run(self, browser=True):
         """Serve the page (opening it in the browser) until 完成 is clicked, or Ctrl+C.
-        Returns finish()'s result, or None when it was stopped before."""
+        Returns done()'s result, or None when it was stopped before."""
         opened = browser and webbrowser.open(self.url)
-        print(("The report is open in your browser: " if opened else
-               "Open the report in your browser: ") + self.url)
+        print((f"The {self.name} is open in your browser: " if opened else
+               f"Open the {self.name} in your browser: ") + self.url)
         print("Every choice is saved as you make it. Click 完成 at the bottom when you're "
               f"done; or close this window and run {self.again} to go on later.")
         try:
             self.server.serve_forever(poll_interval=0.2)
         except KeyboardInterrupt:
-            print(f"Stopped. Your choices so far are saved in {review_file()}.")
+            print(self.stopped())
         finally:
             self.server.server_close()
         return self.result
 
     def _handler(self):
-        report = self
+        page = self
 
         class Handler(http.server.BaseHTTPRequestHandler):
             def log_message(self, format, *args):  # no line in the console for every click
@@ -532,18 +563,17 @@ class Report:
 
             def do_GET(self):
                 url = urllib.parse.urlsplit(self.path)
-                if (self.headers.get("Host") not in report.hosts or url.path != "/"
-                        or urllib.parse.parse_qs(url.query).get("t") != [report.token]):
+                if (self.headers.get("Host") not in page.hosts or url.path != "/"
+                        or urllib.parse.parse_qs(url.query).get("t") != [page.token]):
                     return self.reply(403, "Open the link the bot printed in its window.",
                                       "text/plain")
-                with report.lock:
-                    picked = chosen(report.rows)
-                self.reply(200, page(report.rows, picked, report.token, report.line),
-                           "text/html")
+                with page.lock:
+                    html = page.html()
+                self.reply(200, html, "text/html")
 
             def do_POST(self):
-                if (self.headers.get("Host") not in report.hosts
-                        or self.headers.get("X-Token") != report.token):
+                if (self.headers.get("Host") not in page.hosts
+                        or self.headers.get("X-Token") != page.token):
                     return self.error(403, "not the bot's page")
                 try:
                     length = int(self.headers.get("Content-Length") or 0)
@@ -555,31 +585,59 @@ class Report:
                     return self.error(400, "not JSON")
                 if self.path not in ("/save", "/done"):
                     return self.error(404, "no such thing")
-                with report.lock:
-                    if report.result is not None:
-                        return self.error(409, "完成过了：运行 py -m memelearner report 再打开")
-                    if self.path == "/save":
-                        try:
-                            choose(report.rows, asked.get("key"), asked.get("field"),
-                                   asked.get("value"))
-                        except ValueError as error:
-                            return self.error(400, str(error))
-                        except OSError as error:  # review.json open elsewhere, a full disk
-                            return self.error(500, f"存不进 {review_file()}：{error}")
-                        return self.reply(200, '{"saved": true}')
+                with page.lock:
+                    if page.result is not None:
+                        return self.error(409, page.finished)
                     try:
-                        report.result = finish(report.rows, report.model)
-                    except judging.ModelUnavailable as error:
-                        print(f"Couldn't ask a model to merge your notes: {error}.")
-                        return self.error(503, f"没有模型能合并你的补充（{error}），什么都没学。"
-                                          "你的选择都存着，过一会儿再点「完成」。")
-                    except (OSError, ValueError) as error:  # memes.json broken or open elsewhere
-                        print(f"Couldn't finish: {error!r}")
-                        return self.error(500, f"没完成：{error!r}。看一下 bot 的窗口。")
-                self.reply(200, json.dumps(report.result, ensure_ascii=False))
-                threading.Thread(target=report.server.shutdown, daemon=True).start()
+                        if self.path == "/save":
+                            answer = page.save(asked)
+                            return self.reply(200, json.dumps(
+                                {"saved": True} if answer is None else answer,
+                                ensure_ascii=False))
+                        page.result = page.done()
+                    except Refused as refused:
+                        return self.error(refused.code, str(refused))
+                    except ValueError as error:
+                        return self.error(400, str(error))
+                self.reply(200, json.dumps(page.result, ensure_ascii=False))
+                threading.Thread(target=page.server.shutdown, daemon=True).start()
 
         return Handler
+
+
+class Report(Page):
+    """The report, served on this computer until 完成 is clicked: report.url is its link."""
+
+    name = "report"
+    finished = "完成过了：运行 py -m memelearner report 再打开"
+
+    def __init__(self, rows, model=None, port=0, line="", again="py -m memelearner report"):
+        """again: what to run to open the report again later (it says so when it starts)."""
+        self.rows, self.model, self.line, self.again = rows, model, line, again
+        super().__init__(port)
+
+    def html(self):
+        return page(self.rows, chosen(self.rows), self.token, self.line)
+
+    def save(self, asked):
+        try:
+            choose(self.rows, asked.get("key"), asked.get("field"), asked.get("value"))
+        except OSError as error:  # review.json open elsewhere, a full disk
+            raise Refused(500, f"存不进 {review_file()}：{error}")
+
+    def done(self):
+        try:
+            return finish(self.rows, self.model)
+        except judging.ModelUnavailable as error:
+            print(f"Couldn't ask a model to merge your notes: {error}.")
+            raise Refused(503, f"没有模型能合并你的补充（{error}），什么都没学。"
+                          "你的选择都存着，过一会儿再点「完成」。")
+        except (OSError, ValueError) as error:  # memes.json broken or open elsewhere
+            print(f"Couldn't finish: {error!r}")
+            raise Refused(500, f"没完成：{error!r}。看一下 bot 的窗口。")
+
+    def stopped(self):
+        return f"Stopped. Your choices so far are saved in {review_file()}."
 
 
 PAGE = r"""<!doctype html>
