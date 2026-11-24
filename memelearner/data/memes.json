@@ -2158,7 +2158,7 @@
     "tone": "嘲讽",
     "how": "选手爱秀操作、亮表情或装高手却翻车送掉时，刷“喜欢装”嘲讽他",
     "template": "喜欢XX",
-    "who": "选手",
+    "who": "别的",
     "by": "deepseek/deepseek-flash",
     "of": "ddcc33d9a8",
     "checked": true
@@ -5648,7 +5648,7 @@
     ],
     "tone": "调侃",
     "how": "法师选英雄或出装偏保守、只堆保命装不敢输出时，刷「虎三件」调侃他打法怂",
-    "template": "XX三件",
+    "template": "XX虎三件",
     "who": "选手",
     "by": "deepseek/deepseek-flash",
     "of": "494df308f5",

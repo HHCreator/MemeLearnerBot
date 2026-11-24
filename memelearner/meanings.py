@@ -236,9 +236,9 @@ def _stand_in(error, rest=False, doing="merges", what="meanings"):
 
 class _Asker:
     """Asks a model a question with the instructions it was made with (the merging question
-    by default); once an online model can't be reached, judging.LOCAL_MODEL is asked
-    instead, from then on. doing and what say what the model does, for the line that says
-    so (uses.py asks it what the uses of memes are)."""
+    by default) or others; once an online model can't be reached, judging.LOCAL_MODEL is
+    asked instead, from then on. doing and what say what the model does, for the line that
+    says so (uses.py asks it what the uses of memes are, saying.py has it say memes)."""
 
     def __init__(self, model=None, instructions=MERGE, doing="merges", what="meanings"):
         self.model, self.checked = model or judging.MODEL, False
@@ -247,7 +247,10 @@ class _Asker:
     def _stand_in(self, error, rest=False):
         return _stand_in(error, rest, self.doing, self.what)
 
-    def __call__(self, question):
+    def __call__(self, question, instructions=None, temperature=None):
+        """The model's answer to a question (a dict, {} when it isn't JSON), with these
+        instructions instead of its own, and temperature (see judging._answer())."""
+        instructions = instructions or self.instructions
         if not self.checked:
             self.checked = True
             try:
@@ -255,10 +258,10 @@ class _Asker:
             except judging._Unreachable as error:  # no key, no balance, no answer
                 self.model = self._stand_in(error)
         try:
-            return judging._answer(self.instructions, question, self.model)
+            return judging._answer(instructions, question, self.model, temperature)
         except judging._Unreachable as error:  # the online model stopped answering
             self.model = self._stand_in(error, rest=True)
-            return judging._answer(self.instructions, question, self.model)
+            return judging._answer(instructions, question, self.model, temperature)
 
 
 def _merge_one(item, known, ask):

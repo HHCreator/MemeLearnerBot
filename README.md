@@ -35,6 +35,7 @@ py -m memelearner forget 笑死                        # undo accept or reject
 py -m memelearner memes                             # the memes learned so far
 py -m memelearner report                            # or mark, decide and learn in your browser
 py -m memelearner uses                              # when and how each learned meme is said
+py -m memelearner say "TheShy 一级被抓送了两个"        # the bot says memes that fit, by itself
 ```
 
 `accept` takes the games, a few example lines and their videos from the last run, and the
@@ -77,6 +78,8 @@ memelearner.explain()                   # read videos that explain those memes: 
 memelearner.watching()                  # what the model wasn't sure of yet
 memelearner.accept("绷不住了", meaning="笑得忍不住了")   # a candidate becomes a meme
 memelearner.reject("下路")              # not a meme: never list it again
+said = memelearner.say("TheShy 一级被抓送了两个")   # a few danmu lines with the memes that fit
+memelearner.rate(said, 0, "funny")      # its first line was funny: say more like it
 ```
 
 A meme is a dict:
@@ -113,8 +116,8 @@ Which model below), and sums up the videos for `explain()`; both raise
 `memelearner.ModelUnavailable` only when no model can be asked (Ollama isn't running or
 doesn't have it either).
 
-**Any language: the command line.** `memes`, `lookup`, `find`, `candidates` and `watching`
-take `--json` and print what the Python functions return, in UTF-8. `lookup` exits with 1 when
+**Any language: the command line.** `memes`, `lookup`, `find`, `candidates`, `watching`
+and `say` take `--json` and print what the Python functions return, in UTF-8. `lookup` exits with 1 when
 the phrase isn't a learned meme.
 
 ```
@@ -631,6 +634,69 @@ Apps get the use with each meme (`memelearner.memes()`, `lookup()`, the `--json`
 `memes.json`; `None` before it is written), and `memelearner.write_uses()` writes them from
 Python.
 
+## Saying memes by itself
+
+With the uses written, the bot can say memes without being told what to say: you say what
+is going on in a match, and it answers the way someone in the danmu who knows the memes
+would, with the memes it learned only:
+
+```
+py -m memelearner say "TheShy 一级被抓，送了两个"         # a few lines that fit it
+py -m memelearner say Chovy 又被单杀了 -n 3              # at most 3 (no quotes needed)
+py -m memelearner say "EDG 残局一打三" --game valorant   # the game, when it isn't plain
+py -m memelearner say "..." --json                      # for another program
+py -m memelearner say                                   # the page: say and rate, many times
+```
+
+```
+TheShy 一级被抓，送了两个  ->  打得烂、要输了 · 英雄联盟（LOL） · TheShy（选手）
+  1. theshy出    （wei出，XX出）
+  2. 阿一古，一级就送两个    （阿一古）
+```
+
+`说梗.bat` opens the page, to double-click. It takes a few seconds each time:
+
+1. **Judge.** The model gets what you wrote and the occasions of `data/occasions.txt`, and
+   says which occasions it is (up to 3), which game, and the players, teams, champions and
+   positions in it. A name must be in what you wrote, and the nickname table adds the
+   ones it knows there (大超 is Chovy) with their other nicknames.
+2. **Pick.** The learned memes whose use has those occasions fit. Twelve of them are drawn
+   by weight, so the same moment gets other memes next time: the best-fitting occasions
+   weigh most, and a meme weighs more when it is about someone in the moment (阿一占 for
+   TheShy: its meaning or how names him; such a meme may come even when its occasions
+   don't fit), when its template takes a player or team and one is in it, and when you
+   rated its lines funny in such moments; less when it was only seen in another game, when
+   its template wants a name and nobody is in the moment, and when you said its lines were
+   wrong in such moments.
+3. **Write.** The model gets the moment, the names and their nicknames, and the memes
+   drawn, each with its meaning, use, example lines and the lines you rated (the funny ones
+   to go by, the wrong ones not to). It writes short lines, each with another meme: as it
+   is, or on its template with a name from the moment (theshy出 from wei出). It may leave
+   memes out that don't fit, so there may be fewer lines than you asked for.
+4. **Check.** A line must say its meme: its phrase or a variant, or its template with a
+   name for XX. When someone is in the moment, the name for a player, team or champion must
+   be one of them or one of their nicknames (wei出 isn't about TheShy); else one the meme
+   has itself. The same goes for a name where XX goes next to a meme said as it is: when
+   Chovy is in the moment, 多兰好兄弟 doesn't pass for 好兄弟 (XX好兄弟). The bot knows a
+   name there by the nickname table and by the names two learned memes or more put in
+   their XX. A letter typed more times is the same meme (gggggg says ggg). At most 30
+   characters, and each line another meme. The model is asked once
+   more for the lines that don't pass, told why, and what still doesn't pass is left out
+   (`rejected`, with why). So a line never has a meme the bot didn't learn.
+
+On the page, type what's going on and click 出梗 as often as you like; each line shows the
+meme it says and what that means. Rate a line **好笑** (funny) or **用错了** (wrong), click
+again to take it back: it is kept at once in `memelearner/data/said.json`, with the moment
+it was said in, and steps 2 and 3 go by your ratings from then on. Like the report, the page
+is only served to this computer, through a link with a random token, and it only shows
+lines: it never sends danmu.
+
+`memelearner.say()` returns `{"situation", "when", "game", "names", "lines": [{"line",
+"meme", "template", "name"}], "rejected", "drawn", "model", "spent", "why"}` (`why` says
+why there are no lines, when there are none), and `memelearner.rate(said, index, rating)`
+rates line `index` of it. The model and the fallback to qwen3:14b are the judge's; it writes
+the lines a little more freely (temperature 1.0) than it judges, so they vary.
+
 ## Running by itself for days
 
 On Windows, the bot can run by itself for some days with Task Scheduler while you're away,
@@ -702,6 +768,8 @@ found, how many memes were explained, and the problems.
 | `memelearner/review.py` | the report in your browser: your marks and decisions, and what 完成 learns |
 | `memelearner/uses.py` | when and how each learned meme is said: the model writes it, you check it on a page |
 | `memelearner/data/occasions.txt` | the moments of a match a meme can be said in, which you edit (`uses.py` reads it) |
+| `memelearner/saying.py` | says memes by itself from what is going on in a match, and the page to rate its lines (`say`) |
+| `memelearner/data/said.json` | the lines you rated on that page (`saying.py` writes it; not there before your first rating) |
 | `memelearner/bilibili.py` | reads Bilibili, read only and anonymous |
 | `memelearner/store.py` | the learned and turned-down phrases in `data/memes.json` |
 | `memelearner/data/surf_sources.json` | each game's title words and seed videos |
@@ -711,6 +779,7 @@ found, how many memes were explained, and the problems.
 | `surf.py` | `py surf.py`, short for `py -m memelearner learn` |
 | `开始自动跑.bat` and the three beside it | `auto start`, `stop`, `status` and `report`, to double-click |
 | `梗的用法.bat` | `uses`, to double-click |
+| `说梗.bat` | `say`, to double-click: opens the page |
 
 The design notes, in Chinese like the translator's, are in [docs/DESIGN.md](docs/DESIGN.md).
 

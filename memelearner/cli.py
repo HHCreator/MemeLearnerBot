@@ -18,6 +18,8 @@
     py -m memelearner report                   the report in your browser: mark, decide, then 完成
     py -m memelearner live-report              live-phrases, judge and explain, then the report
     py -m memelearner uses                     a model writes when and how each meme is said
+    py -m memelearner say "TheShy 一级被抓送了两个"   a few danmu lines with the memes that fit
+    py -m memelearner say                      the page: say what's going on, rate the lines
     py -m memelearner sources 阿一古 --explain   which search engines and wikis explain some memes
     py -m memelearner auto start               run by itself for days (Windows Task Scheduler)
     py -m memelearner auto extend --days 4     ... for 4 days from its start instead
@@ -25,7 +27,7 @@
 
 py surf.py is short for learn, with the same options (py -m memelearner learn --help), and
 learn --judge also judges what it found (learn --explain then also reads videos that explain
-the memes, and judges them again). candidates, watching, memes, lookup and find take
+the memes, and judges them again). candidates, watching, memes, lookup, find and say take
 --json to print JSON for another program (UTF-8) instead of lines for people, in the shapes
 __init__.py describes; lookup exits with 1 when the phrase isn't a learned meme. With
 MEMELEARNER_LOG set to a file, what a command prints goes to that file too (and only there
@@ -345,6 +347,34 @@ def _uses(args):
     if result:
         print(f"Of {result['memes']} memes, {result['uses']} have a use, and you checked "
               f"{result['checked']}.")
+
+
+def _say(args):
+    """A few lines with the memes that fit what's going on; with nothing said about, the page
+    to say and rate them."""
+    from . import saying
+    if not args.situation:
+        try:
+            page = saying.SayPage(args.port, args.model)
+        except OSError as error:
+            sys.exit(f"Couldn't open the page on port {args.port}: {error}")
+        result = page.run(not args.no_browser)
+        if result:
+            print(f"It said {result['lines']} lines in {result['said']} moments; you rated "
+                  f"{result['funny']} funny and {result['wrong']} wrong (kept in "
+                  f"{saying.SAID_FILE}).")
+        return
+    try:
+        result = saying.say(" ".join(args.situation), args.count, args.game, args.model)
+    except ValueError as error:  # nothing said, occasions.txt, a count that can't be
+        sys.exit(str(error))
+    except ModelUnavailable as error:
+        print(f"Couldn't ask a model: {error}.")
+        sys.exit(1)
+    if args.json:
+        _print_json(result)
+    else:
+        print(saying.show(result))
 
 
 def _live_report(args):
@@ -698,6 +728,21 @@ def parser():
     _report_options(said, "the model that writes the uses (default %(default)s; "
                     f"{judging.LOCAL_MODEL} when it can't be reached)")
     said.set_defaults(run=_uses)
+
+    speak = sub.add_parser("say", help="a few danmu lines with the learned memes that fit what "
+                           "is going on in a match; without it, the page to say and rate them")
+    speak.add_argument("situation", nargs="*", metavar="WHAT",
+                       help="what is going on in the match, in a sentence (no quotes needed); "
+                       "leave it out to open the page")
+    speak.add_argument("-n", "--count", type=int, default=5, metavar="N",
+                       help="lines to say, at most (default %(default)s)")
+    speak.add_argument("--game", choices=sorted(judging.GAMES),
+                       help="the game it is in (default: the model tells from what you wrote)")
+    speak.add_argument("--json", action="store_true",
+                       help="print what it said as JSON for another program (UTF-8)")
+    _report_options(speak, "the model that judges what's going on and writes the lines "
+                    f"(default %(default)s; {judging.LOCAL_MODEL} when it can't be reached)")
+    speak.set_defaults(run=_say)
 
     look = sub.add_parser("sources", help="ask every search engine and wiki about some "
                           "phrases, to see which ones explain memes from this computer")

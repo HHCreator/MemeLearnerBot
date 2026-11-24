@@ -101,6 +101,7 @@ LOCAL_MODEL = "qwen3:14b"  # the best of them that runs on this computer: it jud
 MODEL = os.environ.get("MEMELEARNER_MODEL", "").strip() or DEFAULT_MODEL
 TIMEOUT = 300  # seconds for one answer; the first one also loads the model
 ANSWER_TOKENS = 1000  # most an online model may write in one answer (they take about 200)
+TEMPERATURE = 0.2  # how freely a model answers: low, so the judge says the same each time
 RETRIES = 3  # times an online model is asked again when it is busy or answers blank
 RETRY_WAIT = 5  # seconds before asking it again, doubling each time
 BUSY = (429, 500, 502, 503, 504)  # what an online API answers when it is busy: ask again
@@ -281,15 +282,17 @@ def check_model(model):
         raise ModelUnavailable(f"the model {model} isn't downloaded: ollama pull {model}{hint}")
 
 
-def _ask(messages, model):
+def _ask(messages, model, temperature=TEMPERATURE):
     """Send a chat to the model and return the reply text. Tests replace this."""
-    return _ask_online(messages, model) if online(model) else _ask_ollama(messages, model)
+    if online(model):
+        return _ask_online(messages, model, temperature)
+    return _ask_ollama(messages, model, temperature)
 
 
 _always_thinks = set()  # models that refused "think": false in this run; it isn't sent again
 
 
-def _ask_ollama(messages, model):
+def _ask_ollama(messages, model, temperature=TEMPERATURE):
     """Send a chat to Ollama and return the reply text."""
     body = {
         "model": model,
@@ -297,7 +300,7 @@ def _ask_ollama(messages, model):
         "stream": False,
         "format": "json",  # Ollama makes the model answer with valid JSON
         "think": False,  # DeepSeek-R1 would otherwise "think" out loud first, which is slow
-        "options": {"temperature": 0.2, "num_ctx": 4096},
+        "options": {"temperature": temperature, "num_ctx": 4096},
     }
     if model in _always_thinks:
         del body["think"]
@@ -327,7 +330,7 @@ def _ask_ollama(messages, model):
 _no_json_mode = set()  # online models whose API turned JSON mode down in this run
 
 
-def _ask_online(messages, model):
+def _ask_online(messages, model, temperature=TEMPERATURE):
     """Send a chat to an online model's API and return the reply text."""
     url, _, name = online(model)
     body = {
@@ -337,7 +340,7 @@ def _ask_online(messages, model):
         "response_format": {"type": "json_object"},  # it answers with valid JSON
         "thinking": {"type": "disabled"},  # DeepSeek thinks out loud first unless told not
                                            # to, which is slower and costs more
-        "temperature": 0.2,
+        "temperature": temperature,
         "max_tokens": ANSWER_TOKENS,
     }
     if model in _no_json_mode:
@@ -423,10 +426,12 @@ def _count(model, read, cached, wrote):
     usage[model].update(calls=1, input=read or 0, cached=cached or 0, output=wrote or 0)
 
 
-def _answer(instructions, question, model):
-    """The model's JSON answer to a question (a dict), or {} when it isn't one."""
-    reply = _ask([{"role": "system", "content": instructions},
-                  {"role": "user", "content": json.dumps(question, ensure_ascii=False)}], model)
+def _answer(instructions, question, model, temperature=None):
+    """The model's JSON answer to a question (a dict), or {} when it isn't one. temperature:
+    how freely it answers (default TEMPERATURE; saying.py has it write lines more freely)."""
+    messages = [{"role": "system", "content": instructions},
+                {"role": "user", "content": json.dumps(question, ensure_ascii=False)}]
+    reply = _ask(messages, model) if temperature is None else _ask(messages, model, temperature)
     found = re.search(r"\{.*\}", reply or "", re.S)
     try:
         answer = json.loads(found.group(0) if found else reply)

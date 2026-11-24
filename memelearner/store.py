@@ -48,6 +48,16 @@ NOT_TEXT = re.compile(r"[^0-9a-z一-鿿]+")
 LATIN = re.compile(r"[0-9a-z]")
 
 
+def shown(path):
+    """One of the bot's files the way a page shows it: from the folder the bot is in
+    (memelearner/data/said.json), or the whole path when it is on another drive (Windows
+    has no path from G: to C:)."""
+    try:
+        return os.path.relpath(path, os.path.dirname(HERE))
+    except ValueError:
+        return path
+
+
 def normal(text):
     """A phrase the way the bot writes it: ＹＹＤＳ -> yyds, 绷不住了！ -> 绷不住了."""
     return NOT_TEXT.sub("", unicodedata.normalize("NFKC", text or "").lower())
