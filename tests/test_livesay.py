@@ -168,7 +168,7 @@ class LiveSayTest(unittest.TestCase):
         watcher, spoken = self.watcher(), []
 
         def speak(*args):
-            spoken.append(set(args[5]))
+            spoken.append((set(args[5]), set(args[6])))
             return real(*args)
 
         real = saying.speak
@@ -182,7 +182,9 @@ class LiveSayTest(unittest.TestCase):
             for item in crowd():
                 watcher.heard(item)
             watcher.look()
-        self.assertEqual(spoken, [set(), {"wei出", "阿一古"}, set()])
+        # Said a moment ago, and in the last looks; then too long ago, but still in the last looks
+        self.assertEqual(spoken, [(set(), set()), ({"wei出", "阿一古"}, {"wei出", "阿一古"}),
+                                  (set(), {"wei出", "阿一古"})])
         befores = [question["before"] for question in self.model.of("look")]
         self.assertEqual(befores, ["", SEEN["situation"], ""])  # too long ago the last time
         memes = store.load()["memes"]
@@ -191,6 +193,10 @@ class LiveSayTest(unittest.TestCase):
         self.assertEqual(saying.draw(memes, moment, rng=Fixed())[:2], ["阿一占", "wei出"])
         self.assertEqual(saying.draw(memes, moment, rng=Fixed(), recent={"阿一占"})[:2],
                          ["wei出", "阿一占"])  # 5 x AGAIN = 1, under wei出's 1.875
+        drawn = saying.draw(memes, moment, rng=Fixed(), last={"阿一占"})
+        self.assertEqual(drawn[0], "wei出")
+        self.assertEqual(drawn[-1], "阿一占")  # after all the others, however well it fits
+        self.assertEqual(sorted(drawn), sorted(saying.draw(memes, moment, rng=Fixed())))
 
     def test_a_model_that_cant_be_asked_is_said_once_and_it_goes_on_listening(self):
         watcher = self.watcher()

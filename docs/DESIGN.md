@@ -168,7 +168,7 @@ flowchart TD
 - **听**（`live.record(heard=...)`）。和 `live` 一样录直播间（断了自己重连，弹幕照样存进 `surf/live/`，以后找新说法用），每条弹幕同时交给 `Watcher.heard()`，留最近一分钟的。
 - **多久看一次**（`Watcher.run()`、`look()`）。每 `EVERY`（30）秒看一次最近 `WINDOW`（45）秒的弹幕；上次看完以后观众自己发的（不算礼物、抽奖和表情）不到 `MIN_DANMU`（8）条就不看，不问模型。直播间冷清的时候一个 token 都不花。
 - **看出场面**（`JUDGE`、`judge()`）。模型拿到直播间标题、弹幕（同一句只给一次，后面写几个人发了：「下雨了 ×12」，发得多的在前，最多 `DANMU_SHOWN` 句，每句最多 `DANMU_LENGTH` 个字）和上次看出来的事（`BEFORE` 秒以内的，比赛可能已经往下走了）。它用一句话说比赛里现在发生了什么，再挑场面、游戏和名字，跟第 3.9 节的判断一样，只是名字要在弹幕或标题里出现过（模型自己加的人不算）。弹幕里看不出比赛在发生什么（大家在问好、聊别的、刷礼物）就写空的，这次不说。
-- **说**（`saying.speak()`）。拿这句话走第 3.9 节的第 2 到 4 步：抽梗、写、检查，最多 `COUNT`（3）句。最近 `RECENT`（5 分钟）说过的梗乘 `saying.AGAIN`（0.2），别的梗先来，不会一直说同几个。
+- **说**（`saying.speak()`）。拿这句话走第 3.9 节的第 2 到 4 步：抽梗、写、检查，最多 `COUNT`（3）句。最近 `RECENT`（5 分钟）说过的梗乘 `saying.AGAIN`（0.2），别的梗先来；上 `LAST`（2）次说过的梗排在所有别的梗后面，合适的梗不够 `CANDIDATES` 个才轮到它们，所以不会一直说同几个。只乘 0.2 不够：加油、BP 这种场面合适的梗本来就不多，2026-11-24 拿录下的两场比赛重放（BLG vs T1、S16 决赛，各 6 分钟、12 次），把光借给ig 在 12 次里出了 5 次，3 次是连着的。
 - **给悬浮窗**（`Server`）。只开在 127.0.0.1 的 `PORT`（8766），`GET /lines?after=N` 给第 N 轮以后说的（最多留 `KEPT` 轮）：直播间、什么时候开始的（`started`：重开以后轮数又从 1 数，悬浮窗看到它变了就从头问）、多久看一次、最近一分钟的弹幕数，每轮的时间、场面那句话、场面、游戏、名字、每句弹幕和它的梗、梗的意思，没说的写为什么。Host 不是 127.0.0.1 或 localhost 的不回（网页的 DNS 重绑定拿不到）。没有改东西的请求，所以不用令牌。翻译器的悬浮窗每几秒问一次，问不到就当 live-say 没开，「梗」栏不显示。
 - **窗口里**。每轮打印时间、场面和说的句子；模型用不了只说一次，弹幕还接着录，模型回来了接着说。
 - **花多少**。每看一次问模型两次（看场面、写），没过检查再问一次，跟一次 `say` 差不多；DeepSeek 每 30 秒几千 token，直播间冷清的时候不花。
@@ -255,7 +255,7 @@ flowchart TD
 | 每个梗多存几句例句 | `store.py` 的 `EXAMPLES` |
 | 梗的场面不够细或者不对 | 改 `data/occasions.txt`（加场面、改说明），再运行 `py -m memelearner uses`：场面全被去掉的梗会重新标；要全部重标就加 `--again`（打了勾的不改） |
 | 自己说梗：说几句、抽几个梗、一句多长 | `saying.py` 开头的 `COUNT`、`CANDIDATES`、`LINE_LENGTH`、`LINES`（给模型看几句例句）、`FUNNY_SHOWN`、`WRONG_SHOWN` |
-| 看直播出梗：多久看一次、看多少弹幕、说几句 | `livesay.py` 开头的 `EVERY`（也可以 `--every`）、`WINDOW`、`MIN_DANMU`、`DANMU_SHOWN`、`COUNT`（也可以 `-n`）、`RECENT`；刚说过的梗少来多少：`saying.AGAIN` |
+| 看直播出梗：多久看一次、看多少弹幕、说几句 | `livesay.py` 开头的 `EVERY`（也可以 `--every`）、`WINDOW`、`MIN_DANMU`、`DANMU_SHOWN`、`COUNT`（也可以 `-n`）、`RECENT`、`LAST`；刚说过的梗少来多少：`saying.AGAIN` |
 | 自己说梗：更爱挑哪些梗 | `saying.py` 开头的 `ABOUT`、`UNFIT_ABOUT`、`OTHER_GAME`、`TAKES_NAME`、`NAMELESS`、`FUNNY`、`WRONG`、`RATED`、`DRAW_POWER`（越大越只挑最合适的，越小越多样）；说法更稳或更多变：`WRITE_TEMPERATURE` |
 | 梗的用法写得更多或更少 | `uses.py` 开头的 `MAX_WHEN`（最多几个场面）、`HOW_LENGTH`（how 最多几个字）、`LINES`（给模型看几句例句）、`TONES`、`WHO` |
 | 模型判断更严或更松 | `judging.py` 开头的 `LINES`、`EXPLANATIONS`、`MIN_FITS`、`FIT_SHARE`、`MIN_TEST_LINES`、`AGAIN_PEOPLE` |

@@ -314,17 +314,18 @@ def weigh(phrase, entry, moment, said=()):
     return weight * FUNNY ** min(rated["funny"], RATED) * WRONG ** min(rated["wrong"], RATED)
 
 
-def draw(memes, moment, said=(), rng=random, limit=CANDIDATES, recent=()):
+def draw(memes, moment, said=(), rng=random, limit=CANDIDATES, recent=(), last=()):
     """Step 2: up to limit learned memes (memes: memes.json's) for a moment, drawn by their
     weight (weigh()) without drawing one twice; the first drawn first. recent: memes said a
-    moment ago, which weigh AGAIN times as much."""
+    moment ago, which weigh AGAIN times as much; last: memes said just now, which come only
+    after all the others (when fewer than limit others fit)."""
     keyed = []  # Efraimidis and Spirakis: the ones with the highest random ** (1 / weight)
     for phrase, entry in memes.items():
         weight = (weigh(phrase, entry, moment, said) *
                   (AGAIN if phrase in recent else 1)) ** DRAW_POWER
         if weight > 0:
-            keyed.append((rng.random() ** (1 / weight), phrase))
-    return [phrase for _, phrase in sorted(keyed, reverse=True)[:limit]]
+            keyed.append((phrase not in last, rng.random() ** (1 / weight), phrase))
+    return [phrase for *_, phrase in sorted(keyed, reverse=True)[:limit]]
 
 
 # -- 3. write and 4. check ------------------------------------------------------------------
@@ -553,12 +554,12 @@ def spender(ask):
     return spent
 
 
-def speak(situation, moment, ask, count=COUNT, rng=None, recent=()):
+def speak(situation, moment, ask, count=COUNT, rng=None, recent=(), last=()):
     """Steps 2 to 4 for a moment judged from situation (judge(), with occasions): {"drawn",
     "lines", "rejected", "why"} as say() returns them. recent: memes said a moment ago, drawn
-    less (draw())."""
+    less; last: memes said just now, drawn after all others (draw())."""
     memes, said = store.load()["memes"], rated()
-    drawn = draw(memes, moment, said, rng or random, recent=recent)
+    drawn = draw(memes, moment, said, rng or random, recent=recent, last=last)
     if not drawn:
         return {"drawn": [], "lines": [], "rejected": [],
                 "why": f"学过的梗里，没有{'、'.join(moment['when'])}的时候说的"}

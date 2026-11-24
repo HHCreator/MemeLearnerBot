@@ -722,7 +722,9 @@ last looked (gifts and stickers don't count):
    (a name must be in the danmu or the title). When the danmu don't tell (people say hello,
    talk about something else, send gifts), it says nothing that time.
 2. **Steps 2 to 4 above,** for that sentence: 3 lines at most, checked the same way. Memes it
-   said in the last 5 minutes are drawn less, so the lines change.
+   said in the last 5 minutes are drawn less, and the ones of its last 2 looks only when too
+   few others fit, so the lines change (on two recorded matches without that, 把光借给ig came
+   in 5 of 12 looks).
 
 ```
 22:31:05  TheShy 一级被抓，送了两个  ->  打得烂、要输了 · 英雄联盟（LOL） · TheShy（选手）
