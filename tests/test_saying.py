@@ -250,7 +250,7 @@ class SayingTest(unittest.TestCase):
     def says(self, line, phrase, situation=THESHY, judged=JUDGED):
         memes = store.load()["memes"]
         said, why = saying.says(line, phrase, memes[phrase], self.moment(situation, judged),
-                                situation, saying._named(memes))
+                                situation)  # the names it knows: memes.json's and the table's
         return said if said else why
 
     def test_a_line_must_say_its_meme_as_learned_or_on_its_template(self):
@@ -453,7 +453,9 @@ class SayingTest(unittest.TestCase):
                 return error.code, json.loads(error.read().decode("utf-8"))
 
         ran = {}
-        thread = threading.Thread(target=lambda: ran.update(result=page.run(browser=False)))
+        thread = threading.Thread(target=lambda: ran.update(result=page.run(browser=False)),
+                                  daemon=True)  # a test that fails never keeps the run going
+        self.addCleanup(lambda: thread.is_alive() and page.server.shutdown())
         with contextlib.redirect_stdout(io.StringIO()) as printed:
             thread.start()
             status, html = ask(page.url)
@@ -492,6 +494,12 @@ class SayingTest(unittest.TestCase):
         self.assertEqual(ran["result"], answer)
         self.assertIn(page.url, printed.getvalue())
         self.assertIn("theshy出", printed.getvalue())  # what it said, in the window too
+        # said.json on another drive than the bot (Windows: the test's on C:, the bot on G:)
+        with mock.patch.object(os.path, "relpath", side_effect=ValueError("another drive")):
+            html = saying.page("token")
+        start = html.index('<script type="application/json" id="data">') + 42
+        self.assertEqual(json.loads(html[start:html.index("</script>", start)])["file"],
+                         saying.SAID_FILE)
 
     def test_the_command_says_or_opens_the_page(self):
         self.model.written = [{"lines": [{"meme": "阿一占", "line": "阿一占"}]}]

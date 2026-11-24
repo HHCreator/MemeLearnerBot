@@ -373,11 +373,14 @@ def _on(template, name):
                                                  unicodedata.normalize("NFKC", template)))
 
 
-def says(line, phrase, entry, moment, situation, others=()):
+def says(line, phrase, entry, moment, situation, others=None):
     """Step 4 for one line and the meme it says it has: ({"template", "name"}, "") when the
     line says it, "" for both when it has the phrase or a variant as it is; (None, why not)
-    when it doesn't, in Chinese for the model. others: the names the bot knows (_named()),
-    for one where XX goes next to a phrase said as it is (多兰好兄弟 on XX好兄弟)."""
+    when it doesn't, in Chinese for the model. others: the names the bot knows (_named(),
+    of memes.json's memes when not given), for one where XX goes next to a phrase said as
+    it is (多兰好兄弟 on XX好兄弟)."""
+    if others is None:
+        others = _named(store.load()["memes"])
     use = entry.get("use") or {}
     template, who = use.get("template") or "", use.get("who") or ""
     texts, keys, situation = _texts(line), _keys(moment["names"]), store.normal(situation)
@@ -413,7 +416,7 @@ def says(line, phrase, entry, moment, situation, others=()):
     return None, f"没有照原样说「{shapes}」"
 
 
-def check(item, drawn, memes, moment, situation, used, others=()):
+def check(item, drawn, memes, moment, situation, used, others=None):
     """Step 4 for one line the model wrote ({"meme", "line"}): ({"line", "meme", "template",
     "name"}, "") when it passes, else (None, why not). drawn: the memes it could say; used:
     the ones said already; others: as for says(). A line that names one meme but says
@@ -625,7 +628,7 @@ def page(token):
     counted = collections.Counter(line["rating"] for line in rated())
     data = {"token": token, "games": games(), "count": COUNT, "most": CANDIDATES,
             "funny": counted["funny"], "wrong": counted["wrong"],
-            "file": os.path.relpath(SAID_FILE, os.path.dirname(store.HERE))}
+            "file": store.shown(SAID_FILE)}
     text = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")  # never ends the tag
     return PAGE.replace("__DATA__", text)
 

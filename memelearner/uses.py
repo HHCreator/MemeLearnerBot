@@ -404,7 +404,7 @@ def page(rows, table, token):
     """The page's HTML, with the rows and the lists to pick from in it."""
     data = {"token": token, "rows": rows, "tones": TONES, "who": WHO,
             "occasions": [{"name": name, "what": what} for name, what in table.items()],
-            "file": os.path.relpath(OCCASIONS_FILE, os.path.dirname(store.HERE))}
+            "file": store.shown(OCCASIONS_FILE)}
     text = json.dumps(data, ensure_ascii=False).replace("<", "\\u003c")  # never ends the tag
     return PAGE.replace("__DATA__", text)
 
