@@ -139,7 +139,8 @@ class LiveSayTest(unittest.TestCase):
         self.assertEqual(self.model.of("write")[0]["count"], 2)
         self.assertIn("1. TheShy出", self.out.getvalue())
         got = watcher.lines()
-        self.assertEqual((got["room"], got["every"], got["heard"]), (ROOM, livesay.EVERY, 10))
+        self.assertEqual((got["room"], got["started"], got["every"], got["heard"]),
+                         (ROOM, 1_800_000_000.0, livesay.EVERY, 10))
         self.assertEqual(got["rounds"][0]["lines"][1]["line"], "阿一古 一级就送")
         self.assertNotIn("rejected", got["rounds"][0])
         self.assertEqual(watcher.lines(after=1)["rounds"], [])

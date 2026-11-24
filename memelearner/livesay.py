@@ -23,8 +23,9 @@ What it says is printed, and served on this computer for other programs, like th
 window of the translator (StupidTransilator), which shows the lines to copy:
 
     GET http://127.0.0.1:8766/lines?after=N
-    {"room": {"name", "title", "link"}, "every": seconds between two looks, "heard": danmu
-     from people in the last minute, "rounds": [round, ...]}: the rounds after round N, the
+    {"room": {"name", "title", "link"}, "started": when it started (unix time; a new one
+     counts rounds from 1 again), "every": seconds between two looks, "heard": danmu from
+     people in the last minute, "rounds": [round, ...]}: the rounds after round N, the
      newest last (KEPT at most), each {"id", "at": unix time, "situation": what it saw, or "",
      "when", "game", "names", "lines": [{"line", "meme", "meaning", "template", "name"}],
      "why": why there are no lines, or "", "model", "spent"}
@@ -142,6 +143,7 @@ class Watcher:
         self.before = ("", 0.0)  # what it saw last, and when
         self.last_error = ""
         self.next_id = 1
+        self.started = clock()
 
     def heard(self, item):
         """Take one danmu as it comes (live.Recording calls it)."""
@@ -231,8 +233,8 @@ class Watcher:
                       for round_ in self.rounds if round_["id"] > after]
         for round_ in rounds:
             del round_["rejected"], round_["drawn"]
-        return {"room": dict(self.room), "every": self.every, "heard": self.heard_lately(),
-                "rounds": rounds}
+        return {"room": dict(self.room), "started": self.started, "every": self.every,
+                "heard": self.heard_lately(), "rounds": rounds}
 
 
 class Server(http.server.ThreadingHTTPServer):

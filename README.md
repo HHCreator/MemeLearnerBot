@@ -731,8 +731,8 @@ last looked (gifts and stickers don't count):
 ```
 
 Other programs on this computer get the lines from `http://127.0.0.1:8766/lines?after=N`:
-`{"room": {"name", "title", "link"}, "every", "heard": danmu from people in the last minute,
-"rounds": [...]}`, each round after round N being `{"id", "at", "situation", "when", "game",
+`{"room": {"name", "title", "link"}, "started", "every", "heard": danmu from people in the
+last minute, "rounds": [...]}` (a new `started` counts rounds from 1 again), each round after round N being `{"id", "at", "situation", "when", "game",
 "names", "lines": [{"line", "meme", "meaning", "template", "name"}], "why", "model",
 "spent"}`. Each look asks the model twice, about as much as one `say`; with DeepSeek that is
 a few thousand tokens every 30 seconds while the room is busy, and nothing while it is quiet.
